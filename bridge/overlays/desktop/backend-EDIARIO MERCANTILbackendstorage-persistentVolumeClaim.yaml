@@ -1,0 +1,9 @@
+#! backend-E:\DIARIO MERCANTIL\backend\storage-persistentVolumeClaim.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: backend-e--diario-mercantil-backend-storage
+    namespace: diariomercantil
+spec:
+    storageClassName: "hostpath" # see docker/desktop-storage-provisioner

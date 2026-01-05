@@ -1,0 +1,104 @@
+services:
+  backend:
+    # Service for the backend API
+    image: diario-mercantil-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: dashboard-backend
+    restart: unless-stopped
+    volumes:
+      - ./backend/storage:/var/www/html/storage
+    ports:
+      - "3000:9000"
+    environment:
+      APP_ENV: production
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: diario_mercantil
+      DB_USERNAME: mercantil_user
+      DB_PASSWORD: secure_password_2025
+      UPLOAD_DIR: /var/www/html/storage/uploads
+      RESULT_DIR: /var/www/html/storage/results
+    depends_on:
+      - db
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+
+  frontend:
+    image: diario-mercantil-frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: dashboard-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app-network
+
+  db:
+    image: mysql:8.0
+    container_name: dashboard-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_password_2025
+      MYSQL_DATABASE: diario_mercantil
+      MYSQL_USER: mercantil_user
+      MYSQL_PASSWORD: secure_password_2025
+    volumes:
+      - db_data:/var/lib/mysql
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - app-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: dashboard-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db_data:

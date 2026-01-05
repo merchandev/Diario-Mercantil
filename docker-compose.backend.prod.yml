@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: dashboard-backend
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/storage:/var/www/html/storage
+    ports:
+      - "8000:8000"

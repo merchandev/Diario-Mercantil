@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Protected PDF viewer - prevent selection and downloads */
+.pdf-viewer-protected,
+.pdf-viewer-protected * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+.pdf-viewer-protected iframe {
+  pointer-events: none !important;
+}
+
+/* Prevent printing via CSS */
+@media print {
+  .pdf-viewer-protected {
+    display: none !important;
+  }
+}
+
+:root { color-scheme: light; }
+.card { @apply bg-white rounded-2xl shadow-sm border border-slate-200; }
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-3xl px-4 h-10 text-sm font-semibold transition active:scale-[0.99]; }
+.btn-primary { @apply bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800; }
+.btn-secondary { @apply bg-slate-800 text-white hover:bg-slate-900; }
+.btn-danger { @apply bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800; }
+
+/* Animación de transición entre pasos (fade + slide) */
+@keyframes fadeSlide {
+	from { opacity: 0; transform: translateY(14px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+.step-anim { animation: fadeSlide .35s ease; }
+
+/* Animación para modales */
+@keyframes fadeIn {
+	from { opacity: 0; transform: scale(0.95); }
+	to { opacity: 1; transform: scale(1); }
+}
+.animate-fadeIn { animation: fadeIn .2s ease-out; }
+.btn-outline { @apply border border-slate-300 text-slate-700 hover:bg-slate-50; }
+.btn-ghost { @apply text-slate-700 hover:bg-slate-100; }
+.btn-icon { @apply w-10 h-10 p-0 rounded-3xl inline-grid place-items-center; }
+.input { @apply border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300; }
+select.input { @apply appearance-none pr-10; }
+.pill { @apply px-2 py-1 rounded-full text-xs font-medium; }

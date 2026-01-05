@@ -1,0 +1,49 @@
+#! backend-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: backend
+    namespace: diariomercantil
+    labels:
+        com.docker.compose.project: diariomercantil
+        com.docker.compose.service: backend
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: diariomercantil
+            com.docker.compose.service: backend
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: diariomercantil
+                com.docker.compose.service: backend
+                com.docker.compose.network.app-network: "true"
+        spec:
+            restartPolicy: Always
+            containers:
+                - name: dashboard-backend
+                  image: diariomercantil-backend
+                  imagePullPolicy: IfNotPresent
+                  env:
+                    - name: APP_ENV
+                      value: "production"
+                    - name: DB_PATH
+                      value: "/var/www/html/storage/database.sqlite"
+                    - name: RESULT_DIR
+                      value: "/var/www/html/storage/results"
+                    - name: UPLOAD_DIR
+                      value: "/var/www/html/storage/uploads"
+                  ports:
+                    - name: backend-8000
+                      containerPort: 8000
+                  volumeMounts:
+                    - name: var-www-html-storage
+                      mountPath: /var/www/html/storage
+            volumes:
+                - name: var-www-html-storage
+                  hostPath:
+                    path: E:\DIARIO MERCANTIL\backend\storage

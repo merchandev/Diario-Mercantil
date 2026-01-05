@@ -1,0 +1,62 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dashboard-backend
+    volumes:
+      - ./backend:/var/www/html
+      - ./backend/storage:/var/www/html/storage
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: local
+      # Use persistent database inside storage directory
+      DB_PATH: /var/www/html/storage/database.sqlite
+      UPLOAD_DIR: /var/www/html/storage/uploads
+      RESULT_DIR: /var/www/html/storage/results
+      MAX_FILE_MB: 500
+      ALLOWED_TYPES: csv,xlsx,json,pdf,zip
+      SSE_RETRY_MS: 2000
+      # Enable FX fallback provider when BCV site hides values behind JS
+      BCV_FALLBACK: "1"
+      # Optional: override fallback base URL
+      # BCV_FALLBACK_URL: https://api.exchangerate.host/latest
+      # Initial admin seeding (used once if user does not exist)
+      # Super admin requested by client
+      ADMIN_DOCUMENT: merchandev
+      ADMIN_PASSWORD: 'G0ku*1896'
+      ADMIN_NAME: "Super Administrador"
+      ADMIN_FORCE_RESET: "1"
+      # Feature flags
+      RAPTOR_MINI_PREVIEW: "1"
+    command: php -S 0.0.0.0:8000 -t public
+    healthcheck:
+      test: ["CMD-SHELL", "php -r 'exit(file_get_contents(\"http://127.0.0.1:8000/api/ping\")===false?1:0);'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dashboard-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_BACKEND_URL: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173 > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s

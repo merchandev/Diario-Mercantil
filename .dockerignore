@@ -1,0 +1,44 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Scripts and development files
+*.ps1
+pack_for_vps.ps1
+fix-encoding.ps1
+
+# Node modules (if any in root)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment files
+.env.local
+.env.*.local
+
+# Backend build artifacts (if building from root)
+backend/vendor/
+backend/node_modules/
+backend/.env
+
+# Frontend build artifacts (if building from root)  
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.*.local
