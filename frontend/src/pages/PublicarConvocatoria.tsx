@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
-import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, updateLegal, uploadFiles } from '../lib/api'
-import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD } from '../lib/constants'
+import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegal, updateLegal, uploadFiles, type LegalRequest } from '../lib/api'
+import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, BANCOS_VENEZUELA } from '../lib/constants'
 
 const TIPO_CONV_OPTS = [
   'Asamblea Ordinaria de accionistas o socios',
@@ -20,6 +20,20 @@ export default function PublicarConvocatoria() {
   const [f1, setF1] = useState<any>({
     tipo_sociedad: '', tipo_convocatoria: '', nombre: '', rif: '', estado: '', oficina: '', tomo: '', numero: '', anio: '', expediente: '', fecha: '', representante: '', ci_rep: ''
   })
+
+  // Resume draft logic
+  useEffect(() => {
+    listLegal({ status: 'Borrador', pub_type: 'Convocatoria', limit: 1 }).then(res => {
+      if (res && res.items && res.items.length > 0) {
+        const draft = res.items[0]
+        console.log('📝 Resuming draft:', draft.id)
+        setRequestId(draft.id)
+        if (draft.meta) {
+          setF1((prev: any) => ({ ...prev, ...draft.meta }))
+        }
+      }
+    }).catch(console.error)
+  }, [])
 
   const [registrosDisponibles, setRegistrosDisponibles] = useState<string[]>([])
 
@@ -271,7 +285,12 @@ export default function PublicarConvocatoria() {
                 </div>
 
                 <div className="mt-2 grid md:grid-cols-3 gap-2">
-                  <input className="input" placeholder="Banco" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })} />
+                  <select className="input" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })}>
+                    <option value="">Banco</option>
+                    {BANCOS_VENEZUELA.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
                   <select className="input" value={pay.tipo_operacion} onChange={e => setPay({ ...pay, tipo_operacion: e.target.value })}>
                     <option>transferencia</option>
                     <option>pago móvil</option>

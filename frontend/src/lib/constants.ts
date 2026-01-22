@@ -158,3 +158,27 @@ export const TIPOS_TRAMITE = [
     "Transformación de Naturaleza Jurídica",
     "Venta de Acciones"
 ]
+
+export const BANCOS_VENEZUELA = [
+    "Banco de Venezuela (0102)",
+    "Banco del Tesoro (0163)",
+    "Banco Agrícola de Venezuela (0166)",
+    "BanFANB (0177)",
+    "Banesco (0134)",
+    "Banco Mercantil (0105)",
+    "BBVA Provincial (0108)",
+    "BNC (Banco Nacional de Crédito) (0191)",
+    "Bancaribe (0114)",
+    "Bancamiga (0172)",
+    "Banplus (0174)",
+    "Banco Exterior (0115)",
+    "Banco Plaza (0138)",
+    "Venezolano de Crédito (0104)",
+    "BFC (Banco Fondo Común) (0151)",
+    "Banco Activo (0171)",
+    "100% Banco (0156)",
+    "DelSur (0157)",
+    "Banco Caroní (0128)",
+    "Banco Sofitasa (0137)",
+    "Banco Internacional de Desarrollo (0173)"
+]

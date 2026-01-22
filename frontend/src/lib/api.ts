@@ -241,7 +241,7 @@ export type LegalPayment = {
   mobile_phone?: string;
   document?: string;
 }
-export async function listLegal(params?: { q?: string; status?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string }) {
+export async function listLegal(params?: { q?: string; status?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string; limit?: number; pub_type?: string }) {
   // Clean up undefined values - don't send them as "undefined" string
   const cleanParams: Record<string, string> = {}
   if (params) {
@@ -251,6 +251,8 @@ export async function listLegal(params?: { q?: string; status?: string; req_from
     if (params.req_to && params.req_to !== 'undefined') cleanParams.req_to = params.req_to
     if (params.pub_from && params.pub_from !== 'undefined') cleanParams.pub_from = params.pub_from
     if (params.pub_to && params.pub_to !== 'undefined') cleanParams.pub_to = params.pub_to
+    if (params.limit) cleanParams.limit = String(params.limit)
+    if (params.pub_type) cleanParams.pub_type = params.pub_type
   }
 
   const qs = new URLSearchParams(cleanParams)

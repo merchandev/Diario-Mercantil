@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
-import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, type LegalRequest, updateLegal, uploadFiles } from '../lib/api'
-import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, TIPOS_TRAMITE } from '../lib/constants'
+import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, type LegalRequest, listLegal, updateLegal, uploadFiles } from '../lib/api'
+import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, TIPOS_TRAMITE, BANCOS_VENEZUELA } from '../lib/constants'
 
 export default function PublicarDocumento() {
   const [step, setStep] = useState(1)
@@ -16,6 +16,21 @@ export default function PublicarDocumento() {
     tipo_sociedad: '', tipo_acto: '', nombre: '', estado: '', oficina: '', registrador_nombre: '', registrador_tipo: '',
     tomo: '', numero: '', anio: '', expediente: '', fecha: '', planilla: ''
   })
+
+  // Resume draft logic
+  // Resume draft logic
+  useEffect(() => {
+    listLegal({ status: 'Borrador', pub_type: 'Documento', limit: 1 }).then(res => {
+      if (res && res.items && res.items.length > 0) {
+        const draft = res.items[0]
+        console.log('📝 Resuming draft:', draft.id)
+        setRequestId(draft.id)
+        if (draft.meta) {
+          setF1((prev: any) => ({ ...prev, ...draft.meta }))
+        }
+      }
+    }).catch(console.error)
+  }, [])
 
   const [registrosDisponibles, setRegistrosDisponibles] = useState<string[]>([])
 
@@ -63,7 +78,7 @@ export default function PublicarDocumento() {
         const res = await createLegal({ status: 'Borrador', name: f1.nombre, document: '', date: f1.fecha || new Date().toISOString().slice(0, 10), pub_type: 'Documento', meta: f1 })
         setRequestId((res as any).id || (res as any).lastId || 0)
       } else {
-        // Update existing draft if backtracking 
+        // Update existing draft
         await updateLegal(requestId, { meta: f1 })
       }
       setStep(2)
@@ -284,7 +299,12 @@ export default function PublicarDocumento() {
                   <div className="text-slate-600">Por favor, reporte el pago realizado completando los datos que se indican a continuación:</div>
                 </div>
                 <div className="mt-2 grid md:grid-cols-3 gap-2">
-                  <input className="input" placeholder="Banco" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })} />
+                  <select className="input" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })}>
+                    <option value="">Banco</option>
+                    {BANCOS_VENEZUELA.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
                   <select className="input" value={pay.tipo_operacion} onChange={e => setPay({ ...pay, tipo_operacion: e.target.value })}>
                     <option>transferencia</option>
                     <option>pago móvil</option>
