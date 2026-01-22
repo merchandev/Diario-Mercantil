@@ -335,9 +335,10 @@ export async function detachLegalFile(id: number, fid: number) {
 }
 
 // Applicant: upload a single PDF and auto-create legal request
-export async function uploadLegalPdf(file: File) {
+export async function uploadLegalPdf(file: File, id?: number) {
   const fd = new FormData()
   fd.append('file', file)
+  if (id) fd.append('legal_request_id', String(id))
   const res = await fetchAuth('/api/legal/upload-pdf', { method: 'POST', body: fd })
   return res.json() as Promise<{ ok: true; id: number; file_id: number; folios: number; pricing: { price_per_folio_usd: number; bcv_rate: number; iva_percent: number; unit_bs: number; subtotal_bs: number; iva_bs: number; total_bs: number } }>
 }
