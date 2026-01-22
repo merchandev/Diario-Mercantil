@@ -10,8 +10,21 @@ class AuthController {
   }
 
   public static function bearerToken(): ?string {
-    $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-    if (preg_match('/^Bearer\s+(.*)$/i', $hdr, $m)) return trim($m[1]);
+    $headers = null;
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+      $headers = $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+      $headers = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    } elseif (function_exists('apache_request_headers')) {
+      $req = apache_request_headers();
+      if (isset($req['Authorization'])) $headers = $req['Authorization'];
+      elseif (isset($req['authorization'])) $headers = $req['authorization'];
+    }
+    
+    if ($headers && preg_match('/^Bearer\s+(.*)$/i', $headers, $m)) {
+        return trim($m[1]);
+    }
+    
     if (isset($_GET['token'])) return trim($_GET['token']);
     return null;
   }
