@@ -1,42 +1,12 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, updateLegal, uploadFiles } from '../lib/api'
+import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD } from '../lib/constants'
 
 const TIPO_CONV_OPTS = [
   'Asamblea Ordinaria de accionistas o socios',
   'Asamblea Extraordinaria de accionistas o socios',
   'Cartel o Edicto Judicial'
-]
-
-const ESTADOS_VENEZUELA = [
-  'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes', 'Delta Amacuro',
-  'Distrito Capital', 'Falcón', 'Guárico', 'Lara', 'Mérida', 'Miranda', 'Monagas', 'Nueva Esparta', 'Portuguesa',
-  'Sucre', 'Táchira', 'Trujillo', 'La Guaira', 'Yaracuy', 'Zulia'
-]
-
-const REGISTROS_POR_ESTADO: Record<string, string[]> = {
-  // Using generic list or the one from PublicarDocumento if available. 
-  // For now using empty or basic if not shared. 
-  // Assuming the user fills it manually if not selected, OR we copy the map from PublicarDocumento.
-  // Ideally this constant should be in a shared file. 
-  // Copying the behavior of text input for simplicity if the constant isn't available, but user asked for "Oficina de registro mercantil"
-  // In `PublicarDocumento` it is a select. Let's assume we use input for now or copy the list if I had it.
-  // I will use input for flexibility unless I see the list is critical. 
-  // Actually, looking at previous file content, `PublicarDocumento.tsx` had `REGISTROS_POR_ESTADO`.
-  // I will leave it as an input that suggests values if possible or just an input to be safe, 
-  // or duplicate the list if I had it in context. 
-  // Since I don't want to bloat this file with a huge list without seeing it all, I'll use a simple input for now 
-  // but labeled correctly. The user requirements didn't explicitly say "dropdown" for Oficina in Convocatorias, but implied "Campos: ... Oficina".
-  // `PublicarDocumento` has it as a dropdown. I will check if I can grab it. 
-  // To stay safe and concise I'll use text input for "Oficina" unless I can easily get the list.
-}
-
-// Re-using the types from PublicarDocumento for consistency
-const SOCIEDAD_OPTS = [
-  "Firma Personal (F.P.)", "Compañía Anónima (C.A.)", "Compañía de Responsabilidad Limitada (C.R.L.)",
-  "Compañía en Comandita Simple (C.C.S.)", "Compañía en Comandita por Acciones (C.C.A.)", "Consorcio",
-  "Sociedades Anónimas (S.A.)", "Sociedad en Comandita Simple (S.C.S.)", "Sociedad en Comandita por Acciones (S.C.A.)",
-  "Sociedad Mercantil Extranjera", "Sociedades de Responsabilidad Limitada (S.R.L.)"
 ]
 
 export default function PublicarConvocatoria() {
