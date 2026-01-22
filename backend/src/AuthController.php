@@ -60,6 +60,19 @@ class AuthController {
     $user = $userStmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$user) {
+      // Fallback: Try searching without the prefix (e.g. "V123" -> "123")
+      // This handles cases where users registered with just numbers but Login UI enforces prefix
+      if (preg_match('/^[VEJGP][0-9]+$/i', $document)) {
+        $raw = substr($document, 1);
+        $userStmt->execute([$raw]);
+        $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+        if ($user) {
+          error_log('[AUTH] ⚠️ Found user via fallback (stripped prefix): ' . $raw);
+        }
+      }
+    }
+
+    if (!$user) {
       error_log('[AUTH] ❌ User not found: ' . $document);
       Response::json(['error'=>'invalid_credentials'], 401);
     }
