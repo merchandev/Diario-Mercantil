@@ -99,6 +99,14 @@ export default function Historial() {
                     <td className="px-4 py-2">{r.status === 'Pendiente' || r.status === 'Borrador' ? 'Borrador' : (r.status === 'Publicado' ? 'Publicada' : r.status)}</td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-3">
+                        {(r.status === 'Borrador' || r.status === 'Pendiente' || r.status === 'Por verificar') && (
+                          <button
+                            className="text-amber-600 hover:underline"
+                            onClick={() => navigate(r.pub_type === 'Convocatoria' ? `/solicitante/convocatoria?id=${r.id}` : `/solicitante/documento?id=${r.id}`)}
+                          >
+                            Editar
+                          </button>
+                        )}
                         <button className="text-brand-700 hover:underline" onClick={() => navigate(`/solicitante/publicaciones/${r.id}`)}>Ver detalles</button>
                         <button className="text-blue-600 hover:underline" onClick={async () => { const b = await downloadLegal(r.id); const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `orden-servicio-${r.id}.pdf`; a.click(); URL.revokeObjectURL(url) }}>Descargar orden</button>
                       </div>

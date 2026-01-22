@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, type LegalFile, type LegalRequest, updateLegal, uploadFiles } from '../../lib/api'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 
 const ESTADOS_VENEZUELA = [
@@ -413,6 +413,8 @@ type Step = 1 | 2 | 3
 
 export default function Documento() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const editId = searchParams.get('id')
   const [step, setStep] = useState<Step>(1)
   const [req, setReq] = useState<LegalRequest | undefined>()
   const [meta, setMeta] = useState<any>({})
@@ -430,6 +432,45 @@ export default function Documento() {
 
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '' })); } catch { } })(); }, [])
+
+  useEffect(() => {
+    if (!editId) return;
+    setLoading(true);
+    getLegal(Number(editId))
+      .then(data => {
+        const item = data.item;
+        setReq(item);
+
+        let parsedMeta = {};
+        if (typeof item.meta === 'string') {
+          try { parsedMeta = JSON.parse(item.meta) } catch { }
+        } else if (typeof item.meta === 'object') {
+          parsedMeta = item.meta || {};
+        }
+        setMeta(parsedMeta);
+
+        listLegalFiles(item.id).then(r => setFiles(r.items));
+
+        // Pre-fill payment info if exists
+        if (data.payments && data.payments.length > 0) {
+          const last = data.payments[0];
+          setPay(prev => ({
+            ...prev,
+            type: last.type === 'Pago móvil' ? 'pago_movil' : 'transferencia',
+            bank: last.bank || '',
+            ref: last.ref || '',
+            date: last.date || new Date().toISOString().slice(0, 10),
+            amount_bs: last.amount_bs,
+            mobile_phone: last.mobile_phone || ''
+          }));
+        }
+      })
+      .catch(err => {
+        console.error('Error loading draft:', err);
+        setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudo cargar la solicitud.', variant: 'error' });
+      })
+      .finally(() => setLoading(false));
+  }, [editId]);
 
   // Debug: rastrear cambios de step
   // useEffect(()=>{
