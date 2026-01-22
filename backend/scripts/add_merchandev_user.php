@@ -19,12 +19,16 @@ $hash = password_hash($password, PASSWORD_DEFAULT);
 // Verificar si ya existe
 $exists = $pdo->prepare('SELECT id FROM users WHERE document=?');
 $exists->execute([$document]);
-if ($exists->fetch()) {
-    echo "\n[INFO] El usuario 'merchandev' ya existe.\n";
-    exit(0);
+$user = $exists->fetch();
+
+if ($user) {
+    // Actualizar si existe
+    $stmt = $pdo->prepare('UPDATE users SET password_hash=?, role=?, status=?, updated_at=? WHERE id=?');
+    $stmt->execute([$hash, $role, $status, $now, $user['id']]);
+    echo "\n[OK] Usuario 'merchandev' ACTUALIZADO con nueva contraseña y rol admin.\n";
+} else {
+    // Insertar si no existe
+    $stmt = $pdo->prepare('INSERT INTO users(document,name,password_hash,role,phone,email,person_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
+    $stmt->execute([$document, $name, $hash, $role, $phone, $email, $person_type, $status, $now, $now]);
+    echo "\n[OK] Usuario 'merchandev' CREADO con contraseña 'G0ku*1896' y rol admin.\n";
 }
-
-$stmt = $pdo->prepare('INSERT INTO users(document,name,password_hash,role,phone,email,person_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
-$stmt->execute([$document, $name, $hash, $role, $phone, $email, $person_type, $status, $now, $now]);
-
-echo "\n[OK] Usuario 'merchandev' creado con contraseña 'G0ku*1896' y rol admin.\n";
