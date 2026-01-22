@@ -21,8 +21,25 @@ export default function PublicarConvocatoria() {
     tipo_sociedad: '', tipo_convocatoria: '', nombre: '', rif: '', estado: '', oficina: '', tomo: '', numero: '', anio: '', expediente: '', fecha: '', representante: '', ci_rep: ''
   })
 
+  const [registrosDisponibles, setRegistrosDisponibles] = useState<string[]>([])
+
+  // Cascading logic
+  useEffect(() => {
+    if (f1.estado && REGISTROS_MERCANTILES[f1.estado]) {
+      setRegistrosDisponibles(REGISTROS_MERCANTILES[f1.estado])
+      if (f1.oficina && !REGISTROS_MERCANTILES[f1.estado].includes(f1.oficina)) {
+        setF1((prev: any) => ({ ...prev, oficina: '' }))
+      }
+    } else {
+      setRegistrosDisponibles([])
+      if (f1.oficina) setF1((prev: any) => ({ ...prev, oficina: '' }))
+    }
+  }, [f1.estado])
+
   // Step 2 files
   const [upState, setUpState] = useState<{ img?: number; doc?: number; logo?: number }>({})
+
+  // ... (rest of state)
 
   // Step 3 payment
   const [folios, setFolios] = useState(1)
@@ -39,6 +56,7 @@ export default function PublicarConvocatoria() {
   }, [])
 
   const priceUsd = Number(settings.convocatoria_usd || 0)
+  // ...
   const unitBs = rate ? +(priceUsd * rate).toFixed(2) : undefined
   const subTotal = unitBs && folios ? +(unitBs * folios).toFixed(2) : undefined
   const ivaPct = Number(settings.iva_percent || 16)
@@ -63,6 +81,7 @@ export default function PublicarConvocatoria() {
   }
 
   const handleUpload = async (file: File | null, kind: 'convocatoria_imagen' | 'convocatoria_texto' | 'logo') => {
+    // ...
     if (!file || !requestId) return
     setBusy(true)
     try {
@@ -71,7 +90,6 @@ export default function PublicarConvocatoria() {
       if (id) {
         await attachLegalFile(requestId, id, kind)
         setUpState(s => ({ ...s, [kind === 'convocatoria_imagen' ? 'img' : (kind === 'convocatoria_texto' ? 'doc' : 'logo')]: id }))
-        // alert('Archivo adjuntado.') // Optional feedback
       }
     } catch (e: any) {
       alert('Error subiendo archivo: ' + e.message)
@@ -81,6 +99,7 @@ export default function PublicarConvocatoria() {
   }
 
   const submitPayment = async (e: React.FormEvent) => {
+    // ...
     e.preventDefault()
     if (!accepted) { alert('Debe aceptar los Términos y Condiciones.'); return }
     if (!requestId) return
@@ -134,7 +153,7 @@ export default function PublicarConvocatoria() {
             <div className="grid md:grid-cols-2 gap-2">
               <select className="input w-full" value={f1.tipo_sociedad} onChange={e => setF1({ ...f1, tipo_sociedad: e.target.value })}>
                 <option value="">Tipo de sociedad</option>
-                {SOCIEDAD_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
+                {TIPOS_SOCIEDAD.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
 
               <select className="input w-full" value={f1.tipo_convocatoria} onChange={e => setF1({ ...f1, tipo_convocatoria: e.target.value })}>
@@ -150,7 +169,11 @@ export default function PublicarConvocatoria() {
                 {ESTADOS_VENEZUELA.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
 
-              <input className="input" placeholder="Oficina de registro mercantil" value={f1.oficina} onChange={e => setF1({ ...f1, oficina: e.target.value })} />
+              <select className="input w-full" value={f1.oficina} onChange={e => setF1({ ...f1, oficina: e.target.value })} disabled={!f1.estado}>
+                <option value="">Oficina de registro mercantil</option>
+                {registrosDisponibles.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+
               <input className="input" placeholder="Tomo / Letra" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value })} />
               <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
