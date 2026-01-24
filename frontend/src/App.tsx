@@ -16,43 +16,65 @@ import PublicLayout from './components/PublicLayout'
 import ApplicantLayout from './pages/solicitante/Layout'
 import PublishChoiceModal from './components/PublishChoiceModal'
 
+// Helper to auto-reload page if a chunk is missing (deployment cache issue)
+function lazyImport(factory: () => Promise<{ default: React.ComponentType<any> }>) {
+  return lazy(async () => {
+    try {
+      return await factory()
+    } catch (error: any) {
+      const msg = error?.message || ''
+      if (msg.includes('dynamically imported module') || msg.includes('dymanically imported module')) {
+        // Prevent infinite loop
+        const key = `chunk_retry_${window.location.pathname}`
+        const retried = sessionStorage.getItem(key)
+        if (!retried) {
+          sessionStorage.setItem(key, 'true')
+          window.location.reload()
+          return { default: () => <LoadingFallback /> }
+        }
+      }
+      throw error
+    }
+  })
+}
+
 // Heavy pages - lazy loaded
-const PanelHome = lazy(() => import('./pages/PanelHome'))
-const Ediciones = lazy(() => import('./pages/Ediciones'))
-const Publicaciones = lazy(() => import('./pages/Publicaciones'))
-const PublicacionDetalle = lazy(() => import('./pages/PublicacionDetalle'))
-const Papelera = lazy(() => import('./pages/Papelera'))
-const MediosPago = lazy(() => import('./pages/MediosPago'))
-const DirectorioLegal = lazy(() => import('./pages/DirectorioLegal'))
-const Usuarios = lazy(() => import('./pages/Usuarios'))
-const Configuracion = lazy(() => import('./pages/Configuracion'))
-const Paginas = lazy(() => import('./pages/Paginas'))
-const FileManager = lazy(() => import('./pages/FileManager'))
+const PanelHome = lazyImport(() => import('./pages/PanelHome'))
+const Ediciones = lazyImport(() => import('./pages/Ediciones'))
+const Publicaciones = lazyImport(() => import('./pages/Publicaciones'))
+const PublicacionDetalle = lazyImport(() => import('./pages/PublicacionDetalle'))
+const Papelera = lazyImport(() => import('./pages/Papelera'))
+const MediosPago = lazyImport(() => import('./pages/MediosPago'))
+const DirectorioLegal = lazyImport(() => import('./pages/DirectorioLegal'))
+const Usuarios = lazyImport(() => import('./pages/Usuarios'))
+const Configuracion = lazyImport(() => import('./pages/Configuracion'))
+const Paginas = lazyImport(() => import('./pages/Paginas'))
+const FileManager = lazyImport(() => import('./pages/FileManager'))
 
 // Public pages - lazy loaded
-const PublicView = lazy(() => import('./pages/PublicView'))
-const EditionPublic = lazy(() => import('./pages/EditionPublic'))
-const EdicionesPublic = lazy(() => import('./pages/EdicionesPublic'))
-const PagePublic = lazy(() => import('./pages/PagePublic'))
-const PublicacionPublic = lazy(() => import('./pages/PublicacionPublic'))
-const Contacto = lazy(() => import('./pages/Contacto'))
-const VisorEspressivoPDF = lazy(() => import('./pages/VisorEspressivoPDF'))
+const PublicView = lazyImport(() => import('./pages/PublicView'))
+const EditionPublic = lazyImport(() => import('./pages/EditionPublic'))
+const EdicionesPublic = lazyImport(() => import('./pages/EdicionesPublic'))
+const PagePublic = lazyImport(() => import('./pages/PagePublic'))
+const PublicacionPublic = lazyImport(() => import('./pages/PublicacionPublic'))
+const Contacto = lazyImport(() => import('./pages/Contacto'))
+const VisorEspressivoPDF = lazyImport(() => import('./pages/VisorEspressivoPDF'))
 
 // Solicitante pages - lazy loaded
-const HistorialSolicitante = lazy(() => import('./pages/solicitante/Historial'))
-const CotizadorSolicitante = lazy(() => import('./pages/solicitante/Cotizador'))
-const ConvocatoriaSolicitante = lazy(() => import('./pages/solicitante/Convocatoria'))
-const PerfilSolicitante = lazy(() => import('./pages/solicitante/Perfil'))
-const PublicacionDetalleSolicitante = lazy(() => import('./pages/solicitante/PublicacionDetalle'))
-const DocumentoSolicitante = lazy(() => import('./pages/solicitante/Documento'))
+const HistorialSolicitante = lazyImport(() => import('./pages/solicitante/Historial'))
+const CotizadorSolicitante = lazyImport(() => import('./pages/solicitante/Cotizador'))
+const ConvocatoriaSolicitante = lazyImport(() => import('./pages/solicitante/Convocatoria'))
+const PerfilSolicitante = lazyImport(() => import('./pages/solicitante/Perfil'))
+const PublicacionDetalleSolicitante = lazyImport(() => import('./pages/solicitante/PublicacionDetalle'))
+const DocumentoSolicitante = lazyImport(() => import('./pages/solicitante/Documento'))
 
 // Form pages - lazy loaded
-const PublicarDocumento = lazy(() => import('./pages/PublicarDocumento'))
-const PublicarDocumentoPDF = lazy(() => import('./pages/PublicarDocumentoPDF'))
-const PublicarConvocatoria = lazy(() => import('./pages/PublicarConvocatoria'))
-const Historial = lazy(() => import('./pages/Historial'))
-const Cotizador = lazy(() => import('./pages/Cotizador'))
-const MediosPagoInfo = lazy(() => import('./pages/MediosPagoInfo'))
+const PublicarDocumento = lazyImport(() => import('./pages/PublicarDocumento'))
+const PublicarDocumentoPDF = lazyImport(() => import('./pages/PublicarDocumentoPDF'))
+const PublicarConvocatoria = lazyImport(() => import('./pages/PublicarConvocatoria'))
+const Historial = lazyImport(() => import('./pages/Historial'))
+const Cotizador = lazyImport(() => import('./pages/Cotizador'))
+const MediosPagoInfo = lazyImport(() => import('./pages/MediosPagoInfo'))
 
 // Wrapper component for lazy-loaded routes
 function LazyRoute({ children }: { children: React.ReactNode }) {

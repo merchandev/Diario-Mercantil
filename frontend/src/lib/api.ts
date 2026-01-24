@@ -20,13 +20,22 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   const url = typeof input === 'string' ? getUrl(input) : input;
   const res = await fetch(url, { ...init, headers })
   if (res.status === 401) {
+    let serverError = 'unauthorized';
+    try {
+      const json = await res.clone().json();
+      if (json.error) serverError = json.error;
+      if (json.debug) console.warn('[Auth Debug]', json);
+      if (json.received_token_preview) console.warn('[Auth Token Rx]', json);
+    } catch (e) { /* ignore */ }
+
     if (!noRedirect) {
       try { localStorage.removeItem('token'); } catch { }
       try { sessionStorage.removeItem('token'); } catch { }
       // Force re-authentication
       if (typeof window !== 'undefined') window.location.href = '/login'
     }
-    throw new Error('unauthorized')
+    console.error(`API 401 Error: ${serverError}`);
+    throw new Error(serverError)
   }
   if (!res.ok) {
     let errorMsg = `HTTP ${res.status}`
