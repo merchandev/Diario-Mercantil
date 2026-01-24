@@ -13,33 +13,26 @@ class AuthController {
     return ($h && preg_match("/^Bearer\s+(.*)$/i", $h, $m)) ? trim($m[1]) : ($_GET["token"] ?? null);
   }
 
+  public static function requireAuth(){
+    $token = self::bearerToken();
+    if (!$token) { http_response_code(401); echo json_encode(["error"=>"unauthorized"]); exit; }
+    $pdo = Database::pdo();
+    $stmt = $pdo->prepare("SELECT u.* FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=? AND t.expires_at > NOW()");
+    $stmt->execute([$token]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$user) { http_response_code(401); echo json_encode(["error"=>"unauthorized"]); exit; }
+    return $user;
+  }
+  
   public static function userFromToken(?string $token){
     if (!$token) return null;
     $pdo = Database::pdo();
-    // Validate token expiry
     $stmt = $pdo->prepare("SELECT u.id,u.document,u.name,u.role FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=? AND t.expires_at > NOW()");
     $stmt->execute([$token]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
   }
 
-  public static function requireAuth(){
-    $token = self::bearerToken();
-    if (!$token) {
-       http_response_code(401); echo json_encode(["error"=>"unauthorized"]); exit;
-    }
-    $pdo = Database::pdo();
-    $stmt = $pdo->prepare("SELECT u.* FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=? AND t.expires_at > NOW()");
-    $stmt->execute([$token]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if (!$user) {
-      http_response_code(401); echo json_encode(["error"=>"unauthorized"]); exit;
-    }
-    return $user;
-  }
-
   public function login(){
-    error_log("[FIX] Login request received");
     $pdo = Database::pdo();
     $in = $this->jsonInput();
     $doc = trim($in["document"] ?? "");
@@ -49,16 +42,13 @@ class AuthController {
     $u->execute([$doc]);
     $user = $u->fetch(PDO::FETCH_ASSOC);
 
-    // Fallback without prefix
     if (!$user && preg_match("/^[VEJGP][0-9]+/i", $doc)) {
          $u->execute([substr($doc, 1)]);
          $user = $u->fetch(PDO::FETCH_ASSOC);
     }
 
     if (!$user || !password_verify($pass, $user["password_hash"])) {
-       http_response_code(401);
-       echo json_encode(["error"=>"invalid_credentials"]);
-       exit;
+       Response::json(["error"=>"invalid_credentials"], 401);
     }
 
     $token = bin2hex(random_bytes(32));
@@ -78,37 +68,28 @@ class AuthController {
     ]]);
   }
 
-  public function logout(){
-     Response::json(["ok"=>true]);
-  }
+  public function logout(){ Response::json(["ok"=>true]); }
   
   public function register(){
     $pdo = Database::pdo();
     $in = $this->jsonInput();
-    
-    $document = trim($in['document'] ?? '');
-    $name = trim($in['name'] ?? '');
-    $password = (string)($in['password'] ?? '');
-    $personType = trim($in['person_type'] ?? 'natural');
-    $email = trim($in['email'] ?? '');
-    $phone = trim($in['phone'] ?? '');
+    $document = trim($in["document"] ?? "");
+    $name = trim($in["name"] ?? "");
+    $password = (string)($in["password"] ?? "");
+    $personType = trim($in["person_type"] ?? "natural");
+    $email = trim($in["email"] ?? "");
+    $phone = trim($in["phone"] ?? "");
 
-    if ($document === '' || $name === '' || $password === '') {
-      Response::json(['error'=>'Documento, nombre y contraseña requeridos'], 400);
-    }
+    if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
     
-    // Check duplicate
     $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
     $check->execute([$document]);
-    if ($check->fetch()) {
-      Response::json(['error'=>'El documento ya está registrado'], 400);
-    }
+    if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);
 
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $now = gmdate('c');
-    
+    $now = gmdate("c");
     $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)");
-    $ins->execute([$document, $name, $hash, 'solicitante', $phone, $email, $personType, $now, $now]);
+    $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $now, $now]);
     
     $uid = $pdo->lastInsertId();
     $token = bin2hex(random_bytes(32));
