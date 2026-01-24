@@ -87,7 +87,7 @@ services:
       PMA_HOST: db
       UPLOAD_LIMIT: 64M
     ports:
-      - "8081:80"
+      - "8088:80"
     depends_on:
       - db
     networks:
