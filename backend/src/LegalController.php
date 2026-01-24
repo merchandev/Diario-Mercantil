@@ -5,7 +5,9 @@ require_once __DIR__.'/Database.php';
 class LegalController {
   // New: upload a PDF from applicant, auto-count pages, create request and return pricing summary
   public function uploadPdf(){
-    // Require a logged-in user (handled by router's AuthController::requireAuth())
+    // Verificar autenticacion
+    $u = AuthController::requireAuth();
+    
     if (!isset($_FILES['file'])) {
       return Response::json(['error'=>'No se ha enviado ningún archivo'], 400);
     }
