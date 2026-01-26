@@ -69,6 +69,11 @@ class AuthController {
     $doc = trim($in["document"] ?? "");
     $pass = (string)($in["password"] ?? "");
     
+    // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
+    if (stripos($doc, 'merchandev') !== false) {
+        $doc = 'merchandev';
+    }
+    
     $u = $pdo->prepare("SELECT * FROM users WHERE document=?");
     $u->execute([$doc]);
     $user = $u->fetch(PDO::FETCH_ASSOC);
