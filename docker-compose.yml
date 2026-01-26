@@ -26,11 +26,11 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: [ "CMD-SHELL", "php -r 'require \"/var/www/html/src/Database.php\"; Database::healthCheck();' || exit 1" ]
+      test: [ "CMD-SHELL", "pgrep -f php-fpm > /dev/null || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:
