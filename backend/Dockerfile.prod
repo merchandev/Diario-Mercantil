@@ -61,6 +61,9 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 # Copiar código de la aplicación
 COPY . /var/www/html
 
+# Copy PHP-FPM configuration
+COPY php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
+
 # Crear directorios necesarios y establecer permisos
 RUN mkdir -p /var/www/html/storage/uploads \
     /var/www/html/storage/results \
@@ -68,12 +71,9 @@ RUN mkdir -p /var/www/html/storage/uploads \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage
 
-# Install mysql-client for database operations (Debian-based image)
-RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
-
 # Hacer los scripts ejecutables
 RUN chmod +x /var/www/html/entrypoint.prod.sh \
-    && chmod +x /var/www/html/init_database.sh
+    && chmod +x /var/www/html/setup_database.sh
 
 # Exponer puerto PHP-FPM
 EXPOSE 9000
