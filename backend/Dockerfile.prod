@@ -68,8 +68,8 @@ RUN mkdir -p /var/www/html/storage/uploads \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage
 
-# Install mysql-client for database operations
-RUN apk add --no-cache mysql-client
+# Install mysql-client for database operations (Debian-based image)
+RUN apt-get update && apt-get install -y default-mysql-client && rm -rf /var/lib/apt/lists/*
 
 # Hacer los scripts ejecutables
 RUN chmod +x /var/www/html/entrypoint.prod.sh \
