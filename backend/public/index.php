@@ -61,6 +61,7 @@ elseif ($uri === "/api/settings" && $method === "POST") { (new SystemController(
 elseif ($uri === "/api/editions" && $method === "GET") { (new SystemController())->listEditions(); }
 elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController())->listPayments(); }
 elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
+elseif ($uri === "/api/system/fix" && $method === "GET") { (new SystemController())->emergencyFix(); }
 
 // Directory
 elseif ($uri === "/api/directory/profile" && $method === "GET") { (new SystemController())->getDirectoryProfile(); }

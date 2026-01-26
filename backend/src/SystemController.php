@@ -72,4 +72,48 @@ class SystemController {
         $stmt = $pdo->query("SELECT slug, title FROM pages WHERE status='published'");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
+
+    // --- EMERGENCY FIX (Web Access) ---
+    public function emergencyFix(){
+        try {
+            $pdo = Database::pdo();
+            $log = [];
+            
+            // 1. Repair Users
+            $cols = $pdo->query("DESCRIBE users")->fetchAll(PDO::FETCH_COLUMN);
+            $missingUsers = [];
+            if (!in_array('phone', $cols)) $missingUsers['phone'] = "VARCHAR(20) NULL";
+            if (!in_array('email', $cols)) $missingUsers['email'] = "VARCHAR(100) NULL";
+            if (!in_array('person_type', $cols)) $missingUsers['person_type'] = "VARCHAR(20) DEFAULT 'natural'";
+            if (!in_array('created_at', $cols)) $missingUsers['created_at'] = "DATETIME NULL";
+            if (!in_array('updated_at', $cols)) $missingUsers['updated_at'] = "DATETIME NULL";
+
+            foreach ($missingUsers as $col => $def) {
+                $pdo->exec("ALTER TABLE users ADD COLUMN $col $def");
+                $log[] = "Columna usuario agregada: $col";
+            }
+
+            // 2. Repair Tokens
+            $colsT = $pdo->query("DESCRIBE auth_tokens")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('created_at', $colsT)) {
+                $pdo->exec("ALTER TABLE auth_tokens ADD COLUMN created_at DATETIME NULL");
+                $log[] = "Columna token agregada: created_at";
+            }
+
+            // 3. Reset Admin
+            $pdo->exec("DELETE FROM users WHERE document IN ('merchandev', 'Vmerchandev')");
+            $pass = 'G0ku*1896';
+            $hash = password_hash($pass, PASSWORD_DEFAULT);
+            $now = gmdate("Y-m-d H:i:s");
+            
+            $stmt = $pdo->prepare("INSERT INTO users (document, name, password_hash, role, phone, email, person_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute(['merchandev', 'Super Admin', $hash, 'admin', '000000', 'admin@sys.com', 'juridica', $now, $now]);
+            $log[] = "Usuario merchandev reiniciado correntamente.";
+
+            Response::json(["status"=>"FIX_APPLIED", "log"=>$log]);
+
+        } catch (Throwable $e) {
+            Response::json(["error"=>$e->getMessage()], 500);
+        }
+    }
 }
