@@ -23,7 +23,7 @@ try {
   $solDoc = 'J000111222';
   $solPass = 'Test#2025!';
   $solHash = password_hash($solPass, PASSWORD_DEFAULT);
-  $stmt->execute([$solDoc,'Solicitante Demo',$solHash,'solicitante',$now]);
+  $stmt->execute([$solDoc,'Solicitante Demo',$solHash,'solicitante','natural','active']);
 
   echo "Seeded admin (document=$adminDoc) and solicitante (document=$solDoc).\n";
   echo "Admin password: $adminPass\nSolicitante password: $solPass\n";
