@@ -64,13 +64,16 @@ export async function login(body: { document: string; password: string }) {
   if (!res.ok) {
     let errorMsg = 'invalid_credentials';
     try {
-      const json = await res.json();
-      // Use logic similar to fetchAuth to extract meaningful errors
+      const json = await res.clone().json();
       if (json.message) errorMsg = json.message;
       else if (json.error) errorMsg = json.error;
     } catch {
-      const text = await res.text();
-      if (text) errorMsg = text;
+      try {
+        const text = await res.text();
+        if (text) errorMsg = text;
+      } catch {
+        // Fallback to generic error
+      }
     }
     throw new Error(errorMsg);
   }
