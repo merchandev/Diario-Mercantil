@@ -9,14 +9,19 @@ require_once __DIR__."/../src/UserController.php";
 require_once __DIR__."/../src/LegalController.php";
 require_once __DIR__."/../src/SystemController.php";
 require_once __DIR__."/../src/Response.php";
-
 require_once __DIR__."/../src/RateController.php";
+require_once __DIR__."/../src/SuperAdminController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
 
+// --- SUPERADMIN (Secret routes for /lotus/) ---
+if ($uri === "/api/superadmin/login" && $method === "POST") { (new SuperAdminController())->login(); }
+elseif ($uri === "/api/superadmin/verify" && $method === "GET") { (new SuperAdminController())->verify(); }
+elseif ($uri === "/api/superadmin/logout" && $method === "POST") { (new SuperAdminController())->logout(); }
+
 // --- 1. AUTH ---
-if ($uri === "/api/auth/login" && $method === "POST") { (new AuthController())->login(); }
+elseif ($uri === "/api/auth/login" && $method === "POST") { (new AuthController())->login(); }
 elseif ($uri === "/api/auth/me") { (new AuthController())->me(); }
 elseif ($uri === "/api/auth/logout" && $method === "POST") { (new AuthController())->logout(); }
 elseif ($uri === "/api/auth/register" && $method === "POST") { (new AuthController())->register(); }

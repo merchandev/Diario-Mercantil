@@ -80,6 +80,43 @@ export async function login(body: { document: string; password: string }) {
   return res.json() as Promise<{ token: string; user: { id: number; document: string; name: string; role: string } }>
 }
 
+// ========== SUPERADMIN API ==========
+
+export async function superadminLogin(body: { username: string; password: string }) {
+  const res = await fetch(getUrl('/api/superadmin/login'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}))
+    throw new Error(json.error || 'invalid_credentials')
+  }
+  return res.json() as Promise<{ token: string; superadmin: { id: number; username: string } }>
+}
+
+export async function verifySuperAdmin() {
+  const token = localStorage.getItem('superadmin_token')
+  if (!token) throw new Error('No token')
+
+  const res = await fetch(getUrl('/api/superadmin/verify'), {
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+  if (!res.ok) throw new Error('Unauthorized')
+  return res.json() as Promise<{ valid: boolean; superadmin: { id: number; username: string } }>
+}
+
+export async function superadminLogout() {
+  const token = localStorage.getItem('superadmin_token')
+  if (!token) return
+
+  await fetch(getUrl('/api/superadmin/logout'), {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  })
+}
+
+
 export async function me() {
   const res = await fetchAuth('/api/auth/me')
   return res.json() as Promise<{ user: { id: number; document: string; name: string; role: string; avatar_url?: string | null } }>
