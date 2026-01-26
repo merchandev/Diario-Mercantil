@@ -121,36 +121,43 @@ class AuthController {
   public function logout(){ Response::json(["ok"=>true]); }
   
   public function register(){
-    $pdo = Database::pdo();
-    $in = $this->jsonInput();
-    $document = trim($in["document"] ?? "");
-    $name = trim($in["name"] ?? "");
-    $password = (string)($in["password"] ?? "");
-    $personType = trim($in["person_type"] ?? "natural");
-    $email = trim($in["email"] ?? "");
-    $phone = trim($in["phone"] ?? "");
+    try {
+        $pdo = Database::pdo();
+        $in = $this->jsonInput();
+        $document = trim($in["document"] ?? "");
+        $name = trim($in["name"] ?? "");
+        $password = (string)($in["password"] ?? "");
+        $personType = trim($in["person_type"] ?? "natural");
+        $email = trim($in["email"] ?? "");
+        $phone = trim($in["phone"] ?? "");
 
-    if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
-    
-    $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
-    $check->execute([$document]);
-    if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);
+        if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
+        
+        $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
+        $check->execute([$document]);
+        if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);
 
-    $hash = password_hash($password, PASSWORD_DEFAULT);
-    $now = gmdate("Y-m-d H:i:s");
-    $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)");
-    $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $now, $now]);
-    
-    $uid = $pdo->lastInsertId();
-    $token = bin2hex(random_bytes(32));
-    $expiry = gmdate("Y-m-d H:i:s", time() + 604800); // 7 days
-    
-    $pdo->prepare("INSERT INTO auth_tokens(user_id,token,expires_at,created_at) VALUES(?,?,?,?)")
-        ->execute([$uid, $token, $expiry, $now]);
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $now = gmdate("Y-m-d H:i:s");
+        $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $now, $now]);
+        
+        $uid = $pdo->lastInsertId();
+        $token = bin2hex(random_bytes(32));
+        $expiry = gmdate("Y-m-d H:i:s", time() + 604800); // 7 days
+        
+        $pdo->prepare("INSERT INTO auth_tokens(user_id,token,expires_at,created_at) VALUES(?,?,?,?)")
+            ->execute([$uid, $token, $expiry, $now]);
 
-    Response::json([
-      "token"=>$token,
-      "user"=>[ "id"=>(int)$uid, "document"=>$document, "name"=>$name, "role"=>"solicitante" ]
-    ]);
+        Response::json([
+          "token"=>$token,
+          "user"=>[ "id"=>(int)$uid, "document"=>$document, "name"=>$name, "role"=>"solicitante" ]
+        ]);
+    } catch (Throwable $e) {
+        // Force JSON response even on fatal errors
+        http_response_code(500);
+        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        exit;
+    }
   }
 }
