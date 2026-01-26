@@ -21,7 +21,9 @@ export default function LotusLogin() {
             localStorage.setItem('superadmin', JSON.stringify(res.superadmin))
             navigate('/lotus/dashboard')
         } catch (err: any) {
-            setError(err?.message || 'Error de autenticación')
+            // SECURITY: Never expose server errors to prevent information leakage
+            console.error('Login error:', err)
+            setError('Credenciales inválidas')
         } finally {
             setLoading(false)
         }
