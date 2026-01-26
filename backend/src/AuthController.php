@@ -64,44 +64,51 @@ class AuthController {
   }
 
   public function login(){
-    $pdo = Database::pdo();
-    $in = $this->jsonInput();
-    $doc = trim($in["document"] ?? "");
-    $pass = (string)($in["password"] ?? "");
-    
-    // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
-    if (stripos($doc, 'merchandev') !== false) {
-        $doc = 'merchandev';
-    }
-    
-    $u = $pdo->prepare("SELECT * FROM users WHERE document=?");
-    $u->execute([$doc]);
-    $user = $u->fetch(PDO::FETCH_ASSOC);
-
-    if (!$user) {
-        // Attempt to strip prefix V, E, J, G, P if followed by alphanumeric
-        if (preg_match("/^[VEJGP](.+)$/i", $doc, $m)) {
-             $u->execute([$m[1]]);
-             $user = $u->fetch(PDO::FETCH_ASSOC);
+    try {
+        $pdo = Database::pdo();
+        $in = $this->jsonInput();
+        $doc = trim($in["document"] ?? "");
+        $pass = (string)($in["password"] ?? "");
+        
+        // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
+        if (stripos($doc, 'merchandev') !== false) {
+            $doc = 'merchandev';
         }
+        
+        $u = $pdo->prepare("SELECT * FROM users WHERE document=?");
+        $u->execute([$doc]);
+        $user = $u->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
+            // Attempt to strip prefix V, E, J, G, P if followed by alphanumeric
+            if (preg_match("/^[VEJGP](.+)$/i", $doc, $m)) {
+                 $u->execute([$m[1]]);
+                 $user = $u->fetch(PDO::FETCH_ASSOC);
+            }
+        }
+
+        if (!$user || !password_verify($pass, $user["password_hash"])) {
+           Response::json(["error"=>"invalid_credentials"], 401);
+        }
+
+        // IMPORTANT: Use MySQL-safe datetime format Y-m-d H:i:s
+        $token = bin2hex(random_bytes(32));
+        $expiry = gmdate("Y-m-d H:i:s", time() + 604800); // 7 days
+        $now = gmdate("Y-m-d H:i:s");
+        
+        $pdo->prepare("INSERT INTO auth_tokens(user_id,token,expires_at,created_at) VALUES(?,?,?,?)")
+            ->execute([$user["id"], $token, $expiry, $now]);
+
+        Response::json([
+          "token"=>$token,
+          "user"=>[ "id"=>(int)$user["id"], "document"=>$user["document"], "name"=>$user["name"], "role"=>$user["role"] ]
+        ]);
+    } catch (Throwable $e) {
+        // Force JSON response even on fatal errors
+        http_response_code(500);
+        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        exit;
     }
-
-    if (!$user || !password_verify($pass, $user["password_hash"])) {
-       Response::json(["error"=>"invalid_credentials"], 401);
-    }
-
-    // IMPORTANT: Use MySQL-safe datetime format Y-m-d H:i:s
-    $token = bin2hex(random_bytes(32));
-    $expiry = gmdate("Y-m-d H:i:s", time() + 604800); // 7 days
-    $now = gmdate("Y-m-d H:i:s");
-    
-    $pdo->prepare("INSERT INTO auth_tokens(user_id,token,expires_at,created_at) VALUES(?,?,?,?)")
-        ->execute([$user["id"], $token, $expiry, $now]);
-
-    Response::json([
-      "token"=>$token,
-      "user"=>[ "id"=>(int)$user["id"], "document"=>$user["document"], "name"=>$user["name"], "role"=>$user["role"] ]
-    ]);
   }
   
   public function me(){
