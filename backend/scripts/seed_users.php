@@ -13,8 +13,11 @@ try {
   $adminPass = getenv('ADMIN_PASSWORD') ?: 'Admin#2025!';
   $adminName = getenv('ADMIN_NAME') ?: 'Administrador';
   $adminHash = password_hash($adminPass, PASSWORD_DEFAULT);
-  $stmt = $pdo->prepare('INSERT INTO users(document,name,password_hash,role,created_at) VALUES(?,?,?,?,?)');
-  $stmt->execute([$adminDoc,$adminName,$adminHash,'admin',$now]);
+  $stmt = $pdo->prepare("
+    INSERT INTO users (document, name, password_hash, role, person_type, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+");
+  $stmt->execute([$adminDoc,$adminName,$adminHash,'admin','natural','active']);
 
   // Test solicitante
   $solDoc = 'J000111222';
