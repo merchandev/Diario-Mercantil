@@ -12,13 +12,9 @@ mkdir -p /var/www/html/storage/database
 chown -R www-data:www-data /var/www/html/storage
 chmod -R 775 /var/www/html/storage
 
-# Create database file if it doesn't exist
-if [ ! -f /var/www/html/storage/database.sqlite ]; then
-    echo "Creating database file..."
-    touch /var/www/html/storage/database.sqlite
-    chown www-data:www-data /var/www/html/storage/database.sqlite
-    chmod 664 /var/www/html/storage/database.sqlite
-fi
+# Run database initialization (this handles MySQL ready check and migrations)
+echo "Initializing database..."
+bash /var/www/html/init_database.sh
 
 echo "Initialization complete. Starting PHP-FPM..."
 

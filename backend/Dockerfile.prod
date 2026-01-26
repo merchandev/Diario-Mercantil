@@ -68,8 +68,12 @@ RUN mkdir -p /var/www/html/storage/uploads \
     && chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage
 
-# Hacer el script de entrada ejecutable
-RUN chmod +x /var/www/html/entrypoint.prod.sh
+# Install mysql-client for database operations
+RUN apk add --no-cache mysql-client
+
+# Hacer los scripts ejecutables
+RUN chmod +x /var/www/html/entrypoint.prod.sh \
+    && chmod +x /var/www/html/init_database.sh
 
 # Exponer puerto PHP-FPM
 EXPOSE 9000

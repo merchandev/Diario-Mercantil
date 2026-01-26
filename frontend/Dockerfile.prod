@@ -3,6 +3,10 @@ FROM node:18-alpine as build
 
 WORKDIR /app
 
+# Accept backend URL as build argument
+ARG VITE_BACKEND_URL=""
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+
 # Copy package files
 COPY package*.json ./
 
@@ -17,6 +21,9 @@ RUN npm run build -- --logLevel info
 
 # Stage 2: Serve with Nginx
 FROM nginx:alpine
+
+# Install wget for healthcheck
+RUN apk add --no-cache wget
 
 # Copy built assets from builder stage
 COPY --from=build /app/dist /usr/share/nginx/html

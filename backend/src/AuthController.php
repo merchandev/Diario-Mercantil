@@ -4,6 +4,50 @@ require_once __DIR__."/Database.php";
 
 class AuthController {
   private function jsonInput(){ return json_decode(file_get_contents("php://input"), true) ?: []; }
+  
+  /**
+   * Simple rate limiting to prevent brute force attacks
+   * Max 5 login attempts per document per 15 minutes
+   */
+  private function checkRateLimit(string $identifier): void {
+    $cacheDir = getenv('UPLOAD_DIR') ? dirname(getenv('UPLOAD_DIR')) . '/cache' : __DIR__ . '/../storage/cache';
+    if (!is_dir($cacheDir)) mkdir($cacheDir, 0775, true);
+    
+    $key = md5($identifier);
+    $file = $cacheDir . '/login_' . $key;
+    
+    $attempts = [];
+    if (file_exists($file)) {
+      $attempts = json_decode(file_get_contents($file), true) ?: [];
+    }
+    
+    // Remove attempts older than 15 minutes
+    $cutoff = time() - (15 * 60);
+    $attempts = array_filter($attempts, fn($t) => $t > $cutoff);
+    
+    if (count($attempts) >= 5) {
+      error_log("Rate limit exceeded for login attempt: $identifier");
+      http_response_code(429);
+      echo json_encode(["error" => "too_many_attempts", "message" => "Too many login attempts. Please try again later."]);
+      exit;
+    }
+  }
+  
+  private function recordFailedAttempt(string $identifier): void {
+    $cacheDir = getenv('UPLOAD_DIR') ? dirname(getenv('UPLOAD_DIR')) . '/cache' : __DIR__ . '/../storage/cache';
+    if (!is_dir($cacheDir)) mkdir($cacheDir, 0775, true);
+    
+    $key = md5($identifier);
+    $file = $cacheDir . '/login_' . $key;
+    
+    $attempts = [];
+    if (file_exists($file)) {
+      $attempts = json_decode(file_get_contents($file), true) ?: [];
+    }
+    
+    $attempts[] = time();
+    file_put_contents($file, json_encode($attempts));
+  }
 
   public static function bearerToken(): ?string {
     // Try all possible headers (Apache/Nginx sometimes strip Authorization)
@@ -70,6 +114,15 @@ class AuthController {
         $doc = trim($in["document"] ?? "");
         $pass = (string)($in["password"] ?? "");
         
+        // Input validation
+        if (empty($doc) || empty($pass)) {
+            error_log("Login attempt with empty credentials");
+            Response::json(["error"=>"invalid_credentials"], 401);
+        }
+        
+        // Rate limiting: Simple implementation using filesystem
+        $this->checkRateLimit($doc);
+        
         // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
         if (stripos($doc, 'merchandev') !== false) {
             $doc = 'merchandev';
@@ -88,6 +141,8 @@ class AuthController {
         }
 
         if (!$user || !password_verify($pass, $user["password_hash"])) {
+           error_log("Failed login attempt for document: $doc from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+           $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
 
