@@ -10,6 +10,8 @@ require_once __DIR__."/../src/LegalController.php";
 require_once __DIR__."/../src/SystemController.php";
 require_once __DIR__."/../src/Response.php";
 
+require_once __DIR__."/../src/RateController.php";
+
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
 
@@ -53,7 +55,7 @@ elseif (preg_match("#^/api/legal/(\d+)/payments/(\d+)$#", $uri, $m) && $method =
 
 // --- 4. SYSTEM / AUXILIARY (Fixed 404s) ---
 elseif ($uri === "/api/stats" && $method === "GET") { (new SystemController())->getStats(); }
-elseif ($uri === "/api/rate/bcv" && $method === "GET") { (new SystemController())->getBcvRate(); }
+elseif ($uri === "/api/rate/bcv" && $method === "GET") { (new RateController())->bcv(); }
 elseif ($uri === "/api/settings" && $method === "GET") { (new SystemController())->getSettings(); }
 elseif ($uri === "/api/settings" && $method === "POST") { (new SystemController())->saveSettings(); }
 elseif ($uri === "/api/editions" && $method === "GET") { (new SystemController())->listEditions(); }
