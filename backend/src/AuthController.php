@@ -73,9 +73,12 @@ class AuthController {
     $u->execute([$doc]);
     $user = $u->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user && preg_match("/^[VEJGP][0-9]+/i", $doc)) {
-         $u->execute([substr($doc, 1)]);
-         $user = $u->fetch(PDO::FETCH_ASSOC);
+    if (!$user) {
+        // Attempt to strip prefix V, E, J, G, P if followed by alphanumeric
+        if (preg_match("/^[VEJGP](.+)$/i", $doc, $m)) {
+             $u->execute([$m[1]]);
+             $user = $u->fetch(PDO::FETCH_ASSOC);
+        }
     }
 
     if (!$user || !password_verify($pass, $user["password_hash"])) {
