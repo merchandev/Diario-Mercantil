@@ -1,6 +1,5 @@
 services:
   backend:
-    # Service for the backend API
     image: diario-mercantil-backend:latest
     build:
       context: ./backend
@@ -10,8 +9,6 @@ services:
       - ./backend/storage:/var/www/html/storage
     ports:
       - "3000:9000"
-    env_file:
-      - ./backend/.env
     environment:
       APP_ENV: production
       DB_CONNECTION: mysql
@@ -23,19 +20,7 @@ services:
       UPLOAD_DIR: /var/www/html/storage/uploads
       RESULT_DIR: /var/www/html/storage/results
     depends_on:
-      db:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+      - db
     networks:
       - app-network
 
@@ -44,29 +29,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-      args:
-        VITE_BACKEND_URL: ""
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "80:80"
-    healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/" ]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - app-network
 
@@ -80,18 +47,7 @@ services:
       MYSQL_PASSWORD: secure_password_2025
     volumes:
       - db_data:/var/lib/mysql
-    healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password_2025" ]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
+    command: --default-authentication-plugin=mysql_native_password
     networks:
       - app-network
 
@@ -104,8 +60,7 @@ services:
     ports:
       - "8088:80"
     depends_on:
-      db:
-        condition: service_healthy
+      - db
     networks:
       - app-network
 
