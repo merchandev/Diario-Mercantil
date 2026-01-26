@@ -1,82 +1,23 @@
-FROM php:8.2-fpm
+FROM php:8.2-fpm-alpine
 
-# Establecer variables de entorno
-ENV DEBIAN_FRONTEND=noninteractive
+# Install required extensions and tools
+RUN apk add --no-cache \
+    mysql-client \
+    && docker-php-ext-install pdo pdo_mysql
 
-# Instalar dependencias del sistema en un solo layer
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # Herramientas básicas
-    ca-certificates \
-    wget \
-    curl \
-    git \
-    unzip \
-    # Dependencias de PHP
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    libfreetype6-dev \
-    libjpeg62-turbo-dev \
-    # SQLite
-    sqlite3 \
-    libsqlite3-dev \
-    # Dependencias de wkhtmltopdf
-    xfonts-base \
-    xfonts-75dpi \
-    fontconfig \
-    libxrender1 \
-    libxext6 \
-    libx11-6 \
-    libjpeg62-turbo \
-    libpng16-16 \
-    libfontconfig1 \
-    libfreetype6 \
-    libssl3 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Configurar e instalar extensiones PHP
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) gd zip mbstring pdo pdo_mysql pdo_sqlite opcache
-
-# Instalar wkhtmltopdf desde el paquete oficial de Ubuntu Jammy
-# Jammy (Ubuntu 22.04) es compatible con Debian Bookworm
-RUN cd /tmp \
-    && wget -q https://github.com/wkhtmltopdf/packaging/releases/download/0.12.6.1-2/wkhtmltox_0.12.6.1-2.jammy_amd64.deb \
-    && apt-get update \
-    && dpkg -i --force-all wkhtmltox_0.12.6.1-2.jammy_amd64.deb || true \
-    && apt-get -f install -y \
-    && rm wkhtmltox_0.12.6.1-2.jammy_amd64.deb \
-    && rm -rf /var/lib/apt/lists/*
-
-# Verificar que wkhtmltopdf esté instalado correctamente
-RUN which wkhtmltopdf && wkhtmltopdf --version || echo "Warning: wkhtmltopdf verification failed"
-
-# Establecer directorio de trabajo
+# Set working directory
 WORKDIR /var/www/html
 
-# Instalar Composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+# Copy application files
+COPY . .
 
-# Copiar código de la aplicación
-COPY . /var/www/html
+# Create storage directories with correct permissions
+RUN mkdir -p storage/uploads storage/results && \
+    chown -R www-data:www-data storage && \
+    chmod -R 775 storage
 
-# Copy PHP-FPM configuration
-COPY php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
-
-# Crear directorios necesarios y establecer permisos
-RUN mkdir -p /var/www/html/storage/uploads \
-    /var/www/html/storage/results \
-    /var/www/html/storage/database \
-    && chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage
-
-# Hacer los scripts ejecutables
-RUN chmod +x /var/www/html/entrypoint.prod.sh \
-    && chmod +x /var/www/html/setup_database.sh
-
-# Exponer puerto PHP-FPM
+# Expose PHP-FPM port
 EXPOSE 9000
 
-# Ejecutar entrypoint que iniciará PHP-FPM
-CMD ["/var/www/html/entrypoint.prod.sh"]
+# Start PHP-FPM
+CMD ["php-fpm"]

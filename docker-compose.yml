@@ -1,6 +1,5 @@
 services:
   backend:
-    image: diario-mercantil-backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
@@ -20,12 +19,18 @@ services:
       UPLOAD_DIR: /var/www/html/storage/uploads
       RESULT_DIR: /var/www/html/storage/results
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - app-network
+    healthcheck:
+      test: [ "CMD-SHELL", "php-fpm -t || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   frontend:
-    image: diario-mercantil-frontend:latest
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
@@ -50,6 +55,12 @@ services:
     command: --default-authentication-plugin=mysql_native_password
     networks:
       - app-network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password_2025" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
@@ -58,15 +69,17 @@ services:
       PMA_HOST: db
       UPLOAD_LIMIT: 64M
     ports:
-      - "8088:80"
+      - "8080:80"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - app-network
+
+volumes:
+  db_data:
+
 
 networks:
   app-network:
     driver: bridge
-
-volumes:
-  db_data:
