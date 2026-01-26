@@ -11,8 +11,7 @@ echo "Waiting for MySQL to be ready..."
 max_retries=30
 counter=0
 
-until php -r "try { require '/var/www/html/src/Database.php'; Database::healthCheck(); exit(0); } catch (Exception \$e) { exit(1); }" 2>/dev/null
-do
+until mysql -h db -u mercantil_user -psecure_password_2025 -e "SELECT 1" > /dev/null 2>&1; do
     counter=$((counter+1))
     if [ $counter -gt $max_retries ]; then
         echo "ERROR: MySQL did not become ready in time"
@@ -25,24 +24,15 @@ done
 echo "✓ Database is ready"
 
 # Check if tables exist
-TABLE_COUNT=$(php -r "
-require '/var/www/html/src/Database.php';
-\$pdo = Database::pdo();
-\$result = \$pdo->query(\"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'diario_mercantil'\");
-echo \$result->fetchColumn();
-")
+TABLE_COUNT=$(mysql -h db -u mercantil_user -psecure_password_2025 -D diario_mercantil -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'diario_mercantil'" 2>/dev/null || echo "0")
 
 echo "Found $TABLE_COUNT tables in database"
 
 if [ "$TABLE_COUNT" -eq "0" ]; then
     echo "Database is empty. Running migrations..."
-    php -r "
-    require '/var/www/html/src/Database.php';
-    \$pdo = Database::pdo();
-    \$sql = file_get_contents('/var/www/html/migrations/init.sql');
-    \$pdo->exec(\$sql);
-    echo 'Migrations completed successfully\n';
-    "
+    mysql -h db -u mercantil_user -psecure_password_2025 diario_mercantil < /var/www/html/migrations/init.sql
+    
+    echo "✓ Migrations completed successfully"
     
     echo "Seeding initial data..."
     php /var/www/html/scripts/seed_users.php
