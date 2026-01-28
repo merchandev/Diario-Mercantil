@@ -145,6 +145,10 @@ export async function getBcvRate(opts?: { force?: boolean }) {
   }>
 }
 
+export async function forceRefreshBcv() {
+  return getBcvRate({ force: true })
+}
+
 export async function listFiles(params?: { q?: string; status?: string }) {
   const qs = new URLSearchParams(params as any)
   const res = await fetchAuth(`/api/files?${qs}`)

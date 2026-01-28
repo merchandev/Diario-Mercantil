@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Save, DollarSign, FileText, Settings as SettingsIcon } from 'lucide-react'
+import { ArrowLeft, Save, DollarSign, FileText, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, saveSettings, Settings as SettingsType } from '../../lib/api'
+import { getSettings, saveSettings, forceRefreshBcv, Settings as SettingsType } from '../../lib/api'
 import { verifySuperAdmin } from '../../lib/api'
 
 export default function Settings() {
     const [settings, setSettings] = useState<Partial<SettingsType>>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
+    const [refreshingRate, setRefreshingRate] = useState(false)
     const navigate = useNavigate()
 
     useEffect(() => {
@@ -37,6 +38,24 @@ export default function Settings() {
             alert('Error al guardar configuración')
         } finally {
             setSaving(false)
+        }
+    }
+
+    async function handleRefreshRate() {
+        setRefreshingRate(true)
+        try {
+            const res = await forceRefreshBcv()
+            if (res.rate) {
+                setSettings(prev => ({ ...prev, bcv_rate: res.rate }))
+                alert(`Tasa actualizada correctamente: ${res.rate} Bs/USD`)
+            } else {
+                alert('No se pudo obtener la tasa. Verifique conexión.')
+            }
+        } catch (error: any) {
+            console.error('Error refreshing BCV:', error)
+            alert('Error al actualizar tasa: ' + (error.message || 'Desconocido'))
+        } finally {
+            setRefreshingRate(false)
         }
     }
 
@@ -81,13 +100,25 @@ export default function Settings() {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Tasa BCV (Bs/USD)</label>
-                                <input
-                                    type="number"
-                                    step="0.01"
-                                    value={settings.bcv_rate || ''}
-                                    onChange={(e) => setSettings({ ...settings, bcv_rate: parseFloat(e.target.value) })}
-                                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
-                                />
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={settings.bcv_rate || ''}
+                                        onChange={(e) => setSettings({ ...settings, bcv_rate: parseFloat(e.target.value) })}
+                                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleRefreshRate}
+                                        disabled={refreshingRate}
+                                        className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-colors disabled:opacity-50"
+                                        title="Actualizar desde BCV"
+                                    >
+                                        <RefreshCw className={`w-5 h-5 ${refreshingRate ? 'animate-spin' : ''}`} />
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Este valor se actualiza automáticamente. Use el botón para forzar actualización.</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Precio por Folio (USD)</label>
