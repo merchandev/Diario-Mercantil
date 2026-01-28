@@ -4,6 +4,11 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") exit(0);
 
+// Disable display_errors to prevent HTML leakage into JSON responses
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL); // Log errors but don't show them
+
 require_once __DIR__."/../src/AuthController.php";
 require_once __DIR__."/../src/UserController.php";
 require_once __DIR__."/../src/LegalController.php";
