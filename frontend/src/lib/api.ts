@@ -416,7 +416,14 @@ export async function uploadLegalPdf(file: File, id?: number) {
 }
 
 // Users
-export type UserSummary = { id: number; document: string; name: string; role: string }
+export interface UserSummary {
+  id: number
+  document: string
+  name: string
+  role: 'admin' | 'solicitante'
+  email?: string
+  status?: 'active' | 'suspended'
+}
 export async function listUsers() {
   const res = await fetchAuth('/api/users')
   return res.json() as Promise<{ items: UserSummary[] }>
@@ -425,7 +432,7 @@ export async function createUser(body: { document: string; name: string; passwor
   const res = await fetchAuth('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json() as Promise<{ id: number }>
 }
-export async function updateUser(id: number, body: { name: string; role?: string; email?: string; phone?: string; status?: string; person_type?: string }) {
+export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string }) {
   const res = await fetchAuth(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }

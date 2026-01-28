@@ -42,10 +42,39 @@ class UserController {
     AuthController::requireAuth();
     $pdo = Database::pdo();
     $in = $this->json();
+    
     $name = trim($in["name"] ?? "");
     $role = $in["role"] ?? "solicitante";
-    $stmt = $pdo->prepare("UPDATE users SET name=?, role=?, updated_at=NOW() WHERE id=?");
-    $stmt->execute([$name,$role,$id]);
+    $email = trim($in["email"] ?? "");
+    $status = trim($in["status"] ?? "");
+    $password = (string)($in["password"] ?? "");
+    
+    // Prepare update query dynamically
+    $fields = ["name=?", "role=?, updated_at=NOW()"];
+    $params = [$name, $role];
+    
+    if ($email !== "") {
+        // Optional: Check for duplicate email if strictly enforced
+        $fields[] = "email=?";
+        $params[] = $email;
+    }
+    
+    if ($status === 'active' || $status === 'suspended') {
+        $fields[] = "status=?";
+        $params[] = $status;
+    }
+    
+    if ($password !== "") {
+        $fields[] = "password_hash=?";
+        $params[] = password_hash($password, PASSWORD_BCRYPT);
+    }
+    
+    $params[] = $id;
+    $sql = "UPDATE users SET " . implode(", ", $fields) . " WHERE id=?";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    
     Response::json(["ok"=>true]);
   }
   

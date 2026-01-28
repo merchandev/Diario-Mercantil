@@ -13,8 +13,10 @@ export default function Users() {
     const [formData, setFormData] = useState({
         document: '',
         name: '',
+        email: '',
         password: '',
-        role: 'solicitante'
+        role: 'solicitante',
+        status: 'active'
     })
 
     const navigate = useNavigate()
@@ -41,14 +43,18 @@ export default function Users() {
             if (editingUser) {
                 await updateUser(editingUser.id, {
                     name: formData.name,
-                    role: formData.role
+                    role: formData.role,
+                    email: formData.email,
+                    status: formData.status,
+                    password: formData.password || undefined // Only send if not empty
                 })
             } else {
                 await createUser(formData)
             }
             setShowModal(false)
             setEditingUser(null)
-            setFormData({ document: '', name: '', password: '', role: 'solicitante' })
+            setEditingUser(null)
+            setFormData({ document: '', name: '', email: '', password: '', role: 'solicitante', status: 'active' })
             loadUsers()
         } catch (error) {
             console.error('Error saving user:', error)
@@ -72,8 +78,10 @@ export default function Users() {
         setFormData({
             document: user.document,
             name: user.name,
-            password: '', // Password not editable directly here for security
-            role: user.role
+            email: user.email || '',
+            password: '', // Password always empty on edit
+            role: user.role,
+            status: user.status || 'active'
         })
         setShowModal(true)
     }
@@ -101,7 +109,8 @@ export default function Users() {
                         <button
                             onClick={() => {
                                 setEditingUser(null)
-                                setFormData({ document: '', name: '', password: '', role: 'solicitante' })
+                                setEditingUser(null)
+                                setFormData({ document: '', name: '', email: '', password: '', role: 'solicitante', status: 'active' })
                                 setShowModal(true)
                             }}
                             className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors shadow-lg shadow-purple-900/20"
@@ -134,7 +143,7 @@ export default function Users() {
                                 <tr>
                                     <th className="px-6 py-4 text-purple-300 font-medium text-sm">Usuario</th>
                                     <th className="px-6 py-4 text-purple-300 font-medium text-sm">Documento</th>
-                                    <th className="px-6 py-4 text-purple-300 font-medium text-sm">Rol</th>
+                                    <th className="px-6 py-4 text-purple-300 font-medium text-sm">Rol/Estado</th>
                                     <th className="px-6 py-4 text-purple-300 font-medium text-sm text-right">Acciones</th>
                                 </tr>
                             </thead>
@@ -166,13 +175,20 @@ export default function Users() {
                                                 {user.document}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${user.role === 'admin'
+                                                <div className="flex flex-col gap-2 items-start">
+                                                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${user.role === 'admin'
                                                         ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                                                         : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                                                    }`}>
-                                                    {user.role === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
-                                                    {user.role === 'admin' ? 'Administrador' : 'Solicitante'}
-                                                </span>
+                                                        }`}>
+                                                        {user.role === 'admin' ? <Shield className="w-3 h-3" /> : <UserIcon className="w-3 h-3" />}
+                                                        {user.role === 'admin' ? 'Administrador' : 'Solicitante'}
+                                                    </span>
+                                                    {user.status === 'suspended' && (
+                                                        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                                                            Suspendido
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
@@ -230,28 +246,49 @@ export default function Users() {
                                     className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
                                 />
                             </div>
-                            {!editingUser && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Contraseña</label>
-                                    <input
-                                        type="password"
-                                        required
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
-                                    />
-                                </div>
-                            )}
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Rol</label>
-                                <select
-                                    value={formData.role}
-                                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
+                                <input
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
-                                >
-                                    <option value="solicitante">Solicitante</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
+                                    placeholder="opcional@correo.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Contraseña</label>
+                                <input
+                                    type="password"
+                                    required={!editingUser} // Only required for new users
+                                    value={formData.password}
+                                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                                    className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Rol</label>
+                                    <select
+                                        value={formData.role}
+                                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                                        className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none"
+                                    >
+                                        <option value="solicitante">Solicitante</option>
+                                        <option value="admin">Administrador</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Estado</label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                        className={`w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white focus:border-purple-500 outline-none ${formData.status === 'suspended' ? 'text-red-400 border-red-500/50' : 'text-green-400'}`}
+                                    >
+                                        <option value="active">Activo</option>
+                                        <option value="suspended">Suspendido</option>
+                                    </select>
+                                </div>
                             </div>
                             <div className="flex gap-3 mt-8">
                                 <button
