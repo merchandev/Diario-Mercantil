@@ -79,6 +79,8 @@ const MediosPagoInfo = lazyImport(() => import('./pages/MediosPagoInfo'))
 // Superadmin Lotus - lazy loaded
 const LotusLogin = lazyImport(() => import('./pages/SuperAdmin/LotusLogin'))
 const SuperAdminDashboard = lazyImport(() => import('./pages/SuperAdmin/Dashboard'))
+const SuperAdminUsers = lazyImport(() => import('./pages/SuperAdmin/Users'))
+// const SuperAdminSettings = lazyImport(() => import('./pages/SuperAdmin/Settings'))
 
 // Wrapper component for lazy-loaded routes
 function LazyRoute({ children }: { children: React.ReactNode }) {
@@ -106,6 +108,8 @@ export default function App() {
       {/* Lotus - Secret Superadmin Routes */}
       <Route path="/lotus/" element={<LazyRoute><LotusLogin /></LazyRoute>} />
       <Route path="/lotus/dashboard" element={<LazyRoute><SuperAdminDashboard /></LazyRoute>} />
+      <Route path="/lotus/users" element={<LazyRoute><SuperAdminUsers /></LazyRoute>} />
+      {/* <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} /> */}
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
