@@ -80,7 +80,10 @@ const MediosPagoInfo = lazyImport(() => import('./pages/MediosPagoInfo'))
 const LotusLogin = lazyImport(() => import('./pages/SuperAdmin/LotusLogin'))
 const SuperAdminDashboard = lazyImport(() => import('./pages/SuperAdmin/Dashboard'))
 const SuperAdminUsers = lazyImport(() => import('./pages/SuperAdmin/Users'))
-// const SuperAdminSettings = lazyImport(() => import('./pages/SuperAdmin/Settings'))
+const SuperAdminPublications = lazyImport(() => import('./pages/SuperAdmin/Publications'))
+const SuperAdminSettings = lazyImport(() => import('./pages/SuperAdmin/Settings'))
+const SuperAdminStats = lazyImport(() => import('./pages/SuperAdmin/Stats'))
+const SuperAdminActivity = lazyImport(() => import('./pages/SuperAdmin/Activity'))
 
 // Wrapper component for lazy-loaded routes
 function LazyRoute({ children }: { children: React.ReactNode }) {
@@ -109,7 +112,10 @@ export default function App() {
       <Route path="/lotus/" element={<LazyRoute><LotusLogin /></LazyRoute>} />
       <Route path="/lotus/dashboard" element={<LazyRoute><SuperAdminDashboard /></LazyRoute>} />
       <Route path="/lotus/users" element={<LazyRoute><SuperAdminUsers /></LazyRoute>} />
-      {/* <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} /> */}
+      <Route path="/lotus/publications" element={<LazyRoute><SuperAdminPublications /></LazyRoute>} />
+      <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} />
+      <Route path="/lotus/stats" element={<LazyRoute><SuperAdminStats /></LazyRoute>} />
+      <Route path="/lotus/activity" element={<LazyRoute><SuperAdminActivity /></LazyRoute>} />
 
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
