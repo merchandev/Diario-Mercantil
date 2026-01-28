@@ -17,58 +17,63 @@ class RateController {
   }
 
   public function bcv(){
-    $pdo = Database::pdo();
-    $force = isset($_GET['force']) && $_GET['force'] === '1';
-    $data = BcvScraper::getRates($force);
+    try {
+        $pdo = Database::pdo();
+        $force = isset($_GET['force']) && $_GET['force'] === '1';
+        $data = BcvScraper::getRates($force);
 
-    // Optional fallback provider when BCV markup doesn't expose numbers
-    // Enabled by default unless BCV_FALLBACK=0
-    $useFallback = getenv('BCV_FALLBACK') !== '0';
-    if ($useFallback) {
-      $needUsd = empty($data['rates']['USD']['value']);
-      $needEur = empty($data['rates']['EUR']['value']);
-      if ($needUsd || $needEur) {
-        error_log('[RateController] ⚠️ BCV scrape incomplete, attempting fallback. Info: ' . json_encode($data['error'] ?? 'missing_values'));
-        try {
-          $fb = $this->fallbackRates();
-          if ($needUsd && isset($fb['USD'])) {
-            $data['rates']['USD'] = ['raw'=>(string)$fb['USD'], 'value'=>(float)$fb['USD']];
+        // Optional fallback provider when BCV markup doesn't expose numbers
+        // Enabled by default unless BCV_FALLBACK=0
+        $useFallback = getenv('BCV_FALLBACK') !== '0';
+        if ($useFallback) {
+          $needUsd = empty($data['rates']['USD']['value']);
+          $needEur = empty($data['rates']['EUR']['value']);
+          if ($needUsd || $needEur) {
+            error_log('[RateController] ⚠️ BCV scrape incomplete, attempting fallback. Info: ' . json_encode($data['error'] ?? 'missing_values'));
+            try {
+              $fb = $this->fallbackRates();
+              if ($needUsd && isset($fb['USD'])) {
+                $data['rates']['USD'] = ['raw'=>(string)$fb['USD'], 'value'=>(float)$fb['USD']];
+              }
+              if ($needEur && isset($fb['EUR'])) {
+                $data['rates']['EUR'] = ['raw'=>(string)$fb['EUR'], 'value'=>(float)$fb['EUR']];
+              }
+              if (!empty($fb['source'])) { $data['source_url'] = $fb['source']; }
+            } catch (Throwable $e) {
+              error_log('[RateController] ❌ Fallback failed: ' . $e->getMessage());
+            }
           }
-          if ($needEur && isset($fb['EUR'])) {
-            $data['rates']['EUR'] = ['raw'=>(string)$fb['EUR'], 'value'=>(float)$fb['EUR']];
-          }
-          if (!empty($fb['source'])) { $data['source_url'] = $fb['source']; }
-        } catch (Throwable $e) {
-          error_log('[RateController] ❌ Fallback failed: ' . $e->getMessage());
         }
-      }
-    }
 
-    // Persist latest USD rate for reuse by other parts of the system
-    $usd = isset($data['rates']['USD']['value']) ? (float)$data['rates']['USD']['value'] : null;
-    if ($usd !== null && $usd > 0) {
-      $this->setSetting($pdo, 'bcv_rate', (string)$usd);
-      $this->setSetting($pdo, 'bcv_rate_live_at', $data['fetched_at'] ?? gmdate('c'));
-    }
+        // Persist latest USD rate for reuse by other parts of the system
+        $usd = isset($data['rates']['USD']['value']) ? (float)$data['rates']['USD']['value'] : null;
+        if ($usd !== null && $usd > 0) {
+          $this->setSetting($pdo, 'bcv_rate', (string)$usd);
+          $this->setSetting($pdo, 'bcv_rate_live_at', $data['fetched_at'] ?? gmdate('c'));
+        }
 
-    $resp = [
-      // Backward compatibility
-      'rate' => $usd ?? (float)($this->getSetting($pdo,'bcv_rate') ?: 0),
-      // Extended fields
-      'usd'  => [
-        'raw' => $data['rates']['USD']['raw'] ?? null,
-        'value' => $data['rates']['USD']['value'] ?? null,
-      ],
-      'eur'  => [
-        'raw' => $data['rates']['EUR']['raw'] ?? null,
-        'value' => $data['rates']['EUR']['value'] ?? null,
-      ],
-      'date_iso'   => $data['date_iso'] ?? null,
-      'fetched_at' => $data['fetched_at'] ?? gmdate('c'),
-      'from_cache' => !empty($data['from_cache']),
-      'source_url' => $data['source_url'] ?? 'https://www.bcv.org.ve/',
-    ];
-    return Response::json($resp);
+        $resp = [
+          // Backward compatibility
+          'rate' => $usd ?? (float)($this->getSetting($pdo,'bcv_rate') ?: 0),
+          // Extended fields
+          'usd'  => [
+            'raw' => $data['rates']['USD']['raw'] ?? null,
+            'value' => $data['rates']['USD']['value'] ?? null,
+          ],
+          'eur'  => [
+            'raw' => $data['rates']['EUR']['raw'] ?? null,
+            'value' => $data['rates']['EUR']['value'] ?? null,
+          ],
+          'date_iso'   => $data['date_iso'] ?? null,
+          'fetched_at' => $data['fetched_at'] ?? gmdate('c'),
+          'from_cache' => !empty($data['from_cache']),
+          'source_url' => $data['source_url'] ?? 'https://www.bcv.org.ve/',
+        ];
+        return Response::json($resp);
+    } catch (\Throwable $e) {
+        error_log('[RateController] Critical Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+        return Response::json(['error' => 'server_error', 'message' => $e->getMessage()], 500);
+    }
   }
 
   public function bcvHtml(){

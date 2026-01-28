@@ -4,7 +4,9 @@ FROM php:8.2-fpm-alpine
 RUN apk add --no-cache \
     mysql-client \
     curl-dev \
-    && docker-php-ext-install pdo pdo_mysql curl
+    libxml2-dev \
+    oniguruma-dev \
+    && docker-php-ext-install pdo pdo_mysql curl mbstring dom xml
 
 # Set working directory
 WORKDIR /var/www/html
