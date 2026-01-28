@@ -33,6 +33,19 @@ final class BcvScraper
             self::cacheWrite($cacheFile, $fresh);
             return $fresh;
         } catch (\Throwable $e) {
+            // Attempt 3rd party fallback for BCV data
+            try {
+                $fallback = self::fetchFromApiProvider();
+                if ($fallback) {
+                    $fallback['from_cache'] = false;
+                    $fallback['warning'] = 'Using API fallback due to main site failure: ' . $e->getMessage();
+                    self::cacheWrite($cacheFile, $fallback);
+                    return $fallback;
+                }
+            } catch (\Throwable $e2) {
+                // Ignore fallback error and proceed to cache/error
+            }
+
             $stale = self::cacheReadAny($cacheFile);
             if ($stale !== null) {
                 $stale['from_cache'] = true;
@@ -247,7 +260,9 @@ final class BcvScraper
         ]);
         $body = @file_get_contents($url, false, $ctx);
         if ($body === false) {
-            throw new \RuntimeException('HTTP fetch failed (streams)');
+            $e = error_get_last();
+            $msg = $e['message'] ?? 'unknown error';
+            throw new \RuntimeException("HTTP fetch failed (streams): $msg");
         }
         return $body;
     }
@@ -309,5 +324,38 @@ final class BcvScraper
         if ($json === false) return;
         @file_put_contents($tmp, $json);
         @rename($tmp, $file);
+    }
+    private static function fetchFromApiProvider(): ?array
+    {
+        // Public API from pydolarvenezuela
+        $url = 'https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv';
+        
+        try {
+            $json = self::httpGet($url);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if ($json === '' || $json === false) return null;
+        
+        $data = json_decode($json, true);
+        if (!is_array($data)) return null;
+        
+        // Structure: { monitors: { usd: { price: float }, eur: { price: float } }, datetime: { date: string } }
+        $usdVal = $data['monitors']['usd']['price'] ?? null;
+        $eurVal = $data['monitors']['eur']['price'] ?? null;
+        $dateStr = $data['datetime']['date'] ?? null; // e.g. "2024-01-28"
+
+        if (!$usdVal && !$eurVal) return null;
+
+        return [
+            'source_url' => 'https://pydolarvenezuela-api.vercel.app',
+            'date_iso'   => $dateStr,
+            'rates'      => [
+                'USD' => $usdVal ? ['raw' => (string)$usdVal, 'value' => (float)$usdVal] : null,
+                'EUR' => $eurVal ? ['raw' => (string)$eurVal, 'value' => (float)$eurVal] : null,
+            ],
+            'fetched_at' => gmdate('c'),
+        ];
     }
 }
