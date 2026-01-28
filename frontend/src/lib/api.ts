@@ -10,7 +10,7 @@ export type FileRow = {
 
 // Auth helpers
 export function getToken() {
-  return localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+  return localStorage.getItem('token') || localStorage.getItem('superadmin_token') || sessionStorage.getItem('token') || ''
 }
 
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {

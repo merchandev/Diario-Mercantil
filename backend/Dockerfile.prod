@@ -11,6 +11,7 @@ WORKDIR /var/www/html
 
 # Copy application files
 COPY . .
+COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 
 # Create storage directories with correct permissions
 RUN mkdir -p storage/uploads storage/results && \

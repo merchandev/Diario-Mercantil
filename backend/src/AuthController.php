@@ -67,7 +67,7 @@ class AuthController {
     return ($h && preg_match("/^Bearer\s+(.*)$/i", $h, $m)) ? trim($m[1]) : ($_GET["token"] ?? null);
   }
 
-  public static function requireAuth(){
+    public static function requireAuth(){
     $token = self::bearerToken();
     if (!$token) { 
         http_response_code(401); 
@@ -76,30 +76,54 @@ class AuthController {
     }
     
     $pdo = Database::pdo();
+    
+    // 1. Try Normal User Token
     // Use simple query first
     $stmt = $pdo->prepare("SELECT u.*, t.expires_at FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=?");
     $stmt->execute([$token]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    if (!$user) {
-        http_response_code(401); 
-        echo json_encode(["error"=>"unauthorized_invalid_token", "received_token_preview" => substr($token,0,5)."..."]);
-        exit;
+    if ($user) {
+        // Check expiry (Server Time vs DB Time)
+        // Convert both to timestamps to be safe
+        if (strtotime($user["expires_at"]) <= time()) {
+             http_response_code(401); 
+             echo json_encode([
+                 "error"=>"unauthorized_expired", 
+                 "expiry"=>$user["expires_at"], 
+                 "now"=>gmdate("Y-m-d H:i:s")
+             ]); 
+             exit;
+        }
+        return $user;
     }
 
-    // Check expiry (Server Time vs DB Time)
-    // Convert both to timestamps to be safe
-    if (strtotime($user["expires_at"]) <= time()) {
-         http_response_code(401); 
-         echo json_encode([
-             "error"=>"unauthorized_expired", 
-             "expiry"=>$user["expires_at"], 
-             "now"=>gmdate("Y-m-d H:i:s")
-         ]); 
-         exit;
+    // 2. Try SuperAdmin Token (Fallback for Admin Panel operations)
+    $stmt = $pdo->prepare("SELECT s.id, s.username, t.expires_at FROM superadmin_tokens t JOIN superadmins s ON s.id=t.superadmin_id WHERE t.token=?");
+    $stmt->execute([$token]);
+    $admin = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($admin) {
+         if (strtotime($admin["expires_at"]) <= time()) {
+             http_response_code(401); 
+             echo json_encode(["error"=>"unauthorized_expired"]); 
+             exit;
+        }
+        // Return a mock user structure compatible with controllers
+        return [
+            "id" => $admin['id'],
+            "document" => "SUPERADMIN",
+            "name" => $admin['username'],
+            "role" => "superadmin", // Special role
+            "email" => "",
+            "phone" => ""
+        ];
     }
 
-    return $user;
+    // If neither
+    http_response_code(401); 
+    echo json_encode(["error"=>"unauthorized_invalid_token", "received_token_preview" => substr($token,0,5)."..."]);
+    exit;
   }
   
   public static function userFromToken(?string $token){
