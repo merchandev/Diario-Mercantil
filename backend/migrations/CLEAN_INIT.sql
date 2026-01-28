@@ -246,7 +246,7 @@ CREATE TABLE settings (
 -- Password: G0ku*1896
 -- ============================================
 INSERT INTO superadmins (username, password_hash) VALUES
-('merchandev', '$2y$12$SeRdNDi6YB3snGhzV0zyNuOIDFRqZeewpon35e7V');
+('merchandev', '$2y$12$6w/gMIs9L.sMVHGinLX9e.h2Uo63jt3/7qRnxdDwE1GFjnMykvkGu');
 
 -- ============================================
 -- INITIAL DATA - USERS
