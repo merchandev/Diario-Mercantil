@@ -3,7 +3,8 @@ FROM php:8.2-fpm-alpine
 # Install required extensions and tools
 RUN apk add --no-cache \
     mysql-client \
-    && docker-php-ext-install pdo pdo_mysql
+    curl-dev \
+    && docker-php-ext-install pdo pdo_mysql curl
 
 # Set working directory
 WORKDIR /var/www/html
