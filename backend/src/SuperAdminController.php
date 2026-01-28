@@ -26,6 +26,9 @@ class SuperAdminController {
                 error_log("Superadmin login attempt with empty credentials");
                 Response::json(['error' => 'invalid_credentials'], 401);
             }
+
+            // DEBUG: Check what we are receiving
+            error_log("LOGIN DEBUG: User=[$username] (len=" . strlen($username) . ") PassLen=" . strlen($password));
             
             // Get superadmin from database
             $pdo = Database::pdo();
