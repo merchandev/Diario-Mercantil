@@ -164,8 +164,14 @@ class AuthController {
             }
         }
 
-        if (!$user || !password_verify($pass, $user["password_hash"])) {
-           error_log("Failed login attempt for document: $doc from IP: " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        if (!$user) {
+           error_log("Login failed: User not found for doc: $doc");
+           $this->recordFailedAttempt($doc);
+           Response::json(["error"=>"invalid_credentials"], 401);
+        }
+
+        if (!password_verify($pass, $user["password_hash"])) {
+           error_log("Login failed: Password mismatch for doc: $doc. Hash len: " . strlen($user['password_hash']));
            $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
