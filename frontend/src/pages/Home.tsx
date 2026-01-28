@@ -1,14 +1,14 @@
 import React from 'react'
 import EditionPromoAside from '../components/EditionPromoAside'
 
-function BannerBox({label, className}:{label:string;className?:string}){
+function BannerBox({ label, className }: { label: string; className?: string }) {
   return (
-    <div className={`card grid place-items-center aspect-[16/5] text-slate-500 ${className||''}`}>
+    <div className={`card grid place-items-center aspect-[16/5] text-slate-500 ${className || ''}`}>
       <span className="text-sm">{label}</span>
     </div>
   )
 }
-export default function Home(){
+export default function Home() {
   // eslint-disable-next-line no-console
   console.log('[Home] Component rendering')
   return (
@@ -50,7 +50,7 @@ export default function Home(){
 
       <section className="mx-auto max-w-7xl px-4 pb-10">
         <div className="grid md:grid-cols-3 gap-6">
-          {[1,2,3].map(i=> (
+          {[1, 2, 3].map(i => (
             <article key={i} className="card p-4">
               <div className="aspect-[4/3] rounded-xl bg-slate-100 mb-3" />
               <h3 className="font-semibold">Nota #{i}</h3>
@@ -70,7 +70,7 @@ export default function Home(){
             <button className="btn btn-primary">Suscribirme</button>
           </form>
         </div>
-        <div className="text-center text-xs text-slate-500 py-4">© {new Date().getFullYear()} Diario — Hecho con React + Tailwind</div>
+        <div className="text-center text-xs text-slate-500 py-4">© 2026 Diario Mercantil Todos los derechos reservados</div>
       </footer>
     </div>
   )
