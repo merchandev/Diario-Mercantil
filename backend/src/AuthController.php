@@ -54,17 +54,30 @@ class AuthController {
     $h = $_SERVER["HTTP_AUTHORIZATION"] 
       ?? $_SERVER["REDIRECT_HTTP_AUTHORIZATION"] 
       ?? $_SERVER["HTTP_X_AUTHORIZATION"] // Sometimes used as workaround
+      ?? $_SERVER["HTTP_X_AUTH_TOKEN"] // Our custom failover
       ?? null;
       
     if (!$h && function_exists("getallheaders")) {
         $headers = getallheaders();
-        $h = $headers["Authorization"] ?? $headers["authorization"] ?? null;
+        $h = $headers["Authorization"] 
+            ?? $headers["authorization"] 
+            ?? $headers["X-Auth-Token"] // Check headers directly
+            ?? null;
     }
     
     // Debug to stderr
     // file_put_contents("php://stderr", "Auth Header: " . ($h ? substr($h,0,10)."..." : "NULL") . "\n", FILE_APPEND);
 
-    $token = ($h && preg_match("/^Bearer\s+(.*)$/i", $h, $m)) ? trim($m[1]) : ($_GET["token"] ?? null);
+    // If header exists, try to extract Bearer or just use the whole value if it looks like a token
+    if ($h) {
+        if (preg_match("/^Bearer\s+(.*)$/i", $h, $m)) {
+            $token = trim($m[1]);
+        } else {
+            $token = trim($h);
+        }
+    } else {
+        $token = $_GET["token"] ?? null;
+    }
     
     // Safety check for "null" string literal coming from buggy clients
     if ($token === "null" || $token === "undefined") return null;

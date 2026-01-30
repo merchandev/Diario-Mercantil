@@ -22,7 +22,10 @@ export function getToken() {
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
   const token = getToken()
   const headers = new Headers(init?.headers || {})
-  if (token) headers.set('Authorization', `Bearer ${token}`)
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+    headers.set('X-Auth-Token', token) // Backup for aggressive proxies
+  }
   const url = typeof input === 'string' ? getUrl(input) : input;
   const res = await fetch(url, { ...init, headers })
   if (res.status === 401) {
