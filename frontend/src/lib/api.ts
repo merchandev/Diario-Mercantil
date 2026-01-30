@@ -10,7 +10,13 @@ export type FileRow = {
 
 // Auth helpers
 export function getToken() {
-  return localStorage.getItem('token') || localStorage.getItem('superadmin_token') || sessionStorage.getItem('token') || ''
+  // If we are in the superadmin section, prefer superadmin token
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/lotus/')) {
+    const t = localStorage.getItem('superadmin_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
+    return (t && t !== 'null' && t !== 'undefined') ? t : '';
+  }
+  const t = localStorage.getItem('token') || localStorage.getItem('superadmin_token') || sessionStorage.getItem('token');
+  return (t && t !== 'null' && t !== 'undefined') ? t : '';
 }
 
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
@@ -32,7 +38,13 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
       try { localStorage.removeItem('token'); } catch { }
       try { sessionStorage.removeItem('token'); } catch { }
       // Force re-authentication
-      if (typeof window !== 'undefined') window.location.href = '/login'
+      if (typeof window !== 'undefined') {
+        if (window.location.pathname.startsWith('/lotus/')) {
+          window.location.href = '/lotus/'
+        } else {
+          window.location.href = '/login'
+        }
+      }
     }
     console.error(`API 401 Error: ${serverError}`);
     throw new Error(serverError)
@@ -469,7 +481,21 @@ export async function saveSettings(settings: Partial<Settings>) {
 // Stats
 export async function getStats() {
   const res = await fetchAuth('/api/stats')
-  return res.json() as Promise<{ publications: number; editions: number; users_active: number }>
+  return res.json() as Promise<{
+    users_total: number;
+    users_active: number;
+    users_suspended: number;
+    users_admin: number;
+    publications: number;
+    publications_pending: number;
+    publications_documents: number;
+    publications_convocations: number;
+    publications_recent_30d: number;
+    editions: number;
+    revenue_total_usd: number;
+    revenue_pending_usd: number;
+    transactions_completed: number;
+  }>
 }
 export async function clearStats() {
   const res = await fetchAuth('/api/stats/clear', { method: 'POST' })

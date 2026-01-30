@@ -64,7 +64,12 @@ class AuthController {
     // Debug to stderr
     // file_put_contents("php://stderr", "Auth Header: " . ($h ? substr($h,0,10)."..." : "NULL") . "\n", FILE_APPEND);
 
-    return ($h && preg_match("/^Bearer\s+(.*)$/i", $h, $m)) ? trim($m[1]) : ($_GET["token"] ?? null);
+    $token = ($h && preg_match("/^Bearer\s+(.*)$/i", $h, $m)) ? trim($m[1]) : ($_GET["token"] ?? null);
+    
+    // Safety check for "null" string literal coming from buggy clients
+    if ($token === "null" || $token === "undefined") return null;
+
+    return $token;
   }
 
     public static function requireAuth(){
