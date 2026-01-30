@@ -73,6 +73,14 @@ elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController()
 elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
 elseif ($uri === "/api/system/fix" && $method === "GET") { (new SystemController())->emergencyFix(); }
 
+// --- 5. PUBLICATIONS (Pages) ---
+elseif ($uri === "/api/publications" && $method === "GET") { (new SystemController())->listPages(); }
+elseif ($uri === "/api/publications" && $method === "POST") { (new SystemController())->createPage(); }
+elseif (preg_match("#^/api/publications/(\d+)$#", $uri, $m)) {
+    if ($method === "PUT") (new SystemController())->updatePage($m[1]);
+    if ($method === "DELETE") (new SystemController())->deletePage($m[1]);
+}
+
 // Directory
 elseif ($uri === "/api/directory/profile" && $method === "GET") { (new SystemController())->getDirectoryProfile(); }
 elseif ($uri === "/api/directory/areas" && $method === "GET") { Response::json(["items"=>[]]); } // Stub

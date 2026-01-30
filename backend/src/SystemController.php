@@ -121,8 +121,74 @@ class SystemController {
     // --- PAGES (CMS) ---
     public function listPagesPublic(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT slug, title FROM pages WHERE status='published'");
+        $stmt = $pdo->query("SELECT slug, title, content FROM pages WHERE status='published' OR published=1");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    }
+
+    // --- ADMIN PAGES (Publications) ---
+    public function listPages(){
+        AuthController::requireAuth();
+        $pdo = Database::pdo();
+        $stmt = $pdo->query("SELECT * FROM pages ORDER BY created_at DESC");
+        Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    }
+
+    public function createPage(){
+        AuthController::requireAuth();
+        $in = $this->json();
+        $pdo = Database::pdo();
+        
+        $title = trim($in['title'] ?? '');
+        $content = $in['content'] ?? '';
+        $status = $in['status'] ?? 'published';
+        $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
+
+        if ($title === '') Response::json(['error'=>'Title required'], 400);
+
+        $stmt = $pdo->prepare("INSERT INTO pages(title, slug, content, status, created_at, updated_at) VALUES(?,?,?,?,NOW(),NOW())");
+        try {
+            $stmt->execute([$title, $slug, $content, $status]);
+            Response::json(['id'=>(int)$pdo->lastInsertId(), 'slug'=>$slug]);
+        } catch(PDOException $e) {
+            if ($e->getCode() == 23000) { // Duplicate slug
+                $slug .= '-' . uniqid();
+                $stmt->execute([$title, $slug, $content, $status]);
+                Response::json(['id'=>(int)$pdo->lastInsertId(), 'slug'=>$slug]);
+            } else {
+                throw $e;
+            }
+        }
+    }
+
+    public function updatePage($id){
+        AuthController::requireAuth();
+        $in = $this->json();
+        $pdo = Database::pdo();
+
+        $title = trim($in['title'] ?? '');
+        $content = $in['content'] ?? '';
+        $status = $in['status'] ?? 'published';
+        
+        $sql = "UPDATE pages SET content=?, status=?, updated_at=NOW()";
+        $params = [$content, $status];
+
+        if ($title !== '') {
+            $sql .= ", title=?";
+            $params[] = $title;
+        }
+
+        $sql .= " WHERE id=?";
+        $params[] = $id;
+
+        $pdo->prepare($sql)->execute($params);
+        Response::json(['ok'=>true]);
+    }
+
+    public function deletePage($id){
+        AuthController::requireAuth();
+        $pdo = Database::pdo();
+        $pdo->prepare("DELETE FROM pages WHERE id=?")->execute([$id]);
+        Response::json(['ok'=>true]);
     }
 
     // --- EMERGENCY FIX (Web Access) ---
