@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 
 const ESTADOS_VENEZUELA = [
@@ -530,7 +530,8 @@ export default function Documento() {
       const res = await fetch('/api/legal/upload-pdf', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${getToken()}`,
+          'X-Auth-Token': getToken()
         },
         body: formData
       })
