@@ -90,7 +90,11 @@ class AuthController {
     if (!$token) { 
         http_response_code(401); 
         $debug = ["msg"=>"Header missing and no query param"];
-        if (function_exists("getallheaders")) { $debug["headers"] = array_keys(getallheaders()); }
+        if (function_exists("getallheaders")) { 
+            $h = getallheaders();
+            $debug["headers"] = array_keys($h);
+            $debug["auth_header_value"] = $h["Authorization"] ?? $h["authorization"] ?? null; 
+        }
         $debug["server_keys"] = array_keys($_SERVER);
         echo json_encode(["error"=>"unauthorized_no_token_found", "debug"=>$debug]); 
         exit; 

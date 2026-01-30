@@ -8,6 +8,7 @@ import './index.css'
 
 // Diagnostic: Force cache invalidation (Nov 18, 2025 02:58 UTC)
 console.log('🚀 [main.tsx] Module loaded, mounting React app...')
+console.log('🚀 App Version: 2026-01-30 FIX (X-Auth-Token)')
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
