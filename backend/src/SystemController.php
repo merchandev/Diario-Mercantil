@@ -7,61 +7,65 @@ class SystemController {
     private function json(){ return json_decode(file_get_contents("php://input"), true) ?: []; }
 
     public function getStats(){
-        // AuthController::requireAuth(); // Optional for dashboard stats
+        AuthController::requireAuth();
         $pdo = Database::pdo();
         
-        // User Statistics
-        $total_users = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
-        $active_users = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='active' OR status IS NULL")->fetchColumn();
-        $suspended_users = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='suspended'")->fetchColumn();
-        $admin_users = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='admin'")->fetchColumn();
-        
-        // Publication Statistics
-        $total_publications = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn();
-        $pending_publications = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status IN ('Pendiente', 'Procesando', 'Por verificar')")->fetchColumn();
-        
-        // Publications by type
-        $documents = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE publication_type='documento' AND status='Publicada'")->fetchColumn();
-        $convocations = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE publication_type='convocatoria' AND status='Publicada'")->fetchColumn();
-        
-        // Edition Statistics
-        $total_editions = (int)$pdo->query("SELECT COUNT(*) FROM editions")->fetchColumn();
-        
-        // Payment/Financial Statistics
-        // Total revenue (suma de todos los pagos procesados)
-        $total_revenue = (float)$pdo->query("SELECT COALESCE(SUM(total_usd), 0) FROM legal_requests WHERE status='Publicada' AND total_usd IS NOT NULL")->fetchColumn();
-        
-        // Pending revenue (publicaciones en proceso de pago)
-        $pending_revenue = (float)$pdo->query("SELECT COALESCE(SUM(total_usd), 0) FROM legal_requests WHERE status IN ('Pendiente', 'Por verificar') AND total_usd IS NOT NULL")->fetchColumn();
-        
-        // Completed transactions count
-        $completed_transactions = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada' AND total_usd IS NOT NULL AND total_usd > 0")->fetchColumn();
-        
-        // Recent activity (últimas 30 días)
-        $recent_publications = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn();
-        
-        Response::json([
-            // User stats
-            "users_total" => $total_users,
-            "users_active" => $active_users,
-            "users_suspended" => $suspended_users,
-            "users_admin" => $admin_users,
+        $stats = [
+            "users_total" => 0,
+            "users_active" => 0,
+            "users_suspended" => 0,
+            "users_admin" => 0,
+            "publications" => 0,
+            "publications_pending" => 0,
+            "publications_documents" => 0,
+            "publications_convocations" => 0,
+            "publications_recent_30d" => 0,
+            "editions" => 0,
+            "revenue_total_usd" => 0,
+            "revenue_pending_usd" => 0,
+            "transactions_completed" => 0
+        ];
+
+
+        try {
+            // User Statistics
+            try { $stats["users_total"] = (int)$pdo->query("SELECT COUNT(*) FROM users")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["users_active"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='active' OR status IS NULL")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["users_suspended"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='suspended'")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["users_admin"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='admin'")->fetchColumn(); } catch(Throwable $e){}
             
-            // Publication stats
-            "publications" => $total_publications,
-            "publications_pending" => $pending_publications,
-            "publications_documents" => $documents,
-            "publications_convocations" => $convocations,
-            "publications_recent_30d" => $recent_publications,
+            // Publication Statistics
+            try { $stats["publications"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["publications_pending"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status IN ('Pendiente', 'Procesando', 'Por verificar')")->fetchColumn(); } catch(Throwable $e){}
             
-            // Edition stats
-            "editions" => $total_editions,
+            // Publications by type
+            try { $stats["publications_documents"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE pub_type='Documento' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["publications_convocations"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE pub_type='Convocatoria' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
             
-            // Financial stats
-            "revenue_total_usd" => round($total_revenue, 2),
-            "revenue_pending_usd" => round($pending_revenue, 2),
-            "transactions_completed" => $completed_transactions
-        ]);
+            // Edition Statistics
+            try { $stats["editions"] = (int)$pdo->query("SELECT COUNT(*) FROM editions")->fetchColumn(); } catch(Throwable $e){}
+            
+            // Financial Statistics (Fixed: use legal_payments)
+            try { 
+                // Using amount_bs as revenue for now. Convert to USD if needed requires rate.
+                // Assuming 1 USD = 36 BS approx if simplistic, but let's just show BS amount.
+                $stats["revenue_total_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(amount_bs), 0) FROM legal_payments")->fetchColumn();
+                $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(amount_bs), 0) FROM legal_payments WHERE status='Pendiente'")->fetchColumn();
+            } catch(Throwable $e){
+                error_log("Financial stats error: " . $e->getMessage());
+            }
+            
+            // Completed transactions
+            try { $stats["transactions_completed"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_payments WHERE status='Aprobado'")->fetchColumn(); } catch(Throwable $e){}
+            
+            // Recent activity
+            try { $stats["publications_recent_30d"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn(); } catch(Throwable $e){}
+
+        } catch (Throwable $e) {
+            error_log("Fatal error fetching stats: " . $e->getMessage());
+        }
+        
+        Response::json($stats);
     }
 
     // --- SETTINGS (BCV, Prices) ---

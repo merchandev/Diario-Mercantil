@@ -46,7 +46,7 @@ export default function SuperAdminDashboard() {
     const cards = [
         { title: 'Usuarios', icon: Users, path: '/lotus/users', color: 'from-blue-500 to-cyan-500' },
         { title: 'Publicaciones', icon: FileText, path: '/lotus/publications', color: 'from-green-500 to-emerald-500' },
-        { title: 'Estadísticas', icon: BarChart3, path: '/lotus/dashboard', color: 'from-purple-500 to-pink-500' },
+
         { title: 'Actividad', icon: Activity, path: '/lotus/activity', color: 'from-orange-500 to-red-500' },
         { title: 'Configuración', icon: Settings, path: '/lotus/settings', color: 'from-indigo-500 to-purple-500' },
     ]
