@@ -44,6 +44,7 @@ services:
 
   db:
     image: mysql:8.0
+    container_name: diario-mercantil-db-1
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root_secure_password_2025
