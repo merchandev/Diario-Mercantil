@@ -2,25 +2,37 @@
 // backend/scripts/migrate_fix_500.php
 require_once __DIR__ . '/../src/Database.php';
 
-echo "--- FIXING MISSING TABLES AND NAMES ---\n";
+echo "--- FIXING TABLE SCHEMA MISMATCHES ---\n";
 
 try {
     $pdo = Database::pdo();
     
-    // 1. Rename 'payments' to 'legal_payments' if needed
-    try {
-        $check = $pdo->query("SHOW TABLES LIKE 'payments'")->fetch();
-        if ($check) {
-            echo "Renaming 'payments' -> 'legal_payments'...\n";
-            $pdo->exec("ALTER TABLE payments RENAME TO legal_payments");
-        } else {
-            echo "Table 'payments' not found (maybe already renamed).\n";
-        }
-    } catch (Exception $e) {
-        echo "Note on rename: " . $e->getMessage() . "\n";
-    }
+    // 1. Drop incorrect tables if they exist
+    // We drop 'payments' (from CLEAN_INIT) and 'legal_payments' (if it was renamed but wrong)
+    echo "Dropping incorrect tables...\n";
+    $pdo->exec("DROP TABLE IF EXISTS payments");
+    $pdo->exec("DROP TABLE IF EXISTS legal_payments");
 
-    // 2. Create 'legal_files' table if missing
+    // 2. Create 'legal_payments' with the text-based schema the Code expects
+    // Code uses: ref, date, bank, type, amount_bs, status
+    echo "Creating correct 'legal_payments' table...\n";
+    $sql = "CREATE TABLE legal_payments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        legal_request_id INT NOT NULL,
+        ref VARCHAR(255),
+        date DATE,
+        bank VARCHAR(100),
+        type VARCHAR(50),
+        amount_bs DECIMAL(12,2),
+        status VARCHAR(50) DEFAULT 'Pendiente',
+        created_at DATETIME NOT NULL,
+        FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id) ON DELETE CASCADE,
+        INDEX idx_request (legal_request_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+    $pdo->exec($sql);
+    echo "Table 'legal_payments' created successfully.\n";
+
+    // 3. Create 'legal_files' table if missing
     try {
         $check = $pdo->query("SHOW TABLES LIKE 'legal_files'")->fetch();
         if (!$check) {
