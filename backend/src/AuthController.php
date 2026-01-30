@@ -89,7 +89,10 @@ class AuthController {
     $token = self::bearerToken();
     if (!$token) { 
         http_response_code(401); 
-        echo json_encode(["error"=>"unauthorized_no_token_found", "debug"=>"Header missing and no query param"]); 
+        $debug = ["msg"=>"Header missing and no query param"];
+        if (function_exists("getallheaders")) { $debug["headers"] = array_keys(getallheaders()); }
+        $debug["server_keys"] = array_keys($_SERVER);
+        echo json_encode(["error"=>"unauthorized_no_token_found", "debug"=>$debug]); 
         exit; 
     }
     
