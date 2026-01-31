@@ -39,7 +39,7 @@ COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 
 # Dar permisos
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html/storage
+    && chmod -R 777 /var/www/html/storage
 
 # Exponer puerto
 EXPOSE 8000
