@@ -1128,7 +1128,7 @@ export default function Documento() {
                 </h3>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center py-2 border-b border-slate-300">
-                    <span className="text-sm text-slate-600">Servicio de publicaciÃ³n - {meta.razon_social || 'Documento'}</span>
+                    <span className="text-sm text-slate-600">Servicio de publicación - {meta.razon_social || 'Documento'}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600">Folios:</span>
@@ -1175,11 +1175,11 @@ export default function Documento() {
                   <input className="input w-full" placeholder="V-12345678 o J-12345678-9" value={pay.document} onChange={e => setPay({ ...pay, document: e.target.value })} />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">TelÃ©fono *</span>
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">Teléfono *</span>
                   <input className="input w-full" placeholder="0412-1234567" value={pay.phone} onChange={e => setPay({ ...pay, phone: e.target.value })} />
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Correo electrÃ³nico *</span>
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">Correo electrónico *</span>
                   <input className="input w-full" type="email" placeholder="correo@ejemplo.com" value={pay.email} onChange={e => setPay({ ...pay, email: e.target.value })} />
                 </label>
                 <label className="block md:col-span-2">
@@ -1195,13 +1195,13 @@ export default function Documento() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                InformaciÃ³n del Pago Realizado
+                Información del Pago Realizado
               </h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Tipo de operaciÃ³n *</span>
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">Tipo de operación *</span>
                   <select className="input w-full" value={pay.type} onChange={e => setPay({ ...pay, type: e.target.value })}>
-                    <option value="pago_movil">Pago MÃ³vil</option>
+                    <option value="pago_movil">Pago Móvil</option>
                     <option value="transferencia">Transferencia Bancaria</option>
                   </select>
                 </label>
@@ -1219,19 +1219,19 @@ export default function Documento() {
                 </label>
                 {pay.type === 'pago_movil' && (
                   <label className="block md:col-span-2">
-                    <span className="text-sm font-medium text-slate-700 mb-1 block">TelÃ©fono desde donde realizÃ³ el pago mÃ³vil *</span>
+                    <span className="text-sm font-medium text-slate-700 mb-1 block">Teléfono desde donde realizó el pago móvil *</span>
                     <input className="input w-full" placeholder="0424-1234567" value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value })} />
                   </label>
                 )}
               </div>
             </div>
 
-            {/* TÃ©rminos y condiciones */}
+            {/* Términos y condiciones */}
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked={accept} onChange={e => setAccept(e.target.checked)} />
                 <span className="text-sm text-slate-700">
-                  Al hacer clic en <strong>"REPORTAR Y PUBLICAR"</strong>, confirmo que he realizado el pago por el monto exacto indicado y acepto los <span className="text-brand-600 font-medium">TÃ©rminos y Condiciones</span> del Diario Mercantil de Venezuela.
+                  Al hacer clic en <strong>"REPORTAR Y PUBLICAR"</strong>, confirmo que he realizado el pago por el monto exacto indicado y acepto los <span className="text-brand-600 font-medium">Términos y Condiciones</span> del Diario Mercantil de Venezuela.
                 </span>
               </label>
             </div>
