@@ -20,18 +20,22 @@ export default function Login() {
       const raw = (docNumber || '').trim()
       const document = /[^0-9]/.test(raw) ? raw : `${docPrefix}${raw}`
       const { token, user } = await apiLogin({ document, password })
-      console.log('🔐 Login exitoso:', { user: user.name, role: user.role })
+      console.log('🔐 Login exitoso:', { user: user.name, role: user.role, token: token.substring(0, 20) + '...' })
 
       if (remember) {
         localStorage.setItem('token', token)
         localStorage.setItem('user_name', user.name || '')
         localStorage.setItem('user_role', user.role || '')
         localStorage.setItem('user_doc', user.document || '')
+        console.log('💾 Token guardado en localStorage:', token.substring(0, 20) + '...')
+        console.log('💾 Verificando localStorage.token:', localStorage.getItem('token')?.substring(0, 20) + '...')
       } else {
         sessionStorage.setItem('token', token)
         sessionStorage.setItem('user_name', user.name || '')
         sessionStorage.setItem('user_role', user.role || '')
         sessionStorage.setItem('user_doc', user.document || '')
+        console.log('💾 Token guardado en sessionStorage:', token.substring(0, 20) + '...')
+        console.log('💾 Verificando sessionStorage.token:', sessionStorage.getItem('token')?.substring(0, 20) + '...')
       }
 
       // Redirect based on role

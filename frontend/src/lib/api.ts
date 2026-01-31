@@ -13,10 +13,21 @@ export function getToken() {
   // If we are in the superadmin section, prefer superadmin token
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/lotus/')) {
     const t = localStorage.getItem('superadmin_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
-    return (t && t !== 'null' && t !== 'undefined') ? t : '';
+    const token = (t && t !== 'null' && t !== 'undefined') ? t : '';
+    console.log('🔑 [getToken] Lotus mode - Token:', token ? token.substring(0, 20) + '...' : 'NULL');
+    return token;
   }
-  const t = localStorage.getItem('token') || localStorage.getItem('superadmin_token') || sessionStorage.getItem('token');
-  return (t && t !== 'null' && t !== 'undefined') ? t : '';
+  const localToken = localStorage.getItem('token');
+  const superToken = localStorage.getItem('superadmin_token');
+  const sessionToken = sessionStorage.getItem('token');
+
+  console.log('🔑 [getToken] localStorage.token:', localToken ? localToken.substring(0, 20) + '...' : 'NULL');
+  console.log('🔑 [getToken] sessionStorage.token:', sessionToken ? sessionToken.substring(0, 20) + '...' : 'NULL');
+
+  const t = localToken || superToken || sessionToken;
+  const token = (t && t !== 'null' && t !== 'undefined') ? t : '';
+  console.log('🔑 [getToken] Final token:', token ? token.substring(0, 20) + '...' : 'NULL');
+  return token;
 }
 
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
@@ -25,9 +36,14 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
     headers.set('X-Auth-Token', token) // Backup for aggressive proxies
+    console.log('📤 [fetchAuth] Sending Authorization header:', `Bearer ${token.substring(0, 20)}...`)
+  } else {
+    console.warn('⚠️ [fetchAuth] NO TOKEN FOUND - Request will be unauthenticated')
   }
   const url = typeof input === 'string' ? getUrl(input) : input;
+  console.log('📤 [fetchAuth] Request to:', typeof url === 'string' ? url : url.toString())
   const res = await fetch(url, { ...init, headers })
+  console.log('📥 [fetchAuth] Response status:', res.status, res.statusText)
   if (res.status === 401) {
     let serverError = 'unauthorized';
     try {
@@ -35,9 +51,11 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
       if (json.error) serverError = json.error;
       if (json.debug) console.warn('[Auth Debug]', json);
       if (json.received_token_preview) console.warn('[Auth Token Rx]', json);
+      console.error('🔴 [fetchAuth] 401 Unauthorized - Server error:', serverError, 'Full response:', json);
     } catch (e) { /* ignore */ }
 
     if (!noRedirect) {
+      console.warn('🔴 [fetchAuth] Removing tokens and redirecting to login...');
       try { localStorage.removeItem('token'); } catch { }
       try { sessionStorage.removeItem('token'); } catch { }
       // Force re-authentication
