@@ -65,23 +65,31 @@ class AuthController {
             ?? null;
     }
     
+    
     // Debug to stderr
-    // file_put_contents("php://stderr", "Auth Header: " . ($h ? substr($h,0,10)."..." : "NULL") . "\n", FILE_APPEND);
+    error_log("🔍 [bearerToken] Auth Header: " . ($h ? substr($h,0,50)."..." : "NULL"));
 
     // If header exists, try to extract Bearer or just use the whole value if it looks like a token
     if ($h) {
         if (preg_match("/^Bearer\s+(.*)$/i", $h, $m)) {
             $token = trim($m[1]);
+            error_log("🔍 [bearerToken] Extracted Bearer token: " . substr($token,0,20)."...");
         } else {
             $token = trim($h);
+            error_log("🔍 [bearerToken] Using full header as token: " . substr($token,0,20)."...");
         }
     } else {
         $token = $_GET["token"] ?? null;
+        error_log("🔍 [bearerToken] No header, checking query param: " . ($token ? substr($token,0,20)."..." : "NULL"));
     }
     
     // Safety check for "null" string literal coming from buggy clients
-    if ($token === "null" || $token === "undefined") return null;
+    if ($token === "null" || $token === "undefined") {
+        error_log("🔍 [bearerToken] Token is literal 'null' or 'undefined', returning null");
+        return null;
+    }
 
+    error_log("🔍 [bearerToken] Final token: " . ($token ? substr($token,0,20)."..." : "NULL"));
     return $token;
   }
 
