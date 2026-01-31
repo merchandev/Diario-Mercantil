@@ -18,7 +18,7 @@ COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 # Create storage directories with correct permissions
 RUN mkdir -p storage/uploads storage/results && \
     chown -R www-data:www-data storage && \
-    chmod -R 775 storage
+    chmod -R 777 storage
 
 # Expose PHP-FPM port
 EXPOSE 9000
