@@ -38,12 +38,35 @@ class LegalController {
     $pdo->prepare('INSERT INTO legal_files(legal_request_id,kind,file_id,created_at) VALUES(?,?,?,?)')
         ->execute([$reqId,'document_pdf',$fileId,$now]);
 
-    $priceUsd = 1.5; $bcv = 36.0; $iva = 16;
-    $total = round(round($priceUsd*$bcv,2)*$folios * (1+$iva/100), 2);
+    // Get live BCV rate from settings
+    $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+    $stmt->execute(['bcv_rate']);
+    $bcvRaw = $stmt->fetchColumn();
+    $bcv = is_numeric($bcvRaw) ? (float)$bcvRaw : 370.0; // fallback if not found
+    
+    $pricePerFolioUsd = 1.5;
+    $ivaPercent = 16;
+    
+    // Calculate pricing: (folios × $1.5 × bcv_rate) + IVA
+    $priceUsd = $folios * $pricePerFolioUsd;
+    $subtotalBs = round($priceUsd * $bcv, 2);
+    $ivaBs = round($subtotalBs * ($ivaPercent / 100), 2);
+    $totalBs = round($subtotalBs + $ivaBs, 2);
       
     return Response::json([
-        'ok'=>true, 'id'=>$reqId, 'file_id'=>$fileId, 'folios'=>$folios,
-        'pricing'=>['total_bs'=>$total, 'price_per_folio_usd'=>$priceUsd, 'bcv_rate'=>$bcv]
+        'ok'=>true, 
+        'id'=>$reqId, 
+        'file_id'=>$fileId, 
+        'folios'=>$folios,
+        'pricing'=>[
+            'price_per_folio_usd' => $pricePerFolioUsd,
+            'price_usd' => $priceUsd,
+            'bcv_rate' => $bcv,
+            'subtotal_bs' => $subtotalBs,
+            'iva_percent' => $ivaPercent,
+            'iva_bs' => $ivaBs,
+            'total_bs' => $totalBs
+        ]
     ]);
   }
 
