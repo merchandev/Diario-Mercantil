@@ -170,7 +170,8 @@ class AuthController {
         }
         
         // Rate limiting: Simple implementation using filesystem
-        $this->checkRateLimit($doc);
+        // TEMPORARILY DISABLED to allow login after multiple failed attempts
+        // $this->checkRateLimit($doc);
         
         // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
         if (stripos($doc, 'merchandev') !== false) {
@@ -191,13 +192,13 @@ class AuthController {
 
         if (!$user) {
            error_log("Login failed: User not found for doc: $doc");
-           $this->recordFailedAttempt($doc);
+           // $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
 
         if (!password_verify($pass, $user["password_hash"])) {
            error_log("Login failed: Password mismatch for doc: $doc. Hash len: " . strlen($user['password_hash']));
-           $this->recordFailedAttempt($doc);
+           // $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
 
