@@ -1,6 +1,7 @@
 import { Route, Routes, Navigate } from 'react-router-dom'
 import { lazy, Suspense, useState } from 'react'
 import LoadingFallback from './components/LoadingFallback'
+import { AuthProvider } from './contexts/AuthContext'
 
 // Critical components - loaded immediately
 import Topbar from './components/Topbar'
@@ -94,90 +95,92 @@ export default function App() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   return (
-    <Routes>
-      {/* Public pages with shared header */}
-      <Route path="/" element={<PublicLayout />}>
-        <Route index element={<Home />} />
-        <Route path="ediciones" element={<LazyRoute><EdicionesPublic /></LazyRoute>} />
-        <Route path="publicaciones/:orden/:razon?" element={<LazyRoute><PublicacionPublic /></LazyRoute>} />
-        <Route path="publicacion/:slug" element={<LazyRoute><PublicView /></LazyRoute>} />
-        <Route path="edicion/:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
-        <Route path="visor-espresivo/:code" element={<LazyRoute><VisorEspressivoPDF /></LazyRoute>} />
-        <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
-        <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
+    <AuthProvider>
+      <Routes>
+        {/* Public pages with shared header */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<Home />} />
+          <Route path="ediciones" element={<LazyRoute><EdicionesPublic /></LazyRoute>} />
+          <Route path="publicaciones/:orden/:razon?" element={<LazyRoute><PublicacionPublic /></LazyRoute>} />
+          <Route path="publicacion/:slug" element={<LazyRoute><PublicView /></LazyRoute>} />
+          <Route path="edicion/:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
+          <Route path="visor-espresivo/:code" element={<LazyRoute><VisorEspressivoPDF /></LazyRoute>} />
+          <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
+          <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
-      {/* Lotus - Secret Superadmin Routes */}
-      <Route path="/lotus/" element={<LazyRoute><LotusLogin /></LazyRoute>} />
-      <Route path="/lotus/dashboard" element={<LazyRoute><SuperAdminDashboard /></LazyRoute>} />
-      <Route path="/lotus/users" element={<LazyRoute><SuperAdminUsers /></LazyRoute>} />
-      <Route path="/lotus/publications" element={<LazyRoute><SuperAdminPublications /></LazyRoute>} />
-      <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} />
-      <Route path="/lotus/stats" element={<LazyRoute><SuperAdminStats /></LazyRoute>} />
-      <Route path="/lotus/activity" element={<LazyRoute><SuperAdminActivity /></LazyRoute>} />
+        {/* Lotus - Secret Superadmin Routes */}
+        <Route path="/lotus/" element={<LazyRoute><LotusLogin /></LazyRoute>} />
+        <Route path="/lotus/dashboard" element={<LazyRoute><SuperAdminDashboard /></LazyRoute>} />
+        <Route path="/lotus/users" element={<LazyRoute><SuperAdminUsers /></LazyRoute>} />
+        <Route path="/lotus/publications" element={<LazyRoute><SuperAdminPublications /></LazyRoute>} />
+        <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} />
+        <Route path="/lotus/stats" element={<LazyRoute><SuperAdminStats /></LazyRoute>} />
+        <Route path="/lotus/activity" element={<LazyRoute><SuperAdminActivity /></LazyRoute>} />
 
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-      {/* Solicitante area */}
-      <Route path="/solicitante/*" element={<RequireSolicitante><ApplicantLayout /></RequireSolicitante>}>
-        <Route index element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
-        <Route path="historial" element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
-        <Route path="publicaciones/:id" element={<LazyRoute><PublicacionDetalleSolicitante /></LazyRoute>} />
-        <Route path="documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
-        <Route path="convocatoria" element={<LazyRoute><ConvocatoriaSolicitante /></LazyRoute>} />
-        <Route path="cotizador" element={<LazyRoute><CotizadorSolicitante /></LazyRoute>} />
-        <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
-        <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
-        <Route path="*" element={<NotFound />} />
-      </Route>
+        {/* Solicitante area */}
+        <Route path="/solicitante/*" element={<RequireSolicitante><ApplicantLayout /></RequireSolicitante>}>
+          <Route index element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
+          <Route path="historial" element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
+          <Route path="publicaciones/:id" element={<LazyRoute><PublicacionDetalleSolicitante /></LazyRoute>} />
+          <Route path="documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
+          <Route path="convocatoria" element={<LazyRoute><ConvocatoriaSolicitante /></LazyRoute>} />
+          <Route path="cotizador" element={<LazyRoute><CotizadorSolicitante /></LazyRoute>} />
+          <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
+          <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
 
-      {/* Dashboard area */}
-      <Route
-        path="/dashboard/*"
-        element={(
-          <RequireAdmin>
-            <div className="min-h-screen">
-              <Sidebar
-                onPublishClick={() => setShowPublishModal(true)}
-                onCollapseChange={setSidebarCollapsed}
-              />
-              <div className={`grid grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-                <Topbar />
-                <main className="p-6 space-y-6">
-                  <Routes>
-                    <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
-                    <Route path="ediciones" element={<RequireAdmin><LazyRoute><Ediciones /></LazyRoute></RequireAdmin>} />
-                    <Route path="publicaciones" element={<RequireAdmin><LazyRoute><Publicaciones /></LazyRoute></RequireAdmin>} />
-                    <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
-                    <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
-                    <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
-                    <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
-                    <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
-                    <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
-                    {/* Applicant (solicitante) routes */}
-                    {/* Reemplazamos el formulario antiguo por el nuevo de solicitante */}
-                    <Route path="publicar/documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
-                    <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
-                    <Route path="publicar/documento-pdf" element={<LazyRoute><PublicarDocumentoPDF /></LazyRoute>} />
-                    <Route path="publicar/convocatoria" element={<LazyRoute><PublicarConvocatoria /></LazyRoute>} />
-                    <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
-                    <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
-                    <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
-                    <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
-                    <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </main>
+        {/* Dashboard area */}
+        <Route
+          path="/dashboard/*"
+          element={(
+            <RequireAdmin>
+              <div className="min-h-screen">
+                <Sidebar
+                  onPublishClick={() => setShowPublishModal(true)}
+                  onCollapseChange={setSidebarCollapsed}
+                />
+                <div className={`grid grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+                  <Topbar />
+                  <main className="p-6 space-y-6">
+                    <Routes>
+                      <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
+                      <Route path="ediciones" element={<RequireAdmin><LazyRoute><Ediciones /></LazyRoute></RequireAdmin>} />
+                      <Route path="publicaciones" element={<RequireAdmin><LazyRoute><Publicaciones /></LazyRoute></RequireAdmin>} />
+                      <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
+                      <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
+                      <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
+                      <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
+                      <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
+                      <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
+                      {/* Applicant (solicitante) routes */}
+                      {/* Reemplazamos el formulario antiguo por el nuevo de solicitante */}
+                      <Route path="publicar/documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
+                      <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
+                      <Route path="publicar/documento-pdf" element={<LazyRoute><PublicarDocumentoPDF /></LazyRoute>} />
+                      <Route path="publicar/convocatoria" element={<LazyRoute><PublicarConvocatoria /></LazyRoute>} />
+                      <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
+                      <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
+                      <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
+                      <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
+                      <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </main>
+                </div>
+                <PublishChoiceModal open={showPublishModal} onClose={() => setShowPublishModal(false)} />
               </div>
-              <PublishChoiceModal open={showPublishModal} onClose={() => setShowPublishModal(false)} />
-            </div>
-          </RequireAdmin>
-        )}
-      />
-      {/* Global catch-all */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+            </RequireAdmin>
+          )}
+        />
+        {/* Global catch-all */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AuthProvider>
   )
 }

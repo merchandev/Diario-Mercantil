@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { login as apiLogin, me } from '../lib/api'
+import { login as apiLogin } from '../lib/api'
 import { IconEye, IconEyeOff, IconIdCard, IconKey } from '../components/icons'
 import { isSolicitanteRole } from '../lib/roleUtils'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
   const [docPrefix, setDocPrefix] = useState<'V' | 'E' | 'J' | 'G' | 'P'>('V')
   const [docNumber, setDocNumber] = useState('')
   const [password, setPassword] = useState('')
@@ -38,6 +40,9 @@ export default function Login() {
         console.log('💾 Token guardado en sessionStorage:', token.substring(0, 20) + '...')
         console.log('💾 Verificando sessionStorage.token:', sessionStorage.getItem('token')?.substring(0, 20) + '...')
       }
+
+      // Refresh auth context with user data
+      await refreshUser()
 
       // Redirect based on role
       console.log('🚀 Redirigiendo basado en rol:', user.role)

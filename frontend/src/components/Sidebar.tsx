@@ -1,7 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { IconHome, IconEditions, IconDocs, IconPayments, IconLegal, IconUsers, IconSettings, IconUserCircle, IconTrash, IconUser } from './icons'
-import { me } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { isAdminRole } from '../lib/roleUtils'
 
 const LinkItem = ({ to, icon, label, collapsed }: { to: string; icon: JSX.Element; label: string; collapsed?: boolean }) => (
   <NavLink to={to} className={({ isActive }) => [
@@ -15,29 +16,19 @@ const LinkItem = ({ to, icon, label, collapsed }: { to: string; icon: JSX.Elemen
 
 export default function Sidebar({ onPublishClick, onCollapseChange }: { onPublishClick?: () => void; onCollapseChange?: (collapsed: boolean) => void }) {
   const location = useLocation()
-  const storedName = (typeof window !== 'undefined' && (localStorage.getItem('user_name') || sessionStorage.getItem('user_name'))) || undefined
-  const storedRole = (typeof window !== 'undefined' && (localStorage.getItem('user_role') || sessionStorage.getItem('user_role'))) || undefined
-  const storedDoc = (typeof window !== 'undefined' && (localStorage.getItem('user_doc') || sessionStorage.getItem('user_doc'))) || undefined
-  const [user, setUser] = useState<{ id?: number; name?: string; role?: string; document?: string; avatar_url?: string | null } | null>(storedName || storedRole || storedDoc ? { name: storedName, role: storedRole, document: storedDoc } : null)
+  const { user } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
-  useEffect(() => {
-    const loadUser = () => {
-      me().then(r => {
-        console.log('👤 [Sidebar] Usuario cargado:', r.user)
-        setUser(r.user)
-      }).catch(err => {
-        console.error('❌ [Sidebar] Error cargando usuario:', err)
-      })
-    }
-    loadUser()
-    window.addEventListener('user_updated', loadUser)
-    return () => window.removeEventListener('user_updated', loadUser)
-  }, [])
+
   useEffect(() => { onCollapseChange?.(collapsed) }, [collapsed, onCollapseChange])
+
   const isAdminPath = location.pathname.startsWith('/dashboard')
   const isSolicitantePath = location.pathname.startsWith('/solicitante')
-  const isAdmin = (user?.role === 'admin') || (!user && isAdminPath)
-  const isSolicitante = (!!user && user.role !== 'admin') || (!user && isSolicitantePath)
+  const isAdmin = isAdminRole(user?.role)
+  const isSolicitante = !isAdmin && !!user
+
+  // Determine role display name
+  const roleDisplayName = isAdminRole(user?.role) ? 'Super Administrador' : 'Solicitante'
+
   return (
     <aside className={`fixed left-0 top-0 h-screen hidden md:flex flex-col p-4 bg-brand-800 text-white transition-all duration-300 z-30 ${collapsed ? 'w-20' : 'w-64'}`}>
       {!collapsed && (
@@ -52,7 +43,7 @@ export default function Sidebar({ onPublishClick, onCollapseChange }: { onPublis
           <div className="text-center">
             <div className="text-xs text-white/80 mb-1">Hola, {user?.name || '...'}</div>
             {user && (
-              <div className="text-sm font-semibold">{user.role === 'admin' ? 'Super Administrador' : 'Solicitante'}</div>
+              <div className="text-sm font-semibold">{roleDisplayName}</div>
             )}
           </div>
         </div>
