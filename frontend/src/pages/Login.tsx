@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { login as apiLogin, me } from '../lib/api'
 import { IconEye, IconEyeOff, IconIdCard, IconKey } from '../components/icons'
+import { isSolicitanteRole } from '../lib/roleUtils'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -39,10 +40,9 @@ export default function Login() {
       }
 
       // Redirect based on role
-      const role = user.role.toLowerCase()
-      console.log('🚀 Redirigiendo basado en rol:', role)
+      console.log('🚀 Redirigiendo basado en rol:', user.role)
 
-      if (role === 'solicitante' || role === 'user') {
+      if (isSolicitanteRole(user.role)) {
         console.log('➡️ Navegando a /solicitante/historial')
         navigate('/solicitante/historial')
       } else {
