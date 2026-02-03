@@ -137,5 +137,4 @@ class FileController {
     readfile($filePath);
     exit;
   }
-  }
 }

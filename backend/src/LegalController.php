@@ -224,11 +224,38 @@ class LegalController {
   }
 
   public function download($id){
-      // (Stub para evitar errores, pero no genera PDF real para ahorrar espacio aquí.
-      // Si necesitas el PDF real, avísame y te paso el bloque PDF.
-      // Por ahora para que no de error 500:)
+      $pdo = Database::pdo();
+      $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
+      $r = $s->fetch(PDO::FETCH_ASSOC);
+      if (!$r) die('Orden no encontrada');
+      
+      $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
+      $pay = $p->fetchAll(PDO::FETCH_ASSOC);
+      
+      // Generate Content
+      $txt = "";
+      $txt .= "DIARIO MERCANTIL DE VENEZUELA\n";
+      $txt .= "Recibo de Orden #{$r['order_no']}\n";
+      $txt .= "Fecha: {$r['date']}\n";
+      $txt .= "--------------------------------------------------\n";
+      $txt .= "Cliente: {$r['name']}\n";
+      $txt .= "Documento: {$r['document']}\n";
+      $txt .= "Estado: {$r['status']}\n";
+      $txt .= "Folios: {$r['folios']}\n";
+      $txt .= "--------------------------------------------------\n";
+      $txt .= "PAGOS REGISTRADOS:\n";
+      foreach($pay as $py) {
+        $txt .= "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}\n";
+      }
+      
+      // Output as Text File for now (safe fallback) or try PDF headers
+      // If we want PDF, we need a library. 
+      // Let's output text with PDF headers? No, that's corrupt.
+      // Let's output a text file "recibo.txt"
+      
       header('Content-Type: text/plain');
-      echo "PDF Download Stub - ID $id";
+      header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.txt"');
+      echo $txt;
   }
   public function getPublic($order){ 
     $pdo = Database::pdo();
