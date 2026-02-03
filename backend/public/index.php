@@ -62,6 +62,7 @@ elseif (preg_match("#^/api/legal/(\d+)/files$#", $uri, $m)) {
 // Payments sub-resource
 elseif (preg_match("#^/api/legal/(\d+)/payments$#", $uri, $m) && $method === "POST") { (new LegalController())->addPayment($m[1]); }
 elseif (preg_match("#^/api/legal/(\d+)/payments/(\d+)$#", $uri, $m) && $method === "DELETE") { (new LegalController())->deletePayment($m[1], $m[2]); }
+elseif ($uri === "/api/legal/public/check" || preg_match("#^/api/legal/public/(.+)$#", $uri, $m) && $method === "GET") { (new LegalController())->getPublic($m[1]); }
 
 // --- 4. SYSTEM / AUXILIARY (Fixed 404s) ---
 elseif ($uri === "/api/stats" && $method === "GET") { (new SystemController())->getStats(); }

@@ -33,12 +33,16 @@ export default function Login() {
         console.log('💾 Token guardado en localStorage:', token.substring(0, 20) + '...')
         console.log('💾 Verificando localStorage.token:', localStorage.getItem('token')?.substring(0, 20) + '...')
       } else {
-        sessionStorage.setItem('token', token)
-        sessionStorage.setItem('user_name', user.name || '')
-        sessionStorage.setItem('user_role', user.role || '')
-        sessionStorage.setItem('user_doc', user.document || '')
-        console.log('💾 Token guardado en sessionStorage:', token.substring(0, 20) + '...')
-        console.log('💾 Verificando sessionStorage.token:', sessionStorage.getItem('token')?.substring(0, 20) + '...')
+        // Always use localStorage for persistence across tabs
+        localStorage.setItem('token', token)
+        localStorage.setItem('user_name', user.name || '')
+        localStorage.setItem('user_role', user.role || '')
+        localStorage.setItem('user_doc', user.document || '')
+
+        // Remove from sessionStorage just in case
+        sessionStorage.removeItem('token')
+
+        console.log('💾 Token guardado en localStorage:', token.substring(0, 20) + '...')
       }
 
       // Refresh auth context with user data

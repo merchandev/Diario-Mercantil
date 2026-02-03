@@ -60,6 +60,7 @@ const PagePublic = lazyImport(() => import('./pages/PagePublic'))
 const PublicacionPublic = lazyImport(() => import('./pages/PublicacionPublic'))
 const Contacto = lazyImport(() => import('./pages/Contacto'))
 const VisorEspressivoPDF = lazyImport(() => import('./pages/VisorEspressivoPDF'))
+const PublicLegalRequest = lazyImport(() => import('./pages/PublicLegalRequest'))
 
 // Solicitante pages - lazy loaded
 const HistorialSolicitante = lazyImport(() => import('./pages/solicitante/Historial'))
@@ -94,6 +95,36 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  // Auto-logout after 45 mins of inactivity
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    const TIMEOUT = 45 * 60 * 1000 // 45 minutes
+
+    const resetTimer = () => {
+      clearTimeout(timer)
+      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
+      if (token) {
+        timer = setTimeout(() => {
+          console.warn('⏰ Inactivity timeout - logging out')
+          localStorage.removeItem('token')
+          sessionStorage.removeItem('token')
+          window.location.href = '/login'
+        }, TIMEOUT)
+      }
+    }
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart']
+    events.forEach(e => window.addEventListener(e, resetTimer))
+
+    resetTimer() // init
+
+    return () => {
+      clearTimeout(timer)
+      events.forEach(e => window.removeEventListener(e, resetTimer))
+    }
+  }, [])
+
   return (
     <AuthProvider>
       <Routes>
