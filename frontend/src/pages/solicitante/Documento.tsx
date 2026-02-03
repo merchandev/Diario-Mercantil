@@ -216,27 +216,27 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
   'Consorcio': [
@@ -244,55 +244,55 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
-  'Sociedades AnÃ³nimas (S.A.)': [
+  'Sociedades Anónimas (S.A.)': [
     'Acta de Asamblea de Junta Directiva',
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
   'Sociedad en Comandita Simple (S.C.S.)': [
@@ -300,27 +300,27 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
   'Sociedad en Comandita por Acciones (S.C.A.)': [
@@ -328,27 +328,27 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
   'Sociedad Mercantil Extranjera': [
@@ -356,27 +356,27 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ],
   'Sociedades de Responsabilidad Limitada (S.R.L.)': [
@@ -384,27 +384,27 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
     'Acta de Asamblea de Socios o Accionistas',
     'Acta de Remate',
     'Aumento de Capital',
-    'AutorizaciÃ³n Judicial',
+    'Autorización Judicial',
     'Cambio de Denominación',
     'Cambio de Domicilio',
-    'ConstituciÃ³n',
-    'ConstituciÃ³n de Fondo de Comercio',
-    'ConstituciÃ³n de Sucursal',
-    'Contrato de Cuentas de ParticipaciÃ³n',
-    'Contratos de AdhesiÃ³n',
-    'DeclaraciÃ³n de AdjudicaciÃ³n',
-    'DisoluciÃ³n',
-    'DomiciliaciÃ³n de Expediente',
-    'LiberaciÃ³n de Prenda Mercantil',
-    'LiquidaciÃ³n',
-    'ModificaciÃ³n al Documento Constitutivo',
-    'ParticiÃ³n de Bienes de la Comunidad Conyugal',
+    'Constitución',
+    'Constitución de Fondo de Comercio',
+    'Constitución de Sucursal',
+    'Contrato de Cuentas de Participación',
+    'Contratos de Adhesión',
+    'Declaración de Adjudicación',
+    'Disolución',
+    'Domiciliación de Expediente',
+    'Liberación de Prenda Mercantil',
+    'Liquidación',
+    'Modificación al Documento Constitutivo',
+    'Partición de Bienes de la Comunidad Conyugal',
     'Prendas Mercantiles',
-    'PrÃ³rroga de DuraciÃ³n',
-    'ReducciÃ³n de Capital',
+    'Prórroga de Duración',
+    'Reducción de Capital',
     'Solicitud de Agregado',
-    'TransacciÃ³n Judicial',
-    'TransformaciÃ³n de Naturaleza JurÃ­dica',
+    'Transacción Judicial',
+    'Transformación de Naturaleza Jurídica',
     'Venta de Acciones'
   ]
 }
@@ -440,6 +440,7 @@ export default function Documento() {
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('id')
   const [step, setStep] = useState<Step>(1)
+  const [showBankList, setShowBankList] = useState(false)
   const [req, setReq] = useState<LegalRequest | undefined>()
   const [meta, setMeta] = useState<any>({})
   const [files, setFiles] = useState<LegalFile[]>([])
@@ -1237,23 +1238,40 @@ export default function Documento() {
                     <option value="transferencia">Transferencia Bancaria</option>
                   </select>
                 </label>
-                <label className="block">
+                <label className="block relative">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Banco emisor *</span>
                   <input
                     className="input w-full"
                     placeholder="Busque o seleccione su banco"
                     value={pay.bank}
+                    onFocus={() => setShowBankList(true)}
+                    onBlur={() => setTimeout(() => setShowBankList(false), 200)}
                     onChange={e => setPay({ ...pay, bank: e.target.value })}
-                    list="bancos-venezuela"
                   />
-                  <datalist id="bancos-venezuela">
-                    {BANCOS_VENEZUELA.map(b => (
-                      <option key={b} value={b} />
-                    ))}
-                  </datalist>
+
+                  {showBankList && (
+                    <ul className="absolute z-50 w-full bg-slate-800 text-white border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto mt-1 left-0">
+                      {BANCOS_VENEZUELA.filter(b => b.toLowerCase().includes(pay.bank.toLowerCase())).length > 0 ? (
+                        BANCOS_VENEZUELA.filter(b => b.toLowerCase().includes(pay.bank.toLowerCase())).map(b => (
+                          <li
+                            key={b}
+                            onMouseDown={() => {
+                              setPay({ ...pay, bank: b })
+                              setShowBankList(false)
+                            }}
+                            className="px-4 py-2 hover:bg-slate-700 cursor-pointer transition-colors text-sm"
+                          >
+                            {b}
+                          </li>
+                        ))
+                      ) : (
+                        <li className="px-4 py-2 text-slate-400 text-sm">No se encontraron resultados</li>
+                      )}
+                    </ul>
+                  )}
                 </label>
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">NÂ° de Referencia *</span>
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">N° de Referencia *</span>
                   <input className="input w-full" placeholder="123456789" value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value })} />
                 </label>
                 <label className="block">
