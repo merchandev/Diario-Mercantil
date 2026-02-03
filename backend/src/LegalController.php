@@ -8,10 +8,16 @@ class LegalController {
   public function uploadPdf(){
     $u = AuthController::requireAuth();
     
-    // DEBUG LOGGING
-    $log = __DIR__.'/../../debug_upload.log';
-    $debug = date('c') . " | POST: " . json_encode($_POST) . " | FILES: " . json_encode($_FILES) . "\n";
-    @file_put_contents($log, $debug, FILE_APPEND);
+    // DEBUG LOGGING (to docker logs)
+    $debugInfo = [
+        'POST' => $_POST,
+        'FILES_META' => [
+            'name' => $_FILES['file']['name'] ?? null,
+            'size' => $_FILES['file']['size'] ?? null,
+            'type' => $_FILES['file']['type'] ?? null,
+        ]
+    ];
+    error_log("UPLOAD PDF DEBUG: " . json_encode($debugInfo));
 
     if (!isset($_FILES['file'])) return Response::json(['error'=>'No se ha enviado ningún archivo'], 400);
     $file = $_FILES['file'];
