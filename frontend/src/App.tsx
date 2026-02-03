@@ -1,5 +1,5 @@
 import { Route, Routes, Navigate } from 'react-router-dom'
-import { lazy, Suspense, useState } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import LoadingFallback from './components/LoadingFallback'
 import { AuthProvider } from './contexts/AuthContext'
 
@@ -98,7 +98,7 @@ export default function App() {
 
   // Auto-logout after 45 mins of inactivity
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    let timer: any // Use any to avoid NodeJS type issues if types aren't installed
     const TIMEOUT = 45 * 60 * 1000 // 45 minutes
 
     const resetTimer = () => {
@@ -138,6 +138,7 @@ export default function App() {
           <Route path="visor-espresivo/:code" element={<LazyRoute><VisorEspressivoPDF /></LazyRoute>} />
           <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
           <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />
+          <Route path="ver/:order" element={<LazyRoute><PublicLegalRequest /></LazyRoute>} />
           <Route path="*" element={<NotFound />} />
         </Route>
 
