@@ -411,8 +411,32 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
 
 type Step = 1 | 2 | 3
 
+const BANCOS_VENEZUELA = [
+  "0134 - Banesco",
+  "0105 - Mercantil",
+  "0108 - BBVA Provincial",
+  "0191 - Banco Nacional de Crédito (BNC)",
+  "0172 - Bancamiga",
+  "0114 - Bancaribe",
+  "0115 - Banco Exterior",
+  "0151 - Banco Fondo Común (BFC)",
+  "0104 - Banco Venezolano de Crédito",
+  "0171 - Banco Activo",
+  "0174 - Banplus",
+  "0138 - Banco Plaza",
+  "0156 - 100% Banco",
+  "0157 - DelSur",
+  "0102 - Banco de Venezuela (BDV)",
+  "0163 - Banco del Tesoro",
+  "0175 - Banco Digital de los Trabajadores (Antiguo Bicentenario)",
+  "0177 - Banco de la Fuerza Armada Nacional Bolivariana (BANFANB)",
+  "0166 - Banco Agrícola de Venezuela"
+]
+
 export default function Documento() {
   const navigate = useNavigate()
+  // ... rest of component
+
   const [searchParams] = useSearchParams()
   const editId = searchParams.get('id')
   const [step, setStep] = useState<Step>(1)
@@ -1215,7 +1239,18 @@ export default function Documento() {
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Banco emisor *</span>
-                  <input className="input w-full" placeholder="Nombre del banco" value={pay.bank} onChange={e => setPay({ ...pay, bank: e.target.value })} />
+                  <input
+                    className="input w-full"
+                    placeholder="Busque o seleccione su banco"
+                    value={pay.bank}
+                    onChange={e => setPay({ ...pay, bank: e.target.value })}
+                    list="bancos-venezuela"
+                  />
+                  <datalist id="bancos-venezuela">
+                    {BANCOS_VENEZUELA.map(b => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">NÂ° de Referencia *</span>
