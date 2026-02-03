@@ -526,6 +526,7 @@ export default function Documento() {
       // Paso 3: Subir al servidor
       const formData = new FormData()
       formData.append('file', file)
+      if (req && req.id) formData.append('legal_request_id', String(req.id))
 
       const res = await fetch('/api/legal/upload-pdf', {
         method: 'POST',

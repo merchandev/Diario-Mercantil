@@ -30,10 +30,18 @@ class LegalController {
     $content = @file_get_contents($dest);
     if(preg_match_all('/\/Type\s*\/Page[\s\/>]/', $content, $m)) $folios = count($m[0]);
 
-    // Crear solicitud asociada
-    $stmt = $pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");
-    $stmt->execute(['Borrador',$u['name'],$u['document'],gmdate('Y-m-d'),$folios,'Documento', $u['id'], $now]);
-    $reqId = (int)$pdo->lastInsertId();
+    // Check if we should attach to existing draft
+    $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
+    
+    if ($reqId > 0) {
+        // Update existing request
+        $pdo->prepare("UPDATE legal_requests SET folios=? WHERE id=?")->execute([$folios, $reqId]);
+    } else {
+        // Crear solicitud nueva (fallback)
+        $stmt = $pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");
+        $stmt->execute(['Borrador',$u['name'],$u['document'],gmdate('Y-m-d'),$folios,'Documento', $u['id'], $now]);
+        $reqId = (int)$pdo->lastInsertId();
+    }
 
     $pdo->prepare('INSERT INTO legal_files(legal_request_id,kind,file_id,created_at) VALUES(?,?,?,?)')
         ->execute([$reqId,'document_pdf',$fileId,$now]);
