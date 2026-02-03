@@ -528,10 +528,9 @@ export default function Documento() {
 
       // CRITICAL: Append ID BEFORE file to ensure it's available to PHP immediately
       if (req && req.id) {
-        console.log('📤 Uploading PDF for existing Request ID:', req.id)
         formData.append('legal_request_id', String(req.id))
       } else {
-        console.warn('⚠️ Uploading PDF without existing Request ID (Duplicate risk)')
+        // Consider logging a warning here if it's truly an unexpected scenario
       }
 
       formData.append('file', file)
