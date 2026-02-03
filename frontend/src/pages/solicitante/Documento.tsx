@@ -1215,9 +1215,9 @@ export default function Documento() {
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Correo electrónico *</span>
                   <input className="input w-full" type="email" placeholder="correo@ejemplo.com" value={pay.email} onChange={e => setPay({ ...pay, email: e.target.value })} />
                 </label>
-                <label className="block md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">DirecciÃ³n</span>
-                  <input className="input w-full" placeholder="DirecciÃ³n completa" value={pay.address} onChange={e => setPay({ ...pay, address: e.target.value })} />
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">Dirección</span>
+                  <input className="input w-full" placeholder="Dirección completa" value={pay.address} onChange={e => setPay({ ...pay, address: e.target.value })} />
                 </label>
               </div>
             </div>
