@@ -57,6 +57,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
     if (!noRedirect) {
       console.warn('🔴 [fetchAuth] Removing tokens and redirecting to login...');
       try { localStorage.removeItem('token'); } catch { }
+      try { localStorage.removeItem('superadmin_token'); } catch { }
       try { sessionStorage.removeItem('token'); } catch { }
       // Force re-authentication
       if (typeof window !== 'undefined') {
