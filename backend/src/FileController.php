@@ -77,9 +77,7 @@ class FileController {
       sleep(2);
     }
   }
-  public function sse() {
-    // ... (existing code) ...
-  }
+
 
   // Serve raw file content
   public function serve($id) {

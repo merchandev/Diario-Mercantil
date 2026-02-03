@@ -232,30 +232,26 @@ class LegalController {
       $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
       $pay = $p->fetchAll(PDO::FETCH_ASSOC);
       
-      // Generate Content
-      $txt = "";
-      $txt .= "DIARIO MERCANTIL DE VENEZUELA\n";
-      $txt .= "Recibo de Orden #{$r['order_no']}\n";
-      $txt .= "Fecha: {$r['date']}\n";
-      $txt .= "--------------------------------------------------\n";
-      $txt .= "Cliente: {$r['name']}\n";
-      $txt .= "Documento: {$r['document']}\n";
-      $txt .= "Estado: {$r['status']}\n";
-      $txt .= "Folios: {$r['folios']}\n";
-      $txt .= "--------------------------------------------------\n";
-      $txt .= "PAGOS REGISTRADOS:\n";
+      require_once __DIR__.'/SimplePdf.php';
+      
+      $pdf = new SimplePdf();
+      $content = "DIARIO MERCANTIL DE VENEZUELA\n\n";
+      $content .= "RECIBO DE ORDEN #{$r['order_no']}\n";
+      $content .= "Fecha: {$r['date']}\n\n";
+      $content .= "Cliente: {$r['name']}\n";
+      $content .= "Documento: {$r['document']}\n";
+      $content .= "Estado: {$r['status']}\n";
+      $content .= "Folios: {$r['folios']}\n\n";
+      $content .= "PAGOS REGISTRADOS:\n";
       foreach($pay as $py) {
-        $txt .= "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}\n";
+        $content .= "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}\n";
       }
       
-      // Output as Text File for now (safe fallback) or try PDF headers
-      // If we want PDF, we need a library. 
-      // Let's output text with PDF headers? No, that's corrupt.
-      // Let's output a text file "recibo.txt"
+      $output = $pdf->render($content);
       
-      header('Content-Type: text/plain');
-      header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.txt"');
-      echo $txt;
+      header('Content-Type: application/pdf');
+      header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.pdf"');
+      echo $output;
   }
   public function getPublic($order){ 
     $pdo = Database::pdo();
