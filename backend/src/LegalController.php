@@ -21,8 +21,15 @@ class LegalController {
 
     $pdo = Database::pdo();
     $now = gmdate('c');
-    $stmt = $pdo->prepare('INSERT INTO files(name,size,type,status,created_at,updated_at) VALUES(?,?,?,?,?,?)');
-    $stmt->execute([$name,$file['size'],'pdf','uploaded',$now,$now]);
+    
+    // Store relative path (relative to storage/uploads? or full relative?)
+    // FileController logic will expect relative to storage/uploads if we stick to a pattern, 
+    // or we can store "uploads/..."
+    // Let's store the filename as it lies in storage/uploads.
+    $storageName = basename($dest);
+    
+    $stmt = $pdo->prepare('INSERT INTO files(name,path,size,type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
+    $stmt->execute([$name,$storageName,$file['size'],'pdf','uploaded',$now,$now]);
     $fileId = (int)$pdo->lastInsertId();
 
     // Contar paginas

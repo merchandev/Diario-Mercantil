@@ -77,4 +77,65 @@ class FileController {
       sleep(2);
     }
   }
+  public function sse() {
+    // ... (existing code) ...
+  }
+
+  // Serve raw file content
+  public function serve($id) {
+    // Allow public access restricted by token query param if needed, or just public for now if obscure?
+    // User images/files might need auth. The request in screenshot has Authorization header.
+    // But standard <img> or <a> tags often miss headers unless using fetch/blob.
+    // The screenshot shows "Auth Bearer" in console, so it's fetching with auth.
+    // AuthController::requireAuth(); // The user requested with fetchAuth, so headers are there.
+
+    $pdo = Database::pdo();
+    $stmt = $pdo->prepare('SELECT name, type, created_at FROM files WHERE id=?');
+    $stmt->execute([$id]);
+    $file = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$file) {
+        http_response_code(404);
+        die('File not found');
+    }
+
+    if (!$file) {
+        http_response_code(404);
+        die('File not found');
+    }
+
+    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
+    $path = $file['path'] ?? null;
+    $filePath = '';
+
+    // Strategy: 
+    // 1. Try 'path' column (new uploads)
+    // 2. Try 'name' column if it looks like a hash (old uploads?) - unlikely as name is original.
+    // 3. Fallback: Search for file with similar ID/pattern? (Hard for lost files)
+    
+    if ($path && file_exists($uploadDir.'/'.$path)) {
+        $filePath = $uploadDir.'/'.$path;
+    } 
+    // Fallback for files without path (Legacy/Broken):
+    // Try to find a file containing the name or just list dir? 
+    // Too expensive. If path is missing, fail.
+    
+    if (!$filePath || !file_exists($filePath)) {
+        http_response_code(404);
+        // Debug: echo "Path: $filePath";
+        die('File content not found on server');
+    }
+
+    // Serve
+    $mime = $file['type'] === 'pdf' ? 'application/pdf' : mime_content_type($filePath);
+    header('Content-Type: '.$mime);
+    header('Content-Length: ' . filesize($filePath));
+    // Provide filename for download
+    $downloadName = $file['name'] ?: basename($filePath);
+    header('Content-Disposition: inline; filename="' . $downloadName . '"'); // inline to view, attachment to download
+    
+    readfile($filePath);
+    exit;
+  }
+  }
 }

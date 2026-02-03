@@ -211,7 +211,14 @@ class SystemController {
                 $log[] = "Columna usuario agregada: $col";
             }
 
-            // 2. Repair Tokens
+            // 2. Repair Files (Add path)
+            $colsF = $pdo->query("DESCRIBE files")->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('path', $colsF)) {
+                $pdo->exec("ALTER TABLE files ADD COLUMN path VARCHAR(255) NULL");
+                $log[] = "Columna files.path agregada.";
+            }
+
+            // 3. Repair Tokens
             $colsT = $pdo->query("DESCRIBE auth_tokens")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('created_at', $colsT)) {
                 $pdo->exec("ALTER TABLE auth_tokens ADD COLUMN created_at DATETIME NULL");
