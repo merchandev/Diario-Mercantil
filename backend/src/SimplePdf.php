@@ -2,8 +2,7 @@
 
 class SimplePdf {
     private $buffer = '';
-    private $objects = [];
-    private $currentObject = 0;
+    private $pageContent = '';
 
     public function __construct() {
         $this->out('%PDF-1.4');
@@ -33,11 +32,17 @@ class SimplePdf {
         $this->out('endobj');
     }
 
-    public function render($text) {
+    // Add text at specific coordinates (x,y) from bottom-left
+    public function text($x, $y, $txt, $size=12) {
+        $txt = str_replace(['(', ')', '\\'], ['\\(', '\\)', '\\\\'], $txt);
+        $this->pageContent .= "BT /F1 $size Tf $x $y Td ($txt) Tj ET\n";
+    }
+
+    public function render() {
         // Content object (4)
-        $this->out('<< /Length ' . strlen($text) . ' >>');
+        $this->out('<< /Length ' . strlen($this->pageContent) . ' >>');
         $this->out('stream');
-        $this->out($text);
+        $this->out($this->pageContent);
         $this->out('endstream');
         $this->endObj();
 

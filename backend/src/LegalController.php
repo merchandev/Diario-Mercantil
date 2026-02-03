@@ -235,19 +235,28 @@ class LegalController {
       require_once __DIR__.'/SimplePdf.php';
       
       $pdf = new SimplePdf();
-      $content = "DIARIO MERCANTIL DE VENEZUELA\n\n";
-      $content .= "RECIBO DE ORDEN #{$r['order_no']}\n";
-      $content .= "Fecha: {$r['date']}\n\n";
-      $content .= "Cliente: {$r['name']}\n";
-      $content .= "Documento: {$r['document']}\n";
-      $content .= "Estado: {$r['status']}\n";
-      $content .= "Folios: {$r['folios']}\n\n";
-      $content .= "PAGOS REGISTRADOS:\n";
+      $y = 750; // Start from top (PDF origin is bottom-left, typically A4 is 595x842)
+      
+      $pdf->text(50, $y, "DIARIO MERCANTIL DE VENEZUELA", 16); $y -= 30;
+      $pdf->text(50, $y, "RECIBO DE ORDEN #{$r['order_no']}", 14); $y -= 20;
+      $pdf->text(50, $y, "Fecha: {$r['date']}"); $y -= 40;
+      
+      $pdf->text(50, $y, "DETALLES DEL CLIENTE:"); $y -= 20;
+      $pdf->text(50, $y, "Cliente: {$r['name']}"); $y -= 15;
+      $pdf->text(50, $y, "Documento ID: {$r['document']}"); $y -= 15;
+      
+      // Basic wrapping for content or just truncate for simple receipt
+      $pdf->text(50, $y, "Estado: {$r['status']}"); $y -= 15;
+      $pdf->text(50, $y, "Folios: {$r['folios']}"); $y -= 30;
+      
+      $pdf->text(50, $y, "PAGOS REGISTRADOS:"); $y -= 20;
       foreach($pay as $py) {
-        $content .= "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}\n";
+        $line = "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}";
+        $pdf->text(50, $y, $line); 
+        $y -= 15;
       }
       
-      $output = $pdf->render($content);
+      $output = $pdf->render();
       
       header('Content-Type: application/pdf');
       header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.pdf"');
