@@ -7,6 +7,12 @@ class LegalController {
   
   public function uploadPdf(){
     $u = AuthController::requireAuth();
+    
+    // DEBUG LOGGING
+    $log = __DIR__.'/../../debug_upload.log';
+    $debug = date('c') . " | POST: " . json_encode($_POST) . " | FILES: " . json_encode($_FILES) . "\n";
+    @file_put_contents($log, $debug, FILE_APPEND);
+
     if (!isset($_FILES['file'])) return Response::json(['error'=>'No se ha enviado ningún archivo'], 400);
     $file = $_FILES['file'];
     $name = $file['name'] ?? '';

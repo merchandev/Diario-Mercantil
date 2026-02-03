@@ -525,8 +525,16 @@ export default function Documento() {
 
       // Paso 3: Subir al servidor
       const formData = new FormData()
+
+      // CRITICAL: Append ID BEFORE file to ensure it's available to PHP immediately
+      if (req && req.id) {
+        console.log('📤 Uploading PDF for existing Request ID:', req.id)
+        formData.append('legal_request_id', String(req.id))
+      } else {
+        console.warn('⚠️ Uploading PDF without existing Request ID (Duplicate risk)')
+      }
+
       formData.append('file', file)
-      if (req && req.id) formData.append('legal_request_id', String(req.id))
 
       const res = await fetch('/api/legal/upload-pdf', {
         method: 'POST',
