@@ -11,8 +11,12 @@ const LinkItem = ({ to, icon, label, collapsed, end }: { to: string; icon: JSX.E
       ? 'bg-brand-900 text-white shadow-md font-medium border-white/5'
       : 'text-white/70 hover:bg-white/10 hover:text-white hover:scale-[1.02]'
   ].join(' ')} title={collapsed ? label : ''}>
-    <span className={({ isActive }: { isActive: boolean }) => isActive ? "text-brand-200" : "text-white/60"}>{icon}</span>
-    {!collapsed && <span className="text-sm">{label}</span>}
+    {({ isActive }) => (
+      <>
+        <span className={isActive ? "text-brand-200" : "text-white/60"}>{icon}</span>
+        {!collapsed && <span className="text-sm">{label}</span>}
+      </>
+    )}
   </NavLink>
 )
 
