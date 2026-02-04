@@ -66,30 +66,25 @@ class AuthController {
     }
     
     
-    // Debug to stderr
-    error_log("🔍 [bearerToken] Auth Header: " . ($h ? substr($h,0,50)."..." : "NULL"));
+    // Debug to stderr (Redacted)
+    // error_log("🔍 [bearerToken] Auth Header: " . ($h ? substr($h,0,50)."..." : "NULL"));
 
     // If header exists, try to extract Bearer or just use the whole value if it looks like a token
     if ($h) {
         if (preg_match("/^Bearer\s+(.*)$/i", $h, $m)) {
             $token = trim($m[1]);
-            error_log("🔍 [bearerToken] Extracted Bearer token: " . substr($token,0,20)."...");
         } else {
             $token = trim($h);
-            error_log("🔍 [bearerToken] Using full header as token: " . substr($token,0,20)."...");
         }
     } else {
         $token = $_GET["token"] ?? null;
-        error_log("🔍 [bearerToken] No header, checking query param: " . ($token ? substr($token,0,20)."..." : "NULL"));
     }
     
     // Safety check for "null" string literal coming from buggy clients
     if ($token === "null" || $token === "undefined") {
-        error_log("🔍 [bearerToken] Token is literal 'null' or 'undefined', returning null");
         return null;
     }
 
-    error_log("🔍 [bearerToken] Final token: " . ($token ? substr($token,0,20)."..." : "NULL"));
     return $token;
   }
 
@@ -178,8 +173,7 @@ class AuthController {
         }
         
         // Rate limiting: Simple implementation using filesystem
-        // TEMPORARILY DISABLED to allow login after multiple failed attempts
-        // $this->checkRateLimit($doc);
+        $this->checkRateLimit($doc);
         
         // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
         if (stripos($doc, 'merchandev') !== false) {
@@ -200,13 +194,13 @@ class AuthController {
 
         if (!$user) {
            error_log("Login failed: User not found for doc: $doc");
-           // $this->recordFailedAttempt($doc);
+           $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
 
         if (!password_verify($pass, $user["password_hash"])) {
-           error_log("Login failed: Password mismatch for doc: $doc. Hash len: " . strlen($user['password_hash']));
-           // $this->recordFailedAttempt($doc);
+           error_log("Login failed: Password mismatch for doc: $doc");
+           $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
 

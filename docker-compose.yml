@@ -9,15 +9,15 @@ services:
     ports:
       - "3000:9000"
     environment:
-      APP_ENV: production
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: diario_mercantil
-      DB_USERNAME: mercantil_user
-      DB_PASSWORD: secure_password_2025
-      UPLOAD_DIR: /var/www/html/storage/uploads
-      RESULT_DIR: /var/www/html/storage/results
+      APP_ENV: ${APP_ENV}
+      DB_CONNECTION: ${DB_CONNECTION}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_DATABASE: ${DB_DATABASE}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      UPLOAD_DIR: ${UPLOAD_DIR}
+      RESULT_DIR: ${RESULT_DIR}
     depends_on:
       db:
         condition: service_healthy
@@ -47,10 +47,10 @@ services:
     container_name: diario-mercantil-db-1
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_secure_password_2025
-      MYSQL_DATABASE: diario_mercantil
-      MYSQL_USER: mercantil_user
-      MYSQL_PASSWORD: secure_password_2025
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     volumes:
       - db_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password

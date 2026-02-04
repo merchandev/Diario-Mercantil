@@ -9,6 +9,9 @@ const backendTarget = process.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
 export default defineConfig({
   plugins: [react()],
+  esbuild: {
+    drop: ['console', 'debugger'],
+  },
   build: {
     manifest: true, // Generate manifest.json for WordPress theme integration
     rollupOptions: {

@@ -97,10 +97,7 @@ class FileController {
         die('File not found');
     }
 
-    if (!$file) {
-        http_response_code(404);
-        die('File not found');
-    }
+
 
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     $path = $file['path'] ?? null;

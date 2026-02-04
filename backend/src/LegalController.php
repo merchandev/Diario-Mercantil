@@ -11,7 +11,18 @@ class LegalController {
     $file = $_FILES['file'];
     $name = $file['name'] ?? '';
     $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-    if ($ext !== 'pdf') return Response::json(['error'=>'Solo PDF'], 400);
+    
+    // Validate Extension
+    if ($ext !== 'pdf') return Response::json(['error'=>'Solo archivos PDF'], 400);
+    
+    // Validate MIME Type
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $file['tmp_name']);
+    finfo_close($finfo);
+    
+    if ($mime !== 'application/pdf') {
+        return Response::json(['error'=>'El archivo no es un PDF válido (MIME mismatch)'], 400);
+    }
     
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
@@ -59,7 +70,13 @@ class LegalController {
     $bcvRaw = $stmt->fetchColumn();
     $bcv = is_numeric($bcvRaw) ? (float)$bcvRaw : 370.0; // fallback if not found
     
-    $pricePerFolioUsd = 1.5;
+    // Get Price Per Folio
+    $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+    $stmt->execute(['price_per_folio_usd']);
+    $priceRaw = $stmt->fetchColumn();
+    $pricePerFolioUsd = is_numeric($priceRaw) ? (float)$priceRaw : 1.5; // fallback
+    
+    // $pricePerFolioUsd = 1.5; // Removed hardcoded val
     $ivaPercent = 16;
     
     // Calculate pricing: (folios × $1.5 × bcv_rate) + IVA
