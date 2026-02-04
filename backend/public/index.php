@@ -16,6 +16,7 @@ require_once __DIR__."/../src/SystemController.php";
 require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/RateController.php";
 require_once __DIR__."/../src/SuperAdminController.php";
+require_once __DIR__."/../src/PagesController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
@@ -76,7 +77,8 @@ elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController()
 elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
 elseif ($uri === "/api/system/fix" && $method === "GET") { (new SystemController())->emergencyFix(); }
 
-// --- 5. PUBLICATIONS (Pages) ---
+// --- 5. PUBLICATIONS & PAGES (Public) ---
+elseif (preg_match("#^/api/page/(.+)$#", $uri, $m) && $method === "GET") { (new PagesController())->publicGet($m[1]); }
 elseif ($uri === "/api/publications" && $method === "GET") { (new SystemController())->listPages(); }
 elseif ($uri === "/api/publications" && $method === "POST") { (new SystemController())->createPage(); }
 elseif (preg_match("#^/api/publications/(\d+)$#", $uri, $m)) {
