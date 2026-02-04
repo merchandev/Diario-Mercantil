@@ -96,7 +96,11 @@ export default function PublicHeader() {
       })
     // Build menu from published pages (excluding contacto), with special routes
     listPagesPublic().then(({ items }) => {
-      if (!items || items.length === 0) return // Keep default menu if no public pages found
+      console.log('🍔 [Menu Debug] API Items:', items)
+      if (!items || items.length === 0) {
+        console.warn('🍔 [Menu Debug] No items returned, keeping default menu')
+        return // Keep default menu if no public pages found
+      }
 
       const order = ['inicio', 'sobre-el-diario', 'como-publicar', 'ediciones', 'directorio-legal', 'preguntas-frecuentes']
       const bySlug = new Map(items.map(it => [it.slug, it]))
@@ -104,16 +108,20 @@ export default function PublicHeader() {
         ...order.filter(s => bySlug.has(s)).map(slug => bySlug.get(slug)!),
         ...items.filter(it => !order.includes(it.slug)).sort((a, b) => a.title.localeCompare(b.title))
       ]
+      console.log('🍔 [Menu Debug] Sorted items:', sorted)
+
       const linkFor = (slug: string) => slug === 'inicio' ? '/' : slug === 'ediciones' ? '/ediciones' : `/p/${slug}`
       const m = sorted.map(it => ({ label: it.title.toUpperCase(), to: linkFor(it.slug) }))
 
       // Ensure INICIO is always first
       if (!m.find(x => x.to === '/')) {
+        console.log('🍔 [Menu Debug] Forcing INICIO')
         m.unshift({ label: 'INICIO', to: '/' })
       }
 
       // Ensure EDICIONES is present (if likely missed by slug check)
       if (!m.find(x => x.to === '/ediciones')) {
+        console.log('🍔 [Menu Debug] Forcing EDICIONES')
         // Try to insert after Como Publicar if possible, else append
         const cpIndex = m.findIndex(x => x.to.includes('como-publicar'))
         if (cpIndex >= 0) m.splice(cpIndex + 1, 0, { label: 'EDICIONES', to: '/ediciones' })
@@ -124,8 +132,11 @@ export default function PublicHeader() {
       const pos = m.findIndex(x => x.to.endsWith('/p/preguntas-frecuentes'))
       const contacto = { label: 'CONTACTO', to: '/contacto' }
       if (pos >= 0) m.splice(pos, 0, contacto); else m.push(contacto)
+
+      console.log('🍔 [Menu Debug] Final Menu:', m)
       setMenu(m)
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('🍔 [Menu Debug] API Error:', err)
       // Keep default, no visual blink
       setMenu([...DEFAULT_MENU])
     })
