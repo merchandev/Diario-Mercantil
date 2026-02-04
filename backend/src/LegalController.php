@@ -275,8 +275,12 @@ class LegalController {
       
       $output = $pdf->render();
       
+      // Clean previous output to prevent PDF corruption
+      if (ob_get_length()) ob_end_clean();
+      
       header('Content-Type: application/pdf');
       header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.pdf"');
+      header('Content-Length: ' . strlen($output));
       echo $output;
   }
   public function getPublic($order){ 
