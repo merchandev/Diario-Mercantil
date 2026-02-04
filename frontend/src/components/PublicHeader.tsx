@@ -49,8 +49,8 @@ function TopBannerRow() {
     <div className="mx-auto max-w-7xl px-4 pt-4">
       <div className="grid grid-cols-1 md:grid-cols-1 gap-4 md:gap-5 items-stretch">
         <div className="flex items-center gap-4">
-          <div className="hidden md:flex items-center h-28 md:h-32">
-            <Link to="/" aria-label="Inicio">
+          <div className="hidden md:flex items-center h-28 md:h-32 relative z-50">
+            <Link to="/" aria-label="Inicio" className="block hover:opacity-90 transition-opacity">
               <img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil" className="h-16 w-auto" />
             </Link>
           </div>
