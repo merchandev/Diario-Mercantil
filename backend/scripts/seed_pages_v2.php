@@ -2,7 +2,7 @@
 require __DIR__ . '/../src/Database.php';
 
 try {
-    $pdo = Database::getConnection();
+    $pdo = Database::pdo();
     echo "🔌 Conectado a la base de datos.\n";
 
     $pages = [
