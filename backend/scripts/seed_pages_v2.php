@@ -91,14 +91,14 @@ try {
         ]
     ];
 
-    $stmt = $pdo->prepare("INSERT INTO pages (slug, title, status, body_blocks, created_at, updated_at) VALUES (:slug, :title, :status, :body_blocks, NOW(), NOW()) ON DUPLICATE KEY UPDATE title = VALUES(title), body_blocks = VALUES(body_blocks), status = VALUES(status)");
+    $stmt = $pdo->prepare("INSERT INTO pages (slug, title, status, body_json, header_html, footer_html, created_at, updated_at) VALUES (:slug, :title, :status, :body_json, '', '', NOW(), NOW()) ON DUPLICATE KEY UPDATE title = VALUES(title), body_json = VALUES(body_json), status = VALUES(status)");
 
     foreach ($pages as $page) {
         $stmt->execute([
             ':slug' => $page['slug'],
             ':title' => $page['title'],
             ':status' => $page['status'],
-            ':body_blocks' => $page['body_blocks']
+            ':body_json' => $page['body_blocks'] // The array key in $pages is still body_blocks but maps to body_json column
         ]);
         echo "✅ Página procesada: {$page['title']} ({$page['slug']})\n";
     }
