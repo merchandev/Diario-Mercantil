@@ -230,8 +230,10 @@ class LegalController {
   public function addPayment($id){
       $in = json_decode(file_get_contents('php://input'),true);
       $pdo = Database::pdo();
+      // Use the status sent from frontend, fallback to 'Pendiente' if not provided
+      $status = isset($in['status']) ? $in['status'] : 'Pendiente';
       $pdo->prepare('INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,created_at) VALUES(?,?,?,?,?,?,?,NOW())')
-          ->execute([$id, $in['ref'], $in['date'], $in['bank'], $in['type'], $in['amount_bs'], 'Pendiente']);
+          ->execute([$id, $in['ref'], $in['date'], $in['bank'], $in['type'], $in['amount_bs'], $status]);
       Response::json(['ok'=>true]);
   }
   
