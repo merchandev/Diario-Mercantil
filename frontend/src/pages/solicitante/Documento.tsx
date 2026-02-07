@@ -455,6 +455,11 @@ export default function Documento() {
   const [showImg, setShowImg] = useState(false)
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'success' | 'error' | 'info' | 'warning' }>({ isOpen: false, title: '', message: '', variant: 'info' })
 
+  // Refs for scrolling to steps
+  const step1Ref = useRef<HTMLDivElement>(null)
+  const step2Ref = useRef<HTMLDivElement>(null)
+  const step3Ref = useRef<HTMLDivElement>(null)
+
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '' })); } catch { } })(); }, [])
 
@@ -730,7 +735,7 @@ export default function Documento() {
 
       // Scroll suave al paso 2
       setTimeout(() => {
-        window.scrollTo({ top: 0, behavior: 'smooth' })
+        step2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
     } catch (err) {
       setLoading(false)
@@ -824,7 +829,7 @@ export default function Documento() {
       <div className="text-sm text-slate-700">¡Completa estos tres pasos y obtén la publicación de tu documento en la próxima edición!</div>
 
       {/* Paso 1 - Modernizado */}
-      <div className="card p-6 space-y-4 shadow-md step-anim">
+      <div ref={step1Ref} className="card p-6 space-y-4 shadow-md step-anim">
         <div className="flex items-center gap-3 pb-3 border-b">
           <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-lg">1</div>
           <div>
@@ -958,7 +963,7 @@ export default function Documento() {
       </div>
 
       {/* Paso 2 - Carga de PDF con análisis */}
-      <div className="card p-6 space-y-4 shadow-md step-anim">
+      <div ref={step2Ref} className="card p-6 space-y-4 shadow-md step-anim">
         <div className="flex items-center gap-3 pb-3 border-b">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${step >= 2 ? 'bg-brand-100 text-brand-700' : 'bg-slate-200 text-slate-500'
             }`}>2</div>
@@ -1116,7 +1121,12 @@ export default function Documento() {
               </button>
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => {
+                  setStep(3)
+                  setTimeout(() => {
+                    step3Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }, 100)
+                }}
                 className="btn btn-primary flex-1 py-3 text-lg font-semibold"
               >
                 Continuar al pago
@@ -1130,7 +1140,7 @@ export default function Documento() {
       </div>
 
       {/* Paso 3 */}
-      <div className={`card shadow-md transition-all step-anim ${step < 3 ? 'opacity-50 cursor-not-allowed' : ''}`}>
+      <div ref={step3Ref} className={`card shadow-md transition-all step-anim ${step < 3 ? 'opacity-50 cursor-not-allowed' : ''}`}>
         <div className="bg-gradient-to-r from-brand-50 to-brand-100 p-6 rounded-t-2xl border-b border-brand-200">
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white ${step >= 3 ? 'bg-brand-600' : 'bg-gray-400'}`}>3</div>
