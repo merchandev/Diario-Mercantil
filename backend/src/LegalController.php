@@ -243,10 +243,26 @@ class LegalController {
   }
 
   public function download($id){
+      // Require authentication
+      $u = AuthController::requireAuth();
+      
       $pdo = Database::pdo();
       $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
       $r = $s->fetch(PDO::FETCH_ASSOC);
-      if (!$r) die('Orden no encontrada');
+      if (!$r) {
+          http_response_code(404);
+          die('Orden no encontrada');
+      }
+      
+      // Check if user has access to this order
+      $role = strtolower($u['role'] ?? '');
+      if (!in_array($role, ['admin','staff','manager'])) {
+          // Regular users can only download their own orders
+          if ((int)$r['user_id'] !== (int)$u['id']) {
+              http_response_code(403);
+              die('No tienes acceso a esta orden');
+          }
+      }
       
       $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
       $pay = $p->fetchAll(PDO::FETCH_ASSOC);
@@ -270,7 +286,8 @@ class LegalController {
       
       $pdf->text(50, $y, "PAGOS REGISTRADOS:"); $y -= 20;
       foreach($pay as $py) {
-        $line = "- {$py['date']}: {$py['amount_bs']} Bs ({$py['status']}) - Ref: {$py['ref']}";
+        $amount = isset($py['amount_bs']) ? number_format((float)$py['amount_bs'], 2) : '0.00';
+        $line = "- {$py['date']}: {$amount} Bs ({$py['status']}) - Ref: {$py['ref']}";
         $pdf->text(50, $y, $line); 
         $y -= 15;
       }
@@ -283,6 +300,9 @@ class LegalController {
       header('Content-Type: application/pdf');
       header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.pdf"');
       header('Content-Length: ' . strlen($output));
+      header('Cache-Control: no-cache, no-store, must-revalidate');
+      header('Pragma: no-cache');
+      header('Expires: 0');
       echo $output;
   }
   public function getPublic($order){ 
