@@ -138,7 +138,7 @@ export default function PublicarConvocatoria() {
         type: pay.tipo_operacion,
         amount_bs: Number(pay.amount_bs || total || 0),
         mobile_phone: pay.tipo_operacion?.toLowerCase?.() === 'pago móvil' ? pay.mobile_phone : undefined,
-        status: 'Pendiente'
+        status: 'Por verificar'
       })
       alert('¡Tu solicitud fue enviada! Está Por verificar.')
     } catch (e: any) {

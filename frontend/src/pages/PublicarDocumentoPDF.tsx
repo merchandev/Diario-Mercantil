@@ -61,7 +61,7 @@ export default function PublicarDocumentoPDF() {
         date: pay.date,
         amount_bs: Number(pay.amount_bs || pricing?.total_bs || 0),
         mobile_phone: pay.type === 'pago móvil' ? (pay.mobile_phone || '') : undefined,
-        status: 'Pendiente'
+        status: 'Por verificar'
       })
       alert('Pago reportado. Su solicitud está por verificar.')
     } catch (e: any) {
