@@ -6,18 +6,18 @@ import { IconArrowLeft, IconDownload, IconCheck } from '../../components/icons'
 import QRCode from 'qrcode.react'
 import AlertDialog from '../../components/AlertDialog'
 
-export default function PublicacionDetalleSolicitante(){
-  const { id } = useParams<{id:string}>()
+export default function PublicacionDetalleSolicitante() {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [req, setReq] = useState<LegalRequest|null>(null)
+  const [req, setReq] = useState<LegalRequest | null>(null)
   const [payments, setPayments] = useState<LegalPayment[]>([])
-  const qrWrapRef = useRef<HTMLDivElement|null>(null)
+  const qrWrapRef = useRef<HTMLDivElement | null>(null)
   const [files, setFiles] = useState<LegalFile[]>([])
-  const [alertDialog, setAlertDialog] = useState<{isOpen:boolean; title:string; message:string; variant:'success'|'error'|'info'|'warning'}>({isOpen:false, title:'', message:'', variant:'info'})
+  const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'success' | 'error' | 'info' | 'warning' }>({ isOpen: false, title: '', message: '', variant: 'info' })
 
-  useEffect(()=>{
-    if(!id) return
+  useEffect(() => {
+    if (!id) return
     setLoading(true)
     getLegal(+id)
       .then(async data => {
@@ -26,17 +26,17 @@ export default function PublicacionDetalleSolicitante(){
         try {
           const filesRes = await listLegalFiles(+id)
           setFiles(filesRes.items)
-        } catch {}
+        } catch { }
       })
       .catch(err => {
         console.error('Error cargando publicación:', err)
-        setAlertDialog({isOpen:true, title:'Error', message:'No se pudo cargar la publicación', variant:'error'})
+        setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudo cargar la publicación', variant: 'error' })
       })
       .finally(() => setLoading(false))
-  },[id])
+  }, [id])
 
-  const handleDownloadPDF = async() => {
-    if(!req) return
+  const handleDownloadPDF = async () => {
+    if (!req) return
     try {
       const blob = await downloadLegal(req.id)
       const url = URL.createObjectURL(blob)
@@ -45,9 +45,9 @@ export default function PublicacionDetalleSolicitante(){
       a.download = `orden-${req.order_no || req.id}.pdf`
       a.click()
       URL.revokeObjectURL(url)
-    } catch(err) {
+    } catch (err) {
       console.error('Error descargando PDF:', err)
-      setAlertDialog({isOpen:true, title:'Error', message:'No se pudo descargar el PDF', variant:'error'})
+      setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudo descargar el PDF', variant: 'error' })
     }
   }
 
@@ -61,7 +61,7 @@ export default function PublicacionDetalleSolicitante(){
     a.click()
   }
 
-  if(loading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -72,7 +72,7 @@ export default function PublicacionDetalleSolicitante(){
     )
   }
 
-  if(!req) {
+  if (!req) {
     return (
       <div className="text-center py-12">
         <h2 className="text-xl font-semibold text-slate-700 mb-4">Publicación no encontrada</h2>
@@ -120,13 +120,12 @@ export default function PublicacionDetalleSolicitante(){
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Estado</label>
-                <span className={`pill ${
-                  req.status==='Publicada'?'bg-green-100 text-green-700':
-                  req.status==='En trámite'?'bg-blue-100 text-blue-700':
-                  req.status==='Por verificar'?'bg-yellow-100 text-yellow-700':
-                  req.status==='Rechazado'?'bg-red-100 text-red-700':
-                  'bg-slate-100 text-slate-700'
-                }`}>
+                <span className={`pill ${req.status === 'Publicada' ? 'bg-green-100 text-green-700' :
+                    req.status === 'En trámite' ? 'bg-blue-100 text-blue-700' :
+                      req.status === 'Por verificar' ? 'bg-yellow-100 text-yellow-700' :
+                        req.status === 'Rechazado' ? 'bg-red-100 text-red-700' :
+                          'bg-slate-100 text-slate-700'
+                  }`}>
                   {req.status}
                 </span>
               </div>
@@ -267,9 +266,9 @@ export default function PublicacionDetalleSolicitante(){
                           <td className="py-2">{p.type}</td>
                           <td className="py-2">{p.bank || '-'}</td>
                           <td className="py-2">{p.date}</td>
-                          <td className="py-2 text-right font-semibold">{p.amount_bs?.toFixed(2)}</td>
+                          <td className="py-2 text-right font-semibold">{Number(p.amount_bs || 0).toFixed(2)}</td>
                           <td className="py-2 text-center">
-                            <span className={`pill text-xs ${p.status==='Verificado'?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}`}>
+                            <span className={`pill text-xs ${p.status === 'Verificado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                               {p.status}
                             </span>
                           </td>
@@ -280,7 +279,7 @@ export default function PublicacionDetalleSolicitante(){
                 </div>
                 <div className="flex justify-end items-center gap-4 pt-4 border-t">
                   <span className="text-slate-600">Total Pagado:</span>
-                  <span className="text-2xl font-bold text-brand-700">Bs. {totalPagado.toFixed(2)}</span>
+                  <span className="text-2xl font-bold text-brand-700">Bs. {Number(totalPagado || 0).toFixed(2)}</span>
                 </div>
               </div>
             )}
@@ -300,7 +299,7 @@ export default function PublicacionDetalleSolicitante(){
                       <span className="text-xs text-slate-500">Vista protegida</span>
                     </div>
                     {f.type === 'pdf' ? (
-                      <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8,'0')} - Solo Lectura`} />
+                      <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8, '0')} - Solo Lectura`} />
                     ) : (
                       <div className="p-6 text-center text-slate-500">Tipo de archivo no soportado para vista previa</div>
                     )}
@@ -323,7 +322,7 @@ export default function PublicacionDetalleSolicitante(){
             <div className="text-xs text-center mt-3 text-slate-500 font-mono break-all">
               {req.order_no || String(req.id).padStart(8, '0')}
             </div>
-            <button 
+            <button
               onClick={handleDownloadQR}
               className="btn btn-outline w-full mt-4 inline-flex items-center justify-center gap-2"
             >
@@ -341,7 +340,7 @@ export default function PublicacionDetalleSolicitante(){
             <button
               onClick={() => {
                 navigator.clipboard.writeText(publicUrl)
-                setAlertDialog({isOpen:true, title:'Copiado', message:'Enlace copiado al portapapeles', variant:'success'})
+                setAlertDialog({ isOpen: true, title: 'Copiado', message: 'Enlace copiado al portapapeles', variant: 'success' })
               }}
               className="btn btn-outline w-full inline-flex items-center justify-center gap-2"
             >
@@ -372,7 +371,7 @@ export default function PublicacionDetalleSolicitante(){
         </div>
       </div>
 
-      <AlertDialog {...alertDialog} onClose={()=>setAlertDialog({...alertDialog,isOpen:false})} />
+      <AlertDialog {...alertDialog} onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })} />
     </section>
   )
 }
