@@ -915,17 +915,38 @@ export default function Documento() {
             <span className="text-sm font-medium text-slate-700 mb-1 block">Tipo de registrador(a) mercantil</span>
             <input className="input w-full" placeholder="Principal, Auxiliar, etc." value={meta.tipo_registrador || ''} onChange={e => setMeta({ ...meta, tipo_registrador: e.target.value })} />
           </label>
-          <label className="block">
+          <div className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo / Letra</span>
-            <input className="input w-full" placeholder="Ej: A, B, 1, 2" value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value })} />
-          </label>
+            <div className="flex gap-2">
+              <select
+                className="input w-24"
+                value={meta.tomo_letra || ''}
+                onChange={e => setMeta({ ...meta, tomo_letra: e.target.value })}
+              >
+                <option value="">-</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+              </select>
+              <input
+                className="input flex-1"
+                placeholder="Número"
+                value={meta.tomo || ''}
+                onChange={e => setMeta({ ...meta, tomo: e.target.value })}
+              />
+            </div>
+          </div>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número</span>
             <input className="input w-full" placeholder="Número" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value })} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Año</span>
-            <input className="input w-full" placeholder="2024" value={meta.anio || ''} onChange={e => setMeta({ ...meta, anio: e.target.value })} />
+            <select className="input w-full" value={meta.anio || new Date().getFullYear()} onChange={e => setMeta({ ...meta, anio: e.target.value })}>
+              {Array.from({ length: 31 }, (_, i) => 2030 - i).map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente</span>
