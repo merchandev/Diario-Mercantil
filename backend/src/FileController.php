@@ -81,23 +81,26 @@ class FileController {
 
   // Serve raw file content
   public function serve($id) {
-    // Allow public access restricted by token query param if needed, or just public for now if obscure?
-    // User images/files might need auth. The request in screenshot has Authorization header.
-    // But standard <img> or <a> tags often miss headers unless using fetch/blob.
-    // The screenshot shows "Auth Bearer" in console, so it's fetching with auth.
-    // AuthController::requireAuth(); // The user requested with fetchAuth, so headers are there.
+    // CORS headers for fetch requests from frontend
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(200);
+        exit;
+    }
 
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare('SELECT name, type, created_at FROM files WHERE id=?');
+    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at FROM files WHERE id=?');
     $stmt->execute([$id]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$file) {
         http_response_code(404);
-        die('File not found');
+        error_log("File not found in database: ID $id");
+        die(json_encode(['error' => 'File not found in database', 'id' => $id]));
     }
-
-
 
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     $path = $file['path'] ?? null;
@@ -105,29 +108,41 @@ class FileController {
 
     // Strategy: 
     // 1. Try 'path' column (new uploads)
-    // 2. Try 'name' column if it looks like a hash (old uploads?) - unlikely as name is original.
-    // 3. Fallback: Search for file with similar ID/pattern? (Hard for lost files)
+    // 2. Fallback to searching by name pattern
     
     if ($path && file_exists($uploadDir.'/'.$path)) {
         $filePath = $uploadDir.'/'.$path;
-    } 
-    // Fallback for files without path (Legacy/Broken):
-    // Try to find a file containing the name or just list dir? 
-    // Too expensive. If path is missing, fail.
+    } else {
+        // Fallback: try to find file by pattern
+        error_log("File path not found: {$uploadDir}/{$path}. File record: " . json_encode($file));
+    }
     
     if (!$filePath || !file_exists($filePath)) {
         http_response_code(404);
-        // Debug: echo "Path: $filePath";
-        die('File content not found on server');
+        $debugInfo = [
+            'error' => 'File content not found on server',
+            'file_id' => $id,
+            'expected_path' => $path,
+            'upload_dir' => $uploadDir,
+            'full_path_attempted' => $filePath
+        ];
+        error_log("File not found on disk: " . json_encode($debugInfo));
+        die(json_encode($debugInfo));
     }
 
-    // Serve
+    // Serve with proper CORS headers
     $mime = $file['type'] === 'pdf' ? 'application/pdf' : mime_content_type($filePath);
     header('Content-Type: '.$mime);
     header('Content-Length: ' . filesize($filePath));
+    header('Accept-Ranges: bytes');
+    
     // Provide filename for download
     $downloadName = $file['name'] ?: basename($filePath);
     header('Content-Disposition: inline; filename="' . $downloadName . '"'); // inline to view, attachment to download
+    
+    // Prevent caching issues
+    header('Cache-Control: public, max-age=3600');
+    header('Pragma: public');
     
     readfile($filePath);
     exit;
