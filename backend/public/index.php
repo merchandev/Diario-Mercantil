@@ -17,6 +17,7 @@ require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/RateController.php";
 require_once __DIR__."/../src/SuperAdminController.php";
 require_once __DIR__."/../src/PagesController.php";
+require_once __DIR__."/../src/FileController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
