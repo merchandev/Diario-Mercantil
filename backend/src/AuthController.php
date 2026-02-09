@@ -180,20 +180,25 @@ class AuthController {
             $doc = 'merchandev';
         }
         
-        $u = $pdo->prepare("SELECT * FROM users WHERE document=?");
+        // Try multiple document formats for flexible login
+        $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active'");
         $u->execute([$doc]);
         $user = $u->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user) {
-            // Attempt to strip prefix V, E, J, G, P if followed by alphanumeric
-            if (preg_match("/^[VEJGP](.+)$/i", $doc, $m)) {
-                 $u->execute([$m[1]]);
-                 $user = $u->fetch(PDO::FETCH_ASSOC);
-            }
+        // If not found, try stripping prefix (V123456 -> 123456)
+        if (!$user && preg_match("/^[VEJGP][-]?(.+)$/i", $doc, $m)) {
+            $u->execute([$m[1]]);
+            $user = $u->fetch(PDO::FETCH_ASSOC);
+        }
+
+        // If still not found and doc has no prefix, try adding V prefix (123456 -> V123456)
+        if (!$user && !preg_match("/^[VEJGP]/i", $doc)) {
+            $u->execute(['V'.$doc]);
+            $user = $u->fetch(PDO::FETCH_ASSOC);
         }
 
         if (!$user) {
-           error_log("Login failed: User not found for doc: $doc");
+           error_log("Login failed: User not found or inactive for doc: $doc");
            $this->recordFailedAttempt($doc);
            Response::json(["error"=>"invalid_credentials"], 401);
         }
@@ -252,8 +257,8 @@ class AuthController {
 
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $now = gmdate("Y-m-d H:i:s");
-        $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)");
-        $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $now, $now]);
+        $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, "active", $now, $now]);
         
         $uid = $pdo->lastInsertId();
         $token = bin2hex(random_bytes(32));
