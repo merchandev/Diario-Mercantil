@@ -23,7 +23,7 @@ class OrderPdf extends FPDF {
         $this->Rect(0, 0, 210, 40, 'F');
         
         if($logoPath && file_exists($logoPath)) {
-            $this->Image($logoPath, 10, 10, 60);
+            $this->Image($logoPath, 10, 10, 70);
         }
         
         // Title & Order Info - Aligned Right

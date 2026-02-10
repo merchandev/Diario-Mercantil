@@ -278,6 +278,11 @@ class LegalController {
       $stmt->execute(['price_per_folio_usd']);
       $pricePerFolio = (float)$stmt->fetchColumn() ?: 1.5;
 
+      // Get BCV Rate
+      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+      $stmt->execute(['bcv_rate']);
+      $bcv = (float)$stmt->fetchColumn() ?: 0.0;
+
       $totalUsd = $r['folios'] * $pricePerFolio;
       $subtotalBs = $totalUsd * $bcv;
 
