@@ -37,7 +37,8 @@ class OrderPdf extends FPDF {
              $orderNo = $this->orderInfo['order_no'] ?? $this->orderInfo['id'] ?? '---';
              $this->SetXY(100, 20);
              $this->Cell(100, 6, '# ORDEN: ' . $orderNo, 0, 1, 'R');
-             $this->Cell(100, 6, 'FECHA: ' . ($this->orderInfo['date'] ?? date('Y-m-d')), 0, 1, 'R');
+             // Date removed as requested
+             // $this->Cell(100, 6, 'FECHA: ' . ($this->orderInfo['date'] ?? date('Y-m-d')), 0, 1, 'R');
         }
         $this->Ln(25);
     }
@@ -46,7 +47,7 @@ class OrderPdf extends FPDF {
         $this->SetY(-15);
         $this->SetFont('Arial', 'I', 8);
         $this->SetTextColor(128, 128, 128);
-        $this->Cell(0, 10, 'Pagina '.$this->PageNo().'/{nb} - Diario Mercantil de Venezuela', 0, 0, 'C');
+        $this->Cell(0, 10, utf8_decode('Página ').$this->PageNo().'/{nb} - Diario Mercantil de Venezuela', 0, 0, 'C');
     }
     
     function InfoSection($clientData, $orderDetails) {
@@ -69,24 +70,29 @@ class OrderPdf extends FPDF {
         }
         
         // Reset Y to below the lowest column
-        $this->SetY($startY + 50); // Approximate height, or calculate dynamic if needed
-        $this->Ln(10);
+        $this->SetY($startY + 50); 
+        $this->Ln(5);
     }
 
     function SectionHeader($label) {
-        $this->SetFont('Arial', 'B', 11);
+        $this->SetFont('Arial', 'B', 10);
         $this->SetTextColor(143, 25, 32);
-        $this->Cell(80, 8, strtoupper($label), 'B', 2, 'L');
-        $this->Ln(2);
+        // Modern approach: No underline, just bold colored text, strictly uppercase
+        $this->Cell(80, 8, strtoupper(utf8_decode($label)), 0, 2, 'L');
+        // Add a thin light separator line below
+        $this->SetDrawColor(230, 230, 230);
+        $this->Line($this->GetX(), $this->GetY(), $this->GetX()+80, $this->GetY());
+        $this->Ln(3);
     }
 
     function KeyValue($key, $value, $x) {
         $this->SetX($x);
-        $this->SetFont('Arial', 'B', 10);
-        $this->SetTextColor(80,80,80);
-        $this->Cell(35, 6, $key, 0, 0);
-        $this->SetFont('Arial', '', 10);
-        $this->SetTextColor(0,0,0);
-        $this->Cell(45, 6, $value, 0, 1);
+        $this->SetFont('Arial', 'B', 9);
+        $this->SetTextColor(120, 120, 120); // Gray labels
+        $this->Cell(35, 6, utf8_decode($key), 0, 0);
+        
+        $this->SetFont('Arial', '', 9);
+        $this->SetTextColor(0, 0, 0); // Black values
+        $this->Cell(45, 6, utf8_decode($value), 0, 1);
     }
 }
