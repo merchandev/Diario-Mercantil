@@ -353,6 +353,10 @@ class LegalController {
       $pdf->Cell(30, 7, 'Total Pagado:', 0, 0, 'R');
       $pdf->Cell(30, 7, number_format($totalPaid, 2).' Bs', 0, 1, 'R');
 
+      $pdf->Ln(15);
+      $pdf->SetFont('Arial', '', 10);
+      $pdf->SetTextColor(100, 100, 100);
+      $pdf->Cell(0, 5, 'Fecha de Emision: ' . ($r['date'] ?? date('Y-m-d')), 0, 1, 'R');
       $output = $pdf->Output('S');
       
       // Clean previous output to prevent PDF corruption

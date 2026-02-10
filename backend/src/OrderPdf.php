@@ -19,19 +19,17 @@ class OrderPdf extends FPDF {
         }
         
         // Title
-        $this->SetFont('Arial', 'B', 24); // Larger font
+        $this->SetFont('Arial', 'B', 16); // Smaller font
         $this->SetTextColor(255, 255, 255);
-        $this->SetXY(110, 12);
+        $this->SetXY(110, 15);
         $this->Cell(90, 10, $this->title, 0, 1, 'R');
         
-        // Order Number & Date
-        $this->SetFont('Arial', '', 11);
+        // Order Number (Date moved to end)
+        $this->SetFont('Arial', '', 10);
         if(!empty($this->orderInfo)) {
              $orderNo = $this->orderInfo['order_no'] ?? $this->orderInfo['id'] ?? '---';
-             $this->SetXY(110, 24);
+             $this->SetXY(110, 22);
              $this->Cell(90, 6, 'Orden #: ' . $orderNo, 0, 1, 'R');
-             $this->SetXY(110, 30);
-             $this->Cell(90, 6, 'Fecha: ' . ($this->orderInfo['date'] ?? date('Y-m-d')), 0, 1, 'R');
         }
 
         $this->Ln(20);
