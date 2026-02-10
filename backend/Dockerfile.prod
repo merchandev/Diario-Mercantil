@@ -6,7 +6,11 @@ RUN apk add --no-cache \
     curl-dev \
     libxml2-dev \
     oniguruma-dev \
-    && docker-php-ext-install pdo pdo_mysql curl mbstring dom xml
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo pdo_mysql curl mbstring dom xml gd
 
 # Set working directory
 WORKDIR /var/www/html

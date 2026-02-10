@@ -11,9 +11,9 @@ class OrderPdf extends FPDF {
         $this->Rect(0, 0, 210, 40, 'F');
         
         // Logo
-        // Adjust path as needed. Assuming this file is in backend/src, so ../public/logo-blanco.png
-        $logoPath = __DIR__.'/../public/logo-blanco.png';
-        if(file_exists($logoPath)) {
+        // Use absolute path for safety
+        $logoPath = realpath(__DIR__.'/../public/logo-blanco.png');
+        if($logoPath && file_exists($logoPath)) {
             $this->Image($logoPath, 10, 8, 50);
         }
         
@@ -27,8 +27,9 @@ class OrderPdf extends FPDF {
         // Order Number & Date
         $this->SetFont('Arial', '', 10);
         if(!empty($this->orderInfo)) {
+             $orderNo = $this->orderInfo['order_no'] ?? $this->orderInfo['id'] ?? '---';
              $this->SetXY(110, 20);
-             $this->Cell(90, 5, 'Orden #: ' . ($this->orderInfo['order_no'] ?? '---'), 0, 1, 'R');
+             $this->Cell(90, 5, 'Orden #: ' . $orderNo, 0, 1, 'R');
              $this->SetXY(110, 25);
              $this->Cell(90, 5, 'Fecha: ' . ($this->orderInfo['date'] ?? date('Y-m-d')), 0, 1, 'R');
         }
