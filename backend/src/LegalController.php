@@ -395,7 +395,8 @@ class LegalController {
   // == FILES ==
   public function listFiles($id){
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare("SELECT lf.id, lf.kind, lf.file_id, f.name, f.size, f.type, f.created_at FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?");
+    // Select f.id as file_id to ensure we get the clean integer ID from the files table
+    $stmt = $pdo->prepare("SELECT lf.id, lf.kind, f.id as file_id, f.name, f.size, f.type, f.created_at FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?");
     $stmt->execute([$id]);
     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
