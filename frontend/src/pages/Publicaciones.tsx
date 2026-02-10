@@ -178,9 +178,7 @@ export default function Publicaciones() {
                   <td className="px-4 py-2">{prettyDate(r.publish_date)}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
-                      {r.status === 'Publicada' && (
-                        <button className="text-purple-700 hover:underline inline-flex items-center gap-1" onClick={() => setQrModal({ isOpen: true, url: `${window.location.origin}/ediciones/${r.order_no || r.id}`, title: `Publicación ${r.order_no || r.id}` })}><IconQrCode /> <span>QR</span></button>
-                      )}
+                      {/* QR Button removed - QR is now edition-based */}
                       <button className="text-brand-700 hover:underline inline-flex items-center gap-1" onClick={() => navigate(`/dashboard/publicaciones/${r.id}`)}><IconSave /> <span>Detalles</span></button>
                       <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = prompt('Motivo del rechazo:'); if (reason === null) return; await rejectLegal(r.id, reason || ''); reload() }}><IconClose /> <span>Rechazar</span></button>
                       <button className="text-emerald-700 hover:underline inline-flex items-center gap-1" onClick={() => download(r.id)}><IconDownload /> <span>Descargar</span></button>
@@ -301,18 +299,19 @@ export default function Publicaciones() {
                       onClick={() => {
                         setConfirmDialog({
                           isOpen: true,
-                          title: 'Aprobar solicitud',
-                          message: '¿Aprobar esta solicitud y marcarla como Publicada?',
+                          title: 'Verificar solicitud',
+                          message: '¿Marcar esta solicitud como Verificada/En trámite?\n\nQuedará lista para ser incluida en una Edición.',
                           variant: 'info',
                           onConfirm: async () => {
-                            await updateLegal(sel.id, { status: 'Publicada', publish_date: new Date().toISOString().slice(0, 10) })
+                            // Set to 'En trámite' so it can be picked up by an Edition
+                            await updateLegal(sel.id, { status: 'En trámite' })
                             reload()
                             setSel(null)
                           }
                         })
                       }}
                     >
-                      ✓ Aprobar y Publicar
+                      ✓ Verificar (En trámite)
                     </button>
                     <button
                       className="btn bg-red-600 text-white hover:bg-red-700 flex-1"

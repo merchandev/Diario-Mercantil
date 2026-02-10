@@ -170,7 +170,7 @@ class EditionController {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $limit = (int)($in['limit'] ?? 10);
     
-    $stmt = $pdo->prepare("SELECT id FROM legal_requests WHERE status='Publicada' AND deleted_at IS NULL ORDER BY id DESC LIMIT ?");
+    $stmt = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND deleted_at IS NULL ORDER BY id DESC LIMIT ?");
     $stmt->execute([$limit]);
     $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
