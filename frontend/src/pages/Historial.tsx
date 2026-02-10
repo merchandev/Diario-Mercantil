@@ -61,7 +61,7 @@ export default function Historial() {
           <div className="card p-3 grid md:grid-cols-4 gap-3">
             <input className="input" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
             <select className="input" value={status} onChange={e => setStatus(e.target.value)}>
-              {['Todos', 'Borrador', 'Por verificar', 'En trámite', 'Publicada', 'Rechazado'].map(o => <option key={o} value={o}>{o}</option>)}
+              {['Todos', 'Borrador', 'Por verificar', 'Verificada', 'Publicada', 'Rechazado'].map(o => <option key={o} value={o}>{o}</option>)}
             </select>
             <input className="input" type="date" value={reqFrom} onChange={e => setReqFrom(e.target.value)} placeholder="Fecha de solicitud (desde)" />
             <input className="input" type="date" value={reqTo} onChange={e => setReqTo(e.target.value)} placeholder="Fecha de solicitud (hasta)" />
@@ -99,7 +99,7 @@ export default function Historial() {
                         <span className={`px-2 py-1 rounded text-xs font-semibold
                         ${(r.status === 'Pendiente' || r.status === 'Borrador') ? 'bg-slate-100 text-slate-800' : ''}
                         ${r.status === 'Por verificar' ? 'bg-amber-100 text-amber-800' : ''}
-                        ${r.status === 'En trámite' ? 'bg-blue-100 text-blue-800' : ''}
+                        ${(r.status === 'En trámite' || r.status === 'Verificada') ? 'bg-blue-100 text-blue-800' : ''}
                         ${(r.status === 'Publicado' || r.status === 'Publicada') ? 'bg-green-100 text-green-800' : ''}
                         ${r.status === 'Rechazado' ? 'bg-red-100 text-red-800' : ''}
                       `}>

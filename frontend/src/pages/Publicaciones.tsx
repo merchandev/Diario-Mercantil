@@ -280,13 +280,14 @@ export default function Publicaciones() {
                     {[
                       { label: 'Pendiente', value: 'Borrador' },
                       { label: 'Por verificar', value: 'Por verificar' },
-                      { label: 'En trámite', value: 'En trámite' },
+                      { label: 'Verificada', value: 'Verificada' },
                       { label: 'Publicado', value: 'Publicada' },
                       { label: 'Rechazado', value: 'Rechazado' },
                     ].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
-                <label className="block col-span-2"><span className="text-sm">Fecha de publicación</span><input className="input w-full" type="date" value={sel.publish_date || ''} onChange={e => setSel({ ...sel, publish_date: e.target.value })} /></label>
+                <label className="block"><span className="text-sm">Fecha de Verificación</span><input className="input w-full" type="date" value={sel.verification_date || ''} onChange={e => setSel({ ...sel, verification_date: e.target.value })} /></label>
+                <label className="block col-span-2"><span className="text-sm">Fecha de publicación ({sel.status === 'Publicada' ? 'Visible' : 'Oculta en PDF'})</span><input className="input w-full" type="date" value={sel.publish_date || ''} onChange={e => setSel({ ...sel, publish_date: e.target.value })} /></label>
               </div>
 
               {/* Acciones rápidas */}
@@ -300,18 +301,21 @@ export default function Publicaciones() {
                         setConfirmDialog({
                           isOpen: true,
                           title: 'Verificar solicitud',
-                          message: '¿Marcar esta solicitud como Verificada/En trámite?\n\nQuedará lista para ser incluida en una Edición.',
+                          message: '¿Marcar esta solicitud como Verificada?\n\nSe registrará la fecha de hoy como fecha de verificación.',
                           variant: 'info',
                           onConfirm: async () => {
-                            // Set to 'En trámite' so it can be picked up by an Edition
-                            await updateLegal(sel.id, { status: 'En trámite' })
+                            // Set to 'Verificada' and set verification_date to today
+                            await updateLegal(sel.id, {
+                              status: 'Verificada',
+                              verification_date: new Date().toISOString().slice(0, 10)
+                            })
                             reload()
                             setSel(null)
                           }
                         })
                       }}
                     >
-                      ✓ Verificar (En trámite)
+                      ✓ Verificar (Aprobado)
                     </button>
                     <button
                       className="btn bg-red-600 text-white hover:bg-red-700 flex-1"

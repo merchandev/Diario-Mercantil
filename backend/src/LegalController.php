@@ -168,7 +168,8 @@ class LegalController {
     $pdo = Database::pdo();
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     
-    $fields = ['status','name','document','date','publish_date','phone','email','address','folios','comment','pub_type','meta'];
+    
+    $fields = ['status','name','document','date','publish_date','verification_date','phone','email','address','folios','comment','pub_type','meta'];
     $set=[]; $vals=[];
     foreach ($fields as $f) {
       if (array_key_exists($f,$in)) {

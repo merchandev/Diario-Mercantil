@@ -317,6 +317,7 @@ export type LegalRequest = {
   date: string;
   order_no?: string;
   publish_date?: string;
+  verification_date?: string;
   phone?: string;
   email?: string;
   address?: string;
