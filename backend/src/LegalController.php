@@ -267,38 +267,97 @@ class LegalController {
       $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
       $pay = $p->fetchAll(PDO::FETCH_ASSOC);
       
-      require_once __DIR__.'/SimplePdf.php';
+      require_once __DIR__.'/OrderPdf.php';
       
-      $pdf = new SimplePdf();
-      $y = 750; // Start from top (PDF origin is bottom-left, typically A4 is 595x842)
+      $pdf = new OrderPdf();
+      $pdf->AliasNbPages();
+      $pdf->orderInfo = $r;
+      $pdf->AddPage();
       
-      $pdf->text(50, $y, "DIARIO MERCANTIL DE VENEZUELA", 16); $y -= 30;
-      $pdf->text(50, $y, "RECIBO DE ORDEN #{$r['order_no']}", 14); $y -= 20;
-      $pdf->text(50, $y, "Fecha: {$r['date']}"); $y -= 40;
+      // -- DETALLES DEL CLIENTE --
+      $pdf->SectionTitle('DETALLES DEL CLIENTE');
+      $pdf->KeyValueRow('Cliente:', $r['name']);
+      $pdf->KeyValueRow('Documento ID:', $r['document']);
+      $pdf->KeyValueRow('Email:', $r['email'] ?? '---');
+      $pdf->KeyValueRow('Telefono:', $r['phone'] ?? '---');
+      $pdf->Ln(5);
+
+      // -- DETALLES DE LA ORDEN --
+      $pdf->SectionTitle('DETALLES DE LA ORDEN');
+      $pdf->KeyValueRow('Estado:', $r['status']);
+      $pdf->KeyValueRow('Tipo:', $r['pub_type'] ?? 'Documento');
+      $pdf->KeyValueRow('Folios:', $r['folios']);
       
-      $pdf->text(50, $y, "DETALLES DEL CLIENTE:"); $y -= 20;
-      $pdf->text(50, $y, "Cliente: {$r['name']}"); $y -= 15;
-      $pdf->text(50, $y, "Documento ID: {$r['document']}"); $y -= 15;
+      // Calculate Pricing again just to show if needed, or rely on stored?
+      // For now, let's just show what we have or calculate loosely
+      // (This logic mirrors uploadPdf pricing briefly for display)
+      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+      $stmt->execute(['bcv_rate']);
+      $bcv = (float)$stmt->fetchColumn() ?: 370.0;
       
-      // Basic wrapping for content or just truncate for simple receipt
-      $pdf->text(50, $y, "Estado: {$r['status']}"); $y -= 15;
-      $pdf->text(50, $y, "Folios: {$r['folios']}"); $y -= 30;
+      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+      $stmt->execute(['price_per_folio_usd']);
+      $pricePerFolio = (float)$stmt->fetchColumn() ?: 1.5;
       
-      $pdf->text(50, $y, "PAGOS REGISTRADOS:"); $y -= 20;
+      $totalUsd = $r['folios'] * $pricePerFolio;
+      $subtotalBs = $totalUsd * $bcv;
+      $ivaBs = $subtotalBs * 0.16;
+      $totalBs = $subtotalBs + $ivaBs;
+
+      $pdf->KeyValueRow('Precio Unit. (USD):', '$'.number_format($pricePerFolio, 2));
+      $pdf->KeyValueRow('Tasa BCV:', number_format($bcv, 2).' Bs/USD');
+      $pdf->Ln(2);
+      
+      $pdf->SetFont('Arial', 'B', 10);
+      $pdf->Cell(50, 6, 'Total Estimado (Bs):', 0, 0);
+      $pdf->SetTextColor(143, 25, 32); // Brand color
+      $pdf->Cell(0, 6, number_format($totalBs, 2).' Bs', 0, 1);
+      $pdf->SetTextColor(0); // Reset
+      $pdf->Ln(5);
+
+      // -- PAGOS REGISTRADOS --
+      $pdf->SectionTitle('PAGOS REGISTRADOS');
+      
+      // Table Header
+      $pdf->SetFont('Arial', 'B', 9);
+      $pdf->SetFillColor(220, 220, 220);
+      $pdf->Cell(30, 7, 'Fecha', 1, 0, 'C', true);
+      $pdf->Cell(40, 7, 'Referencia', 1, 0, 'C', true);
+      $pdf->Cell(40, 7, 'Banco', 1, 0, 'C', true);
+      $pdf->Cell(30, 7, 'Monto (Bs)', 1, 0, 'C', true);
+      $pdf->Cell(30, 7, 'Estado', 1, 1, 'C', true);
+      
+      $pdf->SetFont('Arial', '', 9);
+      $totalPaid = 0;
+      
       foreach($pay as $py) {
-        $amount = isset($py['amount_bs']) ? number_format((float)$py['amount_bs'], 2) : '0.00';
-        $line = "- {$py['date']}: {$amount} Bs ({$py['status']}) - Ref: {$py['ref']}";
-        $pdf->text(50, $y, $line); 
-        $y -= 15;
+        $amount = isset($py['amount_bs']) ? (float)$py['amount_bs'] : 0.0;
+        if($py['status'] == 'Aprobado') $totalPaid += $amount;
+        
+        $pdf->Cell(30, 7, substr($py['date'], 0, 10), 1, 0, 'C');
+        $pdf->Cell(40, 7, $py['ref'], 1, 0, 'C');
+        $pdf->Cell(40, 7, $py['bank'], 1, 0, 'C');
+        $pdf->Cell(30, 7, number_format($amount, 2), 1, 0, 'R');
+        $pdf->Cell(30, 7, $py['status'], 1, 1, 'C');
       }
       
-      $output = $pdf->render();
+      if(empty($pay)) {
+          $pdf->Cell(170, 7, 'No hay pagos registrados', 1, 1, 'C');
+      }
+      
+      $pdf->Ln(2);
+      $pdf->SetFont('Arial', 'B', 10);
+      $pdf->Cell(110, 7, '', 0, 0);
+      $pdf->Cell(30, 7, 'Total Pagado:', 0, 0, 'R');
+      $pdf->Cell(30, 7, number_format($totalPaid, 2).' Bs', 0, 1, 'R');
+
+      $output = $pdf->Output('S');
       
       // Clean previous output to prevent PDF corruption
       if (ob_get_length()) ob_end_clean();
       
       header('Content-Type: application/pdf');
-      header('Content-Disposition: attachment; filename="recibo_orden_'.$r['order_no'].'.pdf"');
+      header('Content-Disposition: inline; filename="orden_'.$r['order_no'].'.pdf"'); // Changed to inline for preview
       header('Content-Length: ' . strlen($output));
       header('Cache-Control: no-cache, no-store, must-revalidate');
       header('Pragma: no-cache');
