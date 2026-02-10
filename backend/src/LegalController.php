@@ -320,25 +320,27 @@ class LegalController {
       
       // Table Header
       $pdf->SetFont('Arial', 'B', 9);
-      $pdf->SetFillColor(220, 220, 220);
-      $pdf->Cell(30, 7, 'Fecha', 1, 0, 'C', true);
-      $pdf->Cell(40, 7, 'Referencia', 1, 0, 'C', true);
-      $pdf->Cell(40, 7, 'Banco', 1, 0, 'C', true);
-      $pdf->Cell(30, 7, 'Monto (Bs)', 1, 0, 'C', true);
-      $pdf->Cell(30, 7, 'Estado', 1, 1, 'C', true);
+      $pdf->SetTextColor(143, 25, 32); // Brand color for headers
+      // $pdf->SetFillColor(220, 220, 220); // Removed fill
+      $pdf->Cell(30, 8, 'Fecha', 'B', 0, 'C', false);
+      $pdf->Cell(40, 8, 'Referencia', 'B', 0, 'C', false);
+      $pdf->Cell(40, 8, 'Banco', 'B', 0, 'C', false);
+      $pdf->Cell(30, 8, 'Monto (Bs)', 'B', 0, 'C', false);
+      $pdf->Cell(30, 8, 'Estado', 'B', 1, 'C', false);
       
       $pdf->SetFont('Arial', '', 9);
+      $pdf->SetTextColor(0);
       $totalPaid = 0;
       
       foreach($pay as $py) {
         $amount = isset($py['amount_bs']) ? (float)$py['amount_bs'] : 0.0;
         if($py['status'] == 'Aprobado') $totalPaid += $amount;
         
-        $pdf->Cell(30, 7, substr($py['date'], 0, 10), 1, 0, 'C');
-        $pdf->Cell(40, 7, $py['ref'], 1, 0, 'C');
-        $pdf->Cell(40, 7, $py['bank'], 1, 0, 'C');
-        $pdf->Cell(30, 7, number_format($amount, 2), 1, 0, 'R');
-        $pdf->Cell(30, 7, $py['status'], 1, 1, 'C');
+        $pdf->Cell(30, 8, substr($py['date'], 0, 10), 'B', 0, 'C');
+        $pdf->Cell(40, 8, $py['ref'], 'B', 0, 'C');
+        $pdf->Cell(40, 8, $py['bank'], 'B', 0, 'C');
+        $pdf->Cell(30, 8, number_format($amount, 2), 'B', 0, 'R');
+        $pdf->Cell(30, 8, $py['status'], 'B', 1, 'C');
       }
       
       if(empty($pay)) {
