@@ -354,7 +354,7 @@ class LegalController {
       $output = $pdf->Output('S');
       
       // Clean previous output to prevent PDF corruption
-      if (ob_get_length()) ob_end_clean();
+      // if (ob_get_length()) ob_end_clean();
       
       header('Content-Type: application/pdf');
       header('Content-Disposition: inline; filename="orden_'.$r['order_no'].'.pdf"'); // Changed to inline for preview
