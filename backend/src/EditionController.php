@@ -192,8 +192,29 @@ class EditionController {
   public function publish($id){
     $pdo = Database::pdo();
     $now = gmdate('Y-m-d');
-    $pdo->prepare("UPDATE editions SET status='Publicada', date=? WHERE id=?")->execute([$now, $id]);
-    Response::json(['ok'=>true]);
+    
+    $pdo->beginTransaction();
+    try {
+        // 1. Update Edition Status
+        $pdo->prepare("UPDATE editions SET status='Publicada', date=? WHERE id=?")->execute([$now, $id]);
+        
+        // 2. Update Status of all associated Legal Requests to 'Publicada'
+        // Get all order IDs from edition_orders
+        $stmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
+        $stmt->execute([$id]);
+        $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if($orderIds) {
+            $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
+            $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)")->execute($orderIds);
+        }
+        
+        $pdo->commit();
+        Response::json(['ok'=>true]);
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        Response::json(['error'=>$e->getMessage()], 500);
+    }
   }
 
   public function uploadPdf($id){

@@ -140,7 +140,8 @@ class LegalController {
     try {
       $pdo = Database::pdo();
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
-      $status = $in['status'] ?? 'Borrador';
+      // Default to 'Por verificar' regardless of input
+      $status = 'Por verificar';
       $u = AuthController::userFromToken(AuthController::bearerToken());
       $uid = $u ? (int)$u['id'] : null;
       $now = gmdate('c');
@@ -252,6 +253,15 @@ class LegalController {
       if (!$r) {
           http_response_code(404);
           die('Orden no encontrada');
+      }
+
+      // Fetch associated Edition for QR Code
+      $stmt = $pdo->prepare("SELECT e.code, e.id FROM editions e JOIN edition_orders eo ON eo.edition_id = e.id WHERE eo.legal_request_id = ? LIMIT 1");
+      $stmt->execute([$id]);
+      $edition = $stmt->fetch(PDO::FETCH_ASSOC);
+      if ($edition) {
+          $r['edition_code'] = $edition['code'];
+          $r['edition_id'] = $edition['id'];
       }
       
       // Check if user has access to this order

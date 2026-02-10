@@ -26,17 +26,25 @@ class OrderPdf extends FPDF {
             $this->Image($logoPath, 10, 10, 70);
         }
         
+        // Edition QR Code
+        if(!empty($this->orderInfo['edition_code'])) {
+            $qrData = urlencode('EDICION:'.$this->orderInfo['edition_code']);
+            $qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data='.$qrData;
+            $this->Image($qrUrl, 85, 10, 25, 25, 'PNG');
+        }
+        
         // Title & Order Info - Aligned Right
         $this->SetFont('Arial', 'B', 20);
         $this->SetTextColor(255, 255, 255);
-        $this->SetXY(100, 10);
-        $this->Cell(100, 10, $this->title, 0, 1, 'R');
+        // Adjusted X to 110 to avoid overlap with QR
+        $this->SetXY(110, 10);
+        $this->Cell(90, 10, $this->title, 0, 1, 'R');
         
         $this->SetFont('Arial', '', 10);
         if(!empty($this->orderInfo)) {
              $orderNo = $this->orderInfo['order_no'] ?? $this->orderInfo['id'] ?? '---';
-             $this->SetXY(100, 20);
-             $this->Cell(100, 6, '# ORDEN: ' . $orderNo, 0, 1, 'R');
+             $this->SetXY(110, 20);
+             $this->Cell(90, 6, '# ORDEN: ' . $orderNo, 0, 1, 'R');
              // Date removed as requested
              // $this->Cell(100, 6, 'FECHA: ' . ($this->orderInfo['date'] ?? date('Y-m-d')), 0, 1, 'R');
         }
