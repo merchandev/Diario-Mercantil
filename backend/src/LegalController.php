@@ -306,9 +306,6 @@ class LegalController {
       $ivaBs = $subtotalBs * 0.16;
       $totalBs = $subtotalBs + $ivaBs;
 
-      $pdf->KeyValueRow('Precio Unit. (USD):', '$'.number_format($pricePerFolio, 2));
-      $pdf->KeyValueRow('Tasa BCV:', number_format($bcv, 2).' Bs/USD');
-      $pdf->Ln(2);
       
       $pdf->SetFont('Arial', 'B', 10);
       $pdf->Cell(50, 6, 'Total Estimado (Bs):', 0, 0);
@@ -318,7 +315,7 @@ class LegalController {
       $pdf->Ln(5);
 
       // -- PAGOS REGISTRADOS --
-      $pdf->SectionTitle('PAGOS REGISTRADOS');
+      $pdf->SectionHeader('PAGOS REGISTRADOS');
       
       // Table Header
       $pdf->SetFont('Arial', 'B', 9);
