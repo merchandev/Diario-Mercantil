@@ -274,30 +274,32 @@ class LegalController {
       $pdf->orderInfo = $r;
       $pdf->AddPage();
       
-      // -- DETALLES DEL CLIENTE --
-      $pdf->SectionTitle('DETALLES DEL CLIENTE');
-      $pdf->KeyValueRow('Cliente:', $r['name']);
-      $pdf->KeyValueRow('Documento ID:', $r['document']);
-      $pdf->KeyValueRow('Email:', $r['email'] ?? '---');
-      $pdf->KeyValueRow('Telefono:', $r['phone'] ?? '---');
-      $pdf->Ln(5);
-
-      // -- DETALLES DE LA ORDEN --
-      $pdf->SectionTitle('DETALLES DE LA ORDEN');
-      $pdf->KeyValueRow('Estado:', $r['status']);
-      $pdf->KeyValueRow('Tipo:', $r['pub_type'] ?? 'Documento');
-      $pdf->KeyValueRow('Folios:', $r['folios']);
-      
-      // Calculate Pricing again just to show if needed, or rely on stored?
-      // For now, let's just show what we have or calculate loosely
-      // (This logic mirrors uploadPdf pricing briefly for display)
-      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
-      $stmt->execute(['bcv_rate']);
-      $bcv = (float)$stmt->fetchColumn() ?: 370.0;
-      
       $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
       $stmt->execute(['price_per_folio_usd']);
       $pricePerFolio = (float)$stmt->fetchColumn() ?: 1.5;
+
+      $totalUsd = $r['folios'] * $pricePerFolio;
+      $subtotalBs = $totalUsd * $bcv;
+
+      $clientData = [
+          'Cliente:' => $r['name'],
+          'Documento:' => $r['document'],
+          'Email:' => $r['email'] ?? '---',
+          'Telefono:' => $r['phone'] ?? '---'
+      ];
+      
+      $orderDetails = [
+          'Estado:' => $r['status'],
+          'Tipo:' => $r['pub_type'] ?? 'Documento',
+          'Folios:' => $r['folios'],
+          'Tasa BCV:' => number_format($bcv, 2)
+      ];
+
+      $pdf->InfoSection($clientData, $orderDetails);
+      
+      // Totals section (moved from bottom of order details to here or after table?)
+      // Use clean layout.
+
       
       $totalUsd = $r['folios'] * $pricePerFolio;
       $subtotalBs = $totalUsd * $bcv;
