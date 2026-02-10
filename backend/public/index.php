@@ -59,7 +59,7 @@ elseif (preg_match("#^/api/legal/(\d+)/reject$#", $uri, $m) && $method === "POST
 elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
 elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
 // Files
-elseif (preg_match("#^/api/uploads/(\d+)$#", $uri, $m) && $method === "GET") { (new FileController())->serve($m[1]); }
+elseif (preg_match("#^/api/uploads/(\d+)$#", $uri, $m)) { (new FileController())->serve($m[1]); }
 elseif (preg_match("#^/api/legal/(\d+)/files$#", $uri, $m)) {
     if ($method === "GET") (new LegalController())->listFiles($m[1]); // Ensure method exists in LegalController or Stub
 }
