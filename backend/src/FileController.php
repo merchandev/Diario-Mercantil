@@ -124,7 +124,8 @@ class FileController {
             'file_id' => $id,
             'expected_path' => $path,
             'upload_dir' => $uploadDir,
-            'full_path_attempted' => $filePath
+            'full_path_attempted' => $filePath,
+            'files_in_dir' => @scandir($uploadDir)
         ];
         error_log("File not found on disk: " . json_encode($debugInfo));
         die(json_encode($debugInfo));
