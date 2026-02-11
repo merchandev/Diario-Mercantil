@@ -7,14 +7,14 @@ type Props = {
   watermark?: string
 }
 
-export default function ProtectedPdfViewer({ src, height = 700, watermark }: Props){
-  const iframeRef = useRef<HTMLIFrameElement|null>(null)
-  const objectUrlRef = useRef<string|null>(null)
-  const [blobUrl, setBlobUrl] = useState<string|null>(null)
-  const [error, setError] = useState<string|null>(null)
+export default function ProtectedPdfViewer({ src, height = 700, watermark }: Props) {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const objectUrlRef = useRef<string | null>(null)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  useEffect(()=>{
+  useEffect(() => {
     let cancelled = false
     const load = async () => {
       if (objectUrlRef.current) {
@@ -44,7 +44,7 @@ export default function ProtectedPdfViewer({ src, height = 700, watermark }: Pro
       } catch (err) {
         console.error('Error cargando PDF:', err)
         if (!cancelled) {
-          setError('Error al cargar el PDF')
+          setError(err.message || 'Error al cargar el PDF')
           setBlobUrl(null)
         }
       } finally {

@@ -163,6 +163,7 @@ export default function Publicaciones() {
                 <th className="text-left px-4 py-2">Tipo de publicación</th>
                 <th className="text-left px-4 py-2">Razón social</th>
                 <th className="text-left px-4 py-2">Estado</th>
+                <th className="text-left px-4 py-2">Fecha de Verificación</th>
                 <th className="text-left px-4 py-2">Fecha de publicación</th>
                 <th className="text-right px-4 py-2">Acciones</th>
               </tr>
@@ -175,6 +176,7 @@ export default function Publicaciones() {
                   <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
                   <td className="px-4 py-2">{r.name}</td>
                   <td className="px-4 py-2">{prettyStatus(r.status)}</td>
+                  <td className="px-4 py-2">{prettyDate(r.verification_date)}</td>
                   <td className="px-4 py-2">{prettyDate(r.publish_date)}</td>
                   <td className="px-4 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
