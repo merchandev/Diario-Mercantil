@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone } from '../components/icons'
+import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone, IconMap } from '../components/icons'
+import { ESTADOS_VENEZUELA, MUNICIPIOS_VENEZUELA } from '../lib/constants'
 
-export default function Register(){
+export default function Register() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     document: '',
     name: '',
     email: '',
     phone: '',
+    state: '',
+    municipality: '',
+    address: '',
     password: '',
     confirmPassword: '',
     person_type: 'natural' as 'natural' | 'juridica'
@@ -17,8 +21,18 @@ export default function Register(){
   const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [availableMunicipalities, setAvailableMunicipalities] = useState<string[]>([])
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  useEffect(() => {
+    if (formData.state && MUNICIPIOS_VENEZUELA[formData.state]) {
+      setAvailableMunicipalities(MUNICIPIOS_VENEZUELA[formData.state])
+    } else {
+      setAvailableMunicipalities([])
+      setFormData(prev => ({ ...prev, municipality: '' }))
+    }
+  }, [formData.state])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
@@ -28,8 +42,8 @@ export default function Register(){
     setLoading(true)
 
     // Validaciones
-    if (!formData.document || !formData.name || !formData.password) {
-      setError('Por favor complete los campos obligatorios')
+    if (!formData.document || !formData.name || !formData.password || !formData.phone || !formData.state || !formData.municipality || !formData.address) {
+      setError('Por favor complete todos los campos obligatorios')
       setLoading(false)
       return
     }
@@ -53,8 +67,11 @@ export default function Register(){
         body: JSON.stringify({
           document: formData.document,
           name: formData.name,
-          email: formData.email || undefined,
-          phone: formData.phone || undefined,
+          email: formData.email,
+          phone: formData.phone,
+          state: formData.state,
+          municipality: formData.municipality,
+          address: formData.address,
           password: formData.password,
           person_type: formData.person_type
         })
@@ -66,7 +83,7 @@ export default function Register(){
       }
 
       const data = await res.json()
-      
+
       // Auto-login después de registro exitoso
       if (data.token) {
         localStorage.setItem('token', data.token)
@@ -84,7 +101,7 @@ export default function Register(){
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 grid place-items-center p-4">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-2xl">
         <div className="text-center mb-6">
           <Link to="/">
             <img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil" className="h-16 mx-auto mb-4" />
@@ -132,147 +149,205 @@ export default function Register(){
               </div>
             </div>
 
-            {/* Documento */}
-            <div>
-              <label htmlFor="document" className="block text-sm font-medium text-slate-700 mb-2">
-                {formData.person_type === 'natural' ? 'Cédula / Pasaporte' : 'RIF'} *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconIdCard />
-                </span>
-                <input
-                  type="text"
-                  id="document"
-                  name="document"
-                  value={formData.document}
-                  onChange={handleChange}
-                  placeholder={formData.person_type === 'natural' ? 'V12345678' : 'J123456789'}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  required
-                />
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Documento */}
+              <div>
+                <label htmlFor="document" className="block text-sm font-medium text-slate-700 mb-2">
+                  {formData.person_type === 'natural' ? 'Cédula / Pasaporte' : 'RIF'} *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconIdCard />
+                  </span>
+                  <input
+                    type="text"
+                    id="document"
+                    name="document"
+                    value={formData.document}
+                    onChange={handleChange}
+                    placeholder={formData.person_type === 'natural' ? 'V12345678' : 'J123456789'}
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Nombre */}
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
+                  {formData.person_type === 'natural' ? 'Nombre completo' : 'Razón social'} *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconUser />
+                  </span>
+                  <input
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    placeholder={formData.person_type === 'natural' ? 'Nombre y Apellido' : 'Empresa C.A.'}
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                  Correo electrónico *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconMail />
+                  </span>
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="correo@ejemplo.com"
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Teléfono */}
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
+                  Teléfono *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconPhone />
+                  </span>
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="04XX-XXXXXXX"
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Nombre */}
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-slate-700 mb-2">
-                {formData.person_type === 'natural' ? 'Nombre completo' : 'Razón social'} *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconUser />
-                </span>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Ingrese su nombre"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  required
-                />
+            {/* Dirección */}
+            <hr className="border-slate-200" />
+            <div className="space-y-4">
+              <h3 className="font-semibold text-slate-700">Dirección de Habitación / Fiscal</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Estado *</label>
+                  <select
+                    name="state"
+                    className="input w-full"
+                    value={formData.state}
+                    onChange={handleChange}
+                    required
+                  >
+                    <option value="">Seleccione Estado</option>
+                    {ESTADOS_VENEZUELA.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Municipio *</label>
+                  <select
+                    name="municipality"
+                    className="input w-full"
+                    value={formData.municipality}
+                    onChange={handleChange}
+                    disabled={!formData.state}
+                    required
+                  >
+                    <option value="">Seleccione Municipio</option>
+                    {availableMunicipalities.map(mun => <option key={mun} value={mun}>{mun}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Dirección Completa (Manual) *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-slate-400">
+                    <IconMap />
+                  </span>
+                  <textarea
+                    name="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Av. Principal, Edif. Torre, Piso 1, Apto 1-A..."
+                    className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent min-h-[80px]"
+                    required
+                  />
+                </div>
               </div>
             </div>
+            <hr className="border-slate-200" />
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
-                Correo electrónico
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconMail />
-                </span>
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  placeholder="correo@ejemplo.com"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Contraseña */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                  Contraseña *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconKey />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full pl-10 pr-12 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <IconEyeOff /> : <IconEye />}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Teléfono */}
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                Teléfono
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconPhone />
-                </span>
-                <input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  placeholder="04XX-XXXXXXX"
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Contraseña */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
-                Contraseña *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconKey />
-                </span>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  placeholder="Mínimo 6 caracteres"
-                  className="w-full pl-10 pr-12 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <IconEyeOff /> : <IconEye />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirmar contraseña */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">
-                Confirmar contraseña *
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <IconKey />
-                </span>
-                <input
-                  type={showConfirm ? 'text' : 'password'}
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repita su contraseña"
-                  className="w-full pl-10 pr-12 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showConfirm ? <IconEyeOff /> : <IconEye />}
-                </button>
+              {/* Confirmar contraseña */}
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 mb-2">
+                  Confirmar contraseña *
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                    <IconKey />
+                  </span>
+                  <input
+                    type={showConfirm ? 'text' : 'password'}
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Repita su contraseña"
+                    className="w-full pl-10 pr-12 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(!showConfirm)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showConfirm ? <IconEyeOff /> : <IconEye />}
+                  </button>
+                </div>
               </div>
             </div>
 

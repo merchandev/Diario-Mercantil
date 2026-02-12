@@ -232,7 +232,17 @@ class AuthController {
   public function me(){
      $u = self::requireAuth();
      Response::json(["user"=>[
-      "id"=>(int)$u["id"], "document"=>$u["document"], "name"=>$u["name"], "role"=>$u["role"], "avatar_url"=>$u["avatar_url"]??null
+      "id"=>(int)$u["id"], 
+      "document"=>$u["document"], 
+      "name"=>$u["name"], 
+      "role"=>$u["role"], 
+      "email"=>$u["email"],
+      "phone"=>$u["phone"],
+      "state"=>$u["state"],
+      "municipality"=>$u["municipality"],
+      "address"=>$u["address"],
+      "person_type"=>$u["person_type"],
+      "avatar_url"=>$u["avatar_url"]??null
     ]]);
   }
 
@@ -249,6 +259,10 @@ class AuthController {
         $email = trim($in["email"] ?? "");
         $phone = trim($in["phone"] ?? "");
 
+        $state = trim($in["state"] ?? "");
+        $municipality = trim($in["municipality"] ?? "");
+        $address = trim($in["address"] ?? "");
+
         if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
         
         $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
@@ -257,8 +271,8 @@ class AuthController {
 
         $hash = password_hash($password, PASSWORD_DEFAULT);
         $now = gmdate("Y-m-d H:i:s");
-        $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)");
-        $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, "active", $now, $now]);
+        $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,state,municipality,address,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $state, $municipality, $address, "active", $now, $now]);
         
         $uid = $pdo->lastInsertId();
         $token = bin2hex(random_bytes(32));

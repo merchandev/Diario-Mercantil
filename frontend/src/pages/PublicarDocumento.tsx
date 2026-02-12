@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
+import { useAuth } from '../hooks/useAuth'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, type LegalRequest, listLegal, updateLegal, uploadFiles } from '../lib/api'
 import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, TIPOS_TRAMITE, BANCOS_VENEZUELA } from '../lib/constants'
 
 export default function PublicarDocumento() {
+  const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [requestId, setRequestId] = useState<number | null>(null)
   const [settings, setSettings] = useState<any>({})
@@ -17,7 +19,6 @@ export default function PublicarDocumento() {
     tomo: '', numero: '', anio: '', expediente: '', fecha: '', planilla: ''
   })
 
-  // Resume draft logic
   // Resume draft logic
   useEffect(() => {
     listLegal({ status: 'Borrador', pub_type: 'Documento', limit: 1 }).then(res => {
@@ -59,6 +60,20 @@ export default function PublicarDocumento() {
   const ivaPct = Number(settings.iva_percent || 16)
   const ivaAmt = subTotal !== undefined ? +(subTotal * (ivaPct / 100)).toFixed(2) : undefined
   const total = subTotal !== undefined && ivaAmt !== undefined ? +(subTotal + ivaAmt).toFixed(2) : undefined
+
+  // Pre-fill payment data from user profile
+  useEffect(() => {
+    if (user) {
+      setPay((prev: any) => ({
+        ...prev,
+        a_nombre: prev.a_nombre || user.name || '',
+        rif: prev.rif || user.document || '',
+        telefono: prev.telefono || user.phone || '',
+        email: prev.email || user.email || '',
+        direccion: prev.direccion || (user.state ? `${user.state}, ${user.municipality}, ${user.address}` : '') || ''
+      }))
+    }
+  }, [user])
 
   useEffect(() => {
     getSettings()

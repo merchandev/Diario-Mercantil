@@ -8,6 +8,9 @@ export interface User {
     role: string
     email?: string
     phone?: string
+    state?: string
+    municipality?: string
+    address?: string
     avatar_url?: string | null
 }
 

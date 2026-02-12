@@ -33,6 +33,9 @@ class UserController {
         // Extra fields
         $email = trim($in["email"] ?? null);
         $phone = trim($in["phone"] ?? null);
+        $state = trim($in["state"] ?? null);
+        $municipality = trim($in["municipality"] ?? null);
+        $address = trim($in["address"] ?? null);
         $status = $in["status"] ?? "active";
         $personType = $in["person_type"] ?? "natural";
 
@@ -51,11 +54,11 @@ class UserController {
         
         // Insert with all fields
         $stmt = $pdo->prepare("
-            INSERT INTO users(document, name, password_hash, role, email, phone, status, person_type, created_at, updated_at) 
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            INSERT INTO users(document, name, password_hash, role, email, phone, state, municipality, address, status, person_type, created_at, updated_at) 
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ");
         
-        $stmt->execute([$document, $name, $hash, $role, $email, $phone, $status, $personType]);
+        $stmt->execute([$document, $name, $hash, $role, $email, $phone, $state, $municipality, $address, $status, $personType]);
         
         Response::json(["id"=>(int)$pdo->lastInsertId()]);
 
@@ -74,33 +77,43 @@ class UserController {
     $in = $this->json();
     
     $name = trim($in["name"] ?? "");
-    $role = $in["role"] ?? "solicitante";
+    $role = $in["role"] ?? "";
     $email = trim($in["email"] ?? "");
-    $status = trim($in["status"] ?? "");
+    $phone = trim($in["phone"] ?? "");
+    $state = trim($in["state"] ?? "");
+    $municipality = trim($in["municipality"] ?? "");
+    $address = trim($in["address"] ?? "");
+    $status = $in["status"] ?? "";
     $password = (string)($in["password"] ?? "");
     
-    // Prepare update query dynamically
-    $fields = ["name=?", "role=?, updated_at=NOW()"];
-    $params = [$name, $role];
-    
-    if ($email !== "") {
-        // Optional: Check for duplicate email if strictly enforced
-        $fields[] = "email=?";
-        $params[] = $email;
-    }
+    $set = ["updated_at=NOW()"];
+    $params = [];
+
+    if ($name !== "") { $set[] = "name=?"; $params[] = $name; }
+    if ($role !== "") { $set[] = "role=?"; $params[] = $role; }
+    if ($email !== "") { $set[] = "email=?"; $params[] = $email; }
+    if ($phone !== "") { $set[] = "phone=?"; $params[] = $phone; }
+    if ($state !== "") { $set[] = "state=?"; $params[] = $state; }
+    if ($municipality !== "") { $set[] = "municipality=?"; $params[] = $municipality; }
+    if ($address !== "") { $set[] = "address=?"; $params[] = $address; } // Allow clearing address? If strictly update if present. 
+    // For simplicity, we update if strictly provided in JSON. If user sends empty string, it updates to empty string.
     
     if ($status === 'active' || $status === 'suspended') {
-        $fields[] = "status=?";
+        $set[] = "status=?";
         $params[] = $status;
     }
     
     if ($password !== "") {
-        $fields[] = "password_hash=?";
+        $set[] = "password_hash=?";
         $params[] = password_hash($password, PASSWORD_BCRYPT);
     }
     
+    if (empty($set)) {
+        Response::json(["ok"=>true]); // Nothing to update
+    }
+
     $params[] = $id;
-    $sql = "UPDATE users SET " . implode(", ", $fields) . " WHERE id=?";
+    $sql = "UPDATE users SET " . implode(", ", $set) . " WHERE id=?";
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
