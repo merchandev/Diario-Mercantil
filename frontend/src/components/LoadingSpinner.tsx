@@ -1,6 +1,6 @@
-export function LoadingSpinner({ message = 'Cargando...' }: { message?: string }) {
+export function LoadingSpinner({ message = 'Cargando...', className = '' }: { message?: string; className?: string }) {
   return (
-    <div className="card p-8 text-center text-slate-500">
+    <div className={`card p-8 text-center text-slate-500 ${className}`}>
       <div className="animate-spin inline-block w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full mb-2"></div>
       <p>{message}</p>
     </div>
@@ -17,7 +17,7 @@ export function ErrorMessage({ message, onRetry }: { message: string; onRetry?: 
         <div className="flex-1">
           <strong>Error:</strong> {message}
           {onRetry && (
-            <button 
+            <button
               onClick={onRetry}
               className="ml-4 text-brand-700 hover:underline font-semibold"
             >

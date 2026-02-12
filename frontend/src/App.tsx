@@ -51,6 +51,8 @@ const Usuarios = lazyImport(() => import('./pages/Usuarios'))
 const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
 const FileManager = lazyImport(() => import('./pages/FileManager'))
+const Medios = lazyImport(() => import('./pages/Medios'))
+const Promo = lazyImport(() => import('./pages/Promo'))
 
 // Public pages - lazy loaded
 const PublicView = lazyImport(() => import('./pages/PublicView'))
@@ -200,6 +202,8 @@ export default function App() {
                       <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
                       <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
                       <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
+                      <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
+                      <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />
                       <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>

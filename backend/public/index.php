@@ -60,6 +60,8 @@ elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GE
 elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
 // Files
 elseif (preg_match("#^/api/uploads/(\d+)$#", $uri, $m)) { (new FileController())->serve($m[1]); }
+elseif ($uri === "/api/files" && $method === "GET") { (new FileController())->list(); }
+elseif ($uri === "/api/files" && $method === "POST") { (new UploadController())->upload(); }
 elseif (preg_match("#^/api/legal/(\d+)/files$#", $uri, $m)) {
     if ($method === "GET") (new LegalController())->listFiles($m[1]); // Ensure method exists in LegalController or Stub
 }

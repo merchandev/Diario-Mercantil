@@ -55,7 +55,9 @@
   Key,
   Camera,
   AlertTriangle,
-  QrCode
+  QrCode,
+  Image,
+  Megaphone
 } from 'lucide-react'
 
 // Export all icons with consistent props handling
@@ -84,6 +86,8 @@ export const IconSearch = (props: any) => <Search className="w-5 h-5" {...props}
 export const IconFilter = (props: any) => <Filter className="w-5 h-5" {...props} />
 export const IconEye = (props: any) => <Eye className="w-5 h-5" {...props} />
 export const IconEyeOff = (props: any) => <EyeOff className="w-5 h-5" {...props} />
+export const IconImage = (props: any) => <Image className="w-5 h-5" {...props} />
+export const IconMegaphone = (props: any) => <Megaphone className="w-5 h-5" {...props} />
 
 // Additional professional icons for extended use
 export const IconCalculator = (props: any) => <Calculator className="w-5 h-5" {...props} />

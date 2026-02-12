@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { IconHome, IconEditions, IconDocs, IconPayments, IconLegal, IconUsers, IconSettings, IconUserCircle, IconTrash, IconUser } from './icons'
+import { IconHome, IconEditions, IconDocs, IconPayments, IconLegal, IconUsers, IconSettings, IconUserCircle, IconTrash, IconUser, IconImage, IconMegaphone } from './icons'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
 
@@ -83,6 +83,9 @@ export default function Sidebar({ onPublishClick, onCollapseChange }: { onPublis
             <LinkItem to="/dashboard/perfil" icon={<IconUser />} label="Mi perfil" collapsed={collapsed} />
             <LinkItem to="/dashboard/usuarios" icon={<IconUsers />} label="Gestionar usuarios" collapsed={collapsed} />
             <LinkItem to="/dashboard/configuracion" icon={<IconSettings />} label="Configuración" collapsed={collapsed} />
+            <div className="my-2 border-t border-white/10 mx-2"></div>
+            <LinkItem to="/dashboard/medios" icon={<IconImage />} label="Medios" collapsed={collapsed} />
+            <LinkItem to="/dashboard/promo" icon={<IconMegaphone />} label="Promo Banners" collapsed={collapsed} />
           </>
         )}
         {isSolicitante && (
