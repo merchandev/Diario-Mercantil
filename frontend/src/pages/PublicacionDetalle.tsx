@@ -234,7 +234,7 @@ export default function PublicacionDetalle() {
           <p className="font-semibold text-amber-900 mb-3">⚠️ Solicitud pendiente de verificación</p>
           <div className="flex gap-2">
             <button className="btn bg-green-600 text-white hover:bg-green-700" onClick={onApprove}>
-              ✓ Aprobar y Publicar
+              ✓ Verificar publicación
             </button>
             <button className="btn bg-red-600 text-white hover:bg-red-700" onClick={onReject}>
               ✗ Rechazar
