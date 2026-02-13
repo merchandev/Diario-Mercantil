@@ -175,6 +175,7 @@ export default function Convocatoria() {
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Documento:</span> <span className="font-medium">{user.document}</span></div>
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Email:</span> <span>{user.email}</span></div>
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Teléfono:</span> <span>{user.phone}</span></div>
+              {user.address && <div className="sm:col-span-2 flex flex-col"><span className="text-slate-500 text-xs">Dirección:</span> <span>{user.address}</span></div>}
             </div>
           </div>
 

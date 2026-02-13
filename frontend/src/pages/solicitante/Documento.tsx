@@ -464,7 +464,7 @@ export default function Documento() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
 
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPayments().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
-  useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '' })); } catch { } })(); }, [])
+  useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '', address: p.address || u.address || '' })); } catch { } })(); }, [])
 
   useEffect(() => {
     if (!editId) return;
