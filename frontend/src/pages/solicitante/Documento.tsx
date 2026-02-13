@@ -780,6 +780,12 @@ export default function Documento() {
 
   const submitStep3 = async () => {
     if (!req || !pdfAnalysis) return
+
+    if (!pay.bank || !pay.ref) {
+      setAlertDialog({ isOpen: true, title: 'Datos incompletos', message: 'Por favor complete todos los datos del pago (banco y referencia) antes de continuar.', variant: 'warning' })
+      return
+    }
+
     setLoading(true)
     try {
       await updateLegal(req.id, {
@@ -1239,12 +1245,10 @@ export default function Documento() {
                       <span className="block text-slate-500 text-xs">Teléfono</span>
                       <span className="text-slate-800">{pay.phone}</span>
                     </div>
-                    {pay.address && (
-                      <div className="sm:col-span-2">
-                        <span className="block text-slate-500 text-xs">Dirección</span>
-                        <span className="text-slate-800">{pay.address}</span>
-                      </div>
-                    )}
+                    <div className="sm:col-span-2">
+                      <span className="block text-slate-500 text-xs">Dirección</span>
+                      <span className="text-slate-800">{pay.address || <span className="text-slate-400 italic">No registrada</span>}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -1360,7 +1364,7 @@ export default function Documento() {
             <div className="flex gap-3 pt-4">
               <button
                 className="btn btn-primary flex-1 h-12 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!accept || loading || !pay.bank || !pay.ref}
+                disabled={!accept || loading}
                 onClick={submitStep3}
               >
                 {loading ? (
@@ -1398,6 +1402,7 @@ export default function Documento() {
                   </svg>
                   Descargar Orden
                 </button>
+
               )}
             </div>
           </div>

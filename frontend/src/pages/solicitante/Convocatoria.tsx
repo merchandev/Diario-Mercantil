@@ -80,6 +80,12 @@ export default function Convocatoria() {
 
   const submit = async () => {
     if (!req) return
+
+    if (!pay.bank || !pay.ref) {
+      alert('Por favor complete todos los datos del pago (banco y referencia) antes de continuar.')
+      return
+    }
+
     await updateLegal(req.id, { status: 'Por verificar', meta, name: meta.razon_social || '', document: meta.rif || '' })
     await addLegalPayment(req.id, { type: pay.type, bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Verificado', mobile_phone: pay.type === 'pago_movil' ? pay.mobile_phone : undefined })
     alert('Solicitud de convocatoria enviada para verificación')
@@ -175,7 +181,7 @@ export default function Convocatoria() {
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Documento:</span> <span className="font-medium">{user.document}</span></div>
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Email:</span> <span>{user.email}</span></div>
               <div className="flex flex-col"><span className="text-slate-500 text-xs">Teléfono:</span> <span>{user.phone}</span></div>
-              {user.address && <div className="sm:col-span-2 flex flex-col"><span className="text-slate-500 text-xs">Dirección:</span> <span>{user.address}</span></div>}
+              <div className="sm:col-span-2 flex flex-col"><span className="text-slate-500 text-xs">Dirección:</span> <span>{user.address || <span className="text-slate-400 italic">No registrada</span>}</span></div>
             </div>
           </div>
 
