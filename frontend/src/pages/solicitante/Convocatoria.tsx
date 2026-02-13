@@ -252,8 +252,8 @@ export default function Convocatoria() {
           </div>
 
           <div className="flex gap-2">
-            <button className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg" disabled={!accept} onClick={submit}>
-              REPORTAR Y PUBLICAR
+            <button className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg" disabled={!accept || !pay.bank || !pay.ref || !pay.date || (pay.type === 'pago_movil' && !pay.mobile_phone)} onClick={submit}>
+              Reportar pago
             </button>
           </div>
         </div>

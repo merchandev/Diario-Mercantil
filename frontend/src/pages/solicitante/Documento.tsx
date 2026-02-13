@@ -1364,7 +1364,7 @@ export default function Documento() {
             <div className="flex gap-3 pt-4">
               <button
                 className="btn btn-primary flex-1 h-12 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!accept || loading}
+                disabled={!accept || loading || !pay.bank || !pay.ref || !pay.date || (pay.type === 'pago_movil' && !pay.mobile_phone)}
                 onClick={submitStep3}
               >
                 {loading ? (
@@ -1380,7 +1380,7 @@ export default function Documento() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    REPORTAR Y PUBLICAR
+                    Reportar pago
                   </>
                 )}
               </button>
