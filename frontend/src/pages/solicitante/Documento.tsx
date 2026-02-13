@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken, listPayments, type PaymentMethod } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
+import YearPicker from '../../components/YearPicker'
 
 const ESTADOS_VENEZUELA = [
   'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes',
@@ -460,7 +461,9 @@ export default function Documento() {
   const step2Ref = useRef<HTMLDivElement>(null)
   const step3Ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+
+  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPayments().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '' })); } catch { } })(); }, [])
 
   useEffect(() => {
@@ -942,11 +945,11 @@ export default function Documento() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Año</span>
-            <select className="input w-full" value={meta.anio || new Date().getFullYear()} onChange={e => setMeta({ ...meta, anio: e.target.value })}>
-              {Array.from({ length: 31 }, (_, i) => 2030 - i).map(year => (
-                <option key={year} value={year}>{year}</option>
-              ))}
-            </select>
+            <YearPicker
+              value={meta.anio}
+              onChange={(y) => setMeta({ ...meta, anio: y })}
+              className="w-full"
+            />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente</span>
@@ -1181,7 +1184,32 @@ export default function Documento() {
           </div>
         ) : (
           <div className="p-6 space-y-6 step-anim">
-            {/* Resumen de Precios */}
+            {/* Datos de Cuentas Bancarias - NUEVO */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+              <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-900">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Instrucciones para el Pago
+              </h3>
+              <p className="text-sm text-blue-800 mb-4">
+                Por favor realice el pago a una de las siguientes cuentas bancarias antes de registrar su referencia:
+              </p>
+              <div className="grid md:grid-cols-2 gap-4">
+                {paymentMethods.map(pm => (
+                  <div key={pm.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 text-sm">
+                    <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
+                    <div className="flex justify-between"><span className="text-slate-500">Tipo:</span> <span className="font-medium">{pm.type}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Cuenta/Tel:</span> <span className="font-mono font-medium">{pm.account || pm.phone}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Titular:</span> <span className="font-medium">{pm.holder}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
+                  </div>
+                ))}
+                {paymentMethods.length === 0 && <p className="text-slate-500 italic">No hay métodos de pago configurados.</p>}
+              </div>
+            </div>
+
+            {/* Resumen de la Orden + Datos del Solicitante (Solo Lectura) */}
             {pdfAnalysis && (
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-brand-900">
@@ -1190,8 +1218,40 @@ export default function Documento() {
                   </svg>
                   Resumen de la Orden
                 </h3>
+
+                {/* Datos del Solicitante (Integrados) */}
+                <div className="mb-6 bg-white rounded-lg p-4 border border-slate-200">
+                  <h4 className="font-semibold text-brand-800 mb-3 text-sm uppercase tracking-wide border-b pb-2">Datos del Solicitante</h4>
+                  <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <div>
+                      <span className="block text-slate-500 text-xs">Nombre / Razón Social</span>
+                      <strong className="text-slate-800">{pay.name}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 text-xs">Documento (RIF/CI)</span>
+                      <strong className="text-slate-800">{pay.document}</strong>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 text-xs">Correo Electrónico</span>
+                      <span className="text-slate-800">{pay.email}</span>
+                    </div>
+                    <div>
+                      <span className="block text-slate-500 text-xs">Teléfono</span>
+                      <span className="text-slate-800">{pay.phone}</span>
+                    </div>
+                    {pay.address && (
+                      <div className="sm:col-span-2">
+                        <span className="block text-slate-500 text-xs">Dirección</span>
+                        <span className="text-slate-800">{pay.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Totales */}
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-slate-300">
+                  <h4 className="font-semibold text-brand-800 mb-2 text-sm uppercase tracking-wide border-b pb-2">Detalle de Costos</h4>
+                  <div className="flex justify-between items-center py-1">
                     <span className="text-sm text-slate-600">Servicio de publicación - {meta.razon_social || 'Documento'}</span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -1214,44 +1274,12 @@ export default function Documento() {
                     <span className="text-lg font-bold text-brand-900">TOTAL A PAGAR:</span>
                     <span className="text-2xl font-bold text-brand-600">Bs. {pdfAnalysis.total_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800 mt-4">
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 mt-4">
                     <strong>Importante:</strong> El pago debe realizarse por el monto exacto indicado, sin redondeos.
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Datos Personales */}
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-brand-900">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                Datos del Solicitante
-              </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Nombre completo *</span>
-                  <input className="input w-full" placeholder="Nombre completo" value={pay.name} onChange={e => setPay({ ...pay, name: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">C.I. / RIF *</span>
-                  <input className="input w-full" placeholder="V-12345678 o J-12345678-9" value={pay.document} onChange={e => setPay({ ...pay, document: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Teléfono *</span>
-                  <input className="input w-full" placeholder="0412-1234567" value={pay.phone} onChange={e => setPay({ ...pay, phone: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Correo electrónico *</span>
-                  <input className="input w-full" type="email" placeholder="correo@ejemplo.com" value={pay.email} onChange={e => setPay({ ...pay, email: e.target.value })} />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Dirección</span>
-                  <input className="input w-full" placeholder="Dirección completa" value={pay.address} onChange={e => setPay({ ...pay, address: e.target.value })} />
-                </label>
-              </div>
-            </div>
 
             {/* Datos del Pago */}
             <div className="bg-white rounded-xl border border-slate-200 p-6">
