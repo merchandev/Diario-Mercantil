@@ -128,17 +128,37 @@ export default function Convocatoria() {
       <div className="card p-4 space-y-3">
         <h2 className="font-semibold">Paso 2. Adjuntar archivos de la convocatoria</h2>
         <div className="grid md:grid-cols-3 gap-3">
-          <label className="text-sm">Convocatoria digitalizada (imagen)
-            <input className="input w-full" type="file" accept="image/*" onChange={e => onUpload('convocatoria_scan', e.target.files)} />
+          <label className="text-sm block">
+            <span className="font-medium text-slate-700">Convocatoria digitalizada (imagen)</span>
+            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_scan', e.target.files)} />
+            {files.find(f => f.kind === 'convocatoria_scan') && (
+              <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Archivo cargado: {files.find(f => f.kind === 'convocatoria_scan')?.name}
+              </div>
+            )}
           </label>
-          <label className="text-sm">Texto de la convocatoria (Word)
-            <input className="input w-full" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e => onUpload('convocatoria_word', e.target.files)} />
+          <label className="text-sm block">
+            <span className="font-medium text-slate-700">Texto de la convocatoria (Word)</span>
+            <input className="input w-full mt-1" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e => onUpload('convocatoria_word', e.target.files)} />
+            {files.find(f => f.kind === 'convocatoria_word') && (
+              <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Archivo cargado: {files.find(f => f.kind === 'convocatoria_word')?.name}
+              </div>
+            )}
           </label>
-          <label className="text-sm">Logo de la sociedad (opcional)
-            <input className="input w-full" type="file" accept="image/*" onChange={e => onUpload('convocatoria_logo', e.target.files)} />
+          <label className="text-sm block">
+            <span className="font-medium text-slate-700">Logo de la sociedad (opcional)</span>
+            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_logo', e.target.files)} />
+            {files.find(f => f.kind === 'convocatoria_logo') && (
+              <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Archivo cargado: {files.find(f => f.kind === 'convocatoria_logo')?.name}
+              </div>
+            )}
           </label>
         </div>
-        {req && <div className="text-sm text-slate-600">Archivos cargados: {files.length}</div>}
       </div>
 
       <div className="card p-4 space-y-6">

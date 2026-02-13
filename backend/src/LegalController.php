@@ -54,6 +54,9 @@ class LegalController {
     if ($reqId > 0) {
         // Update existing request
         $pdo->prepare("UPDATE legal_requests SET folios=? WHERE id=?")->execute([$folios, $reqId]);
+        
+        // Remove previous document_pdf files to ensure only one exists
+        $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind='document_pdf'")->execute([$reqId]);
     } else {
         // Crear solicitud nueva (fallback)
         $stmt = $pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");
@@ -404,6 +407,10 @@ class LegalController {
   public function attachFile($id){
     $in = json_decode(file_get_contents('php://input'),true);
     $pdo = Database::pdo();
+    
+    // Remove existing file of the same kind to ensure 1:1 relationship per kind
+    $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $in['kind']]);
+    
     $pdo->prepare("INSERT INTO legal_files(legal_request_id,file_id,kind,created_at) VALUES(?,?,?,NOW())")
         ->execute([$id, $in['file_id'], $in['kind']]);
     Response::json(['ok'=>true]);

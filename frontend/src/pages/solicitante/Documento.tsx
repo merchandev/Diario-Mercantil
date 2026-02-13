@@ -510,6 +510,31 @@ export default function Documento() {
   //   console.log('🔄 Step cambió a:', step)
   // }, [step])
 
+  useEffect(() => {
+    if (req && req.folios && req.folios > 0 && !pdfAnalysis && settings.price_per_folio_usd && bcv) {
+      const folios = req.folios
+      const pricePerFolio = Number(settings.price_per_folio_usd || 1.5)
+      const bcvRate = bcv || Number(settings.bcv_rate || 36)
+      const ivaPercent = Number(settings.iva_percent || 16)
+
+      const priceUsd = folios * pricePerFolio
+      const unitBs = pricePerFolio * bcvRate
+      const subtotalBs = folios * unitBs
+      const totalBs = subtotalBs * (1 + ivaPercent / 100)
+      const ivaBs = subtotalBs * (ivaPercent / 100)
+
+      setPdfAnalysis({
+        folios,
+        price_usd: priceUsd,
+        price_bs: totalBs, // Approximation if original calc was different, but close enough
+        subtotal_bs: subtotalBs,
+        iva_bs: ivaBs,
+        total_bs: totalBs
+      })
+    }
+  }, [req, settings, bcv])
+
+
   const ensureDraft = async () => {
     if (req) return req
     // Crear el borrador con el mínimo de campos para evitar fallos por metadatos
@@ -1090,7 +1115,9 @@ export default function Documento() {
                 </div>
                 <div>
                   <h3 className="font-bold text-green-900 text-lg">¡Documento analizado exitosamente!</h3>
-                  <p className="text-sm text-green-700">El sistema ha contado las páginas y calculado el precio</p>
+                  <p className="text-sm text-green-700 font-medium">
+                    {files.find(f => f.kind === 'document_pdf')?.name || 'El sistema ha contado las páginas y calculado el precio'}
+                  </p>
                 </div>
               </div>
 
