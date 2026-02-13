@@ -54,7 +54,11 @@ export default function YearPicker({
     return (
         <div className={`relative ${className}`} ref={containerRef}>
             <div
-                onClick={() => !disabled && setIsOpen(!isOpen)}
+                onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!disabled) setIsOpen(!isOpen)
+                }}
                 className={`
           flex items-center justify-between w-full px-3 py-2 bg-white border border-slate-300 rounded-lg shadow-sm 
           text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 cursor-pointer
@@ -68,7 +72,7 @@ export default function YearPicker({
             </div>
 
             {isOpen && (
-                <div className="absolute z-50 w-64 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute z-[999] w-64 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl animate-in fade-in zoom-in-95 duration-100">
                     <div className="p-2 grid grid-cols-4 gap-1 max-h-64 overflow-y-auto custom-scrollbar">
                         {years.map(year => (
                             <button
