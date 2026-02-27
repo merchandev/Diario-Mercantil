@@ -10,7 +10,8 @@ import FlipbookViewer from '../components/FlipbookViewer'
 export default function Ediciones() {
   const [rows, setRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState<{ date: string; edition_no: number; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), edition_no: 1, selectedOrders: [] })
+  const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
+  const [form, setForm] = useState<{ date: string; edition_no: number; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
   const [createPdf, setCreatePdf] = useState<File | null>(null)
   const [selId, setSelId] = useState<number | undefined>(undefined)
   const [detail, setDetail] = useState<{ edition: Edition; orders: LegalRequest[] } | null>(null)
@@ -21,6 +22,7 @@ export default function Ediciones() {
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => { } })
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'success' | 'error' | 'info' | 'warning' }>({ isOpen: false, title: '', message: '', variant: 'info' })
   const [expanded, setExpanded] = useState({ pdf: true, pubs: true, qr: true })
+  const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(false)
 
   const load = async () => {
     try {
@@ -32,6 +34,9 @@ export default function Ediciones() {
     }
   };
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    setForm(prev => ({ ...prev, edition_no: nextEditionNo }));
+  }, [rows]);
 
   const openDetail = async (id: number) => {
     setSelId(id)
@@ -53,7 +58,7 @@ export default function Ediciones() {
       if (newId) {
         await uploadEditionPdf(newId, createPdf)
       }
-      setForm({ date: new Date().toISOString().slice(0, 10), edition_no: 1, selectedOrders: [] })
+      setForm({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
       setCreatePdf(null)
       await load()
       if (newId) {
@@ -135,7 +140,7 @@ export default function Ediciones() {
             </label>
             <div className="mb-4">
               <label className="block text-sm font-semibold mb-1 text-slate-700">Número de Edición</label>
-              <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value="Automático" title="El número de edición se genera automáticamente" />
+              <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value={form.edition_no} title="El número de edición se genera automáticamente en orden consecutivo" />
             </div>
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final</span>
@@ -254,238 +259,253 @@ export default function Ediciones() {
         </div>
 
         {detail && selId && (
-          <div className="card p-6 grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="flex items-center justify-between border-b pb-4">
-                <h2 className="text-2xl font-semibold text-brand-800">Detalles de la edicion</h2>
-                <button className="btn btn-ghost inline-flex items-center gap-2" onClick={() => { setSelId(undefined); setDetail(null) }}>
-                  <IconClose /> <span>Cerrar</span>
+          <div className="card shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div className="bg-brand-50/40 px-5 py-4 border-b border-brand-100 flex flex-wrap items-center justify-between gap-4">
+              <h2 className="text-xl font-bold text-brand-800">Detalles de la edicion #{detail.edition.edition_no}</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost text-slate-500 hover:text-brand-700 flex items-center gap-1.5 text-sm font-medium"
+                  onClick={() => setIsDetailsCollapsed(!isDetailsCollapsed)}
+                >
+                  <span className="text-[10px]">{isDetailsCollapsed ? '▼' : '▲'}</span>
+                  {isDetailsCollapsed ? 'Maximizar' : 'Minimizar'}
+                </button>
+                <button className="btn btn-ghost text-slate-500 hover:text-red-600 flex items-center gap-1.5 text-sm font-medium" onClick={() => { setSelId(undefined); setDetail(null) }}>
+                  <IconClose className="w-4 h-4" /> <span>Cerrar</span>
                 </button>
               </div>
+            </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="block text-sm font-medium mb-2">Codigo de verificacion</span>
-                  <input className="input w-full font-mono" value={detail.edition.code} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, code: e.target.value } })} />
-                </label>
-                <label className="block">
-                  <span className="block text-sm font-medium mb-2">Fecha de publicacion</span>
-                  <input className="input w-full" type="date" value={detail.edition.date} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
-                </label>
-                <label className="block">
-                  <span className="block text-sm font-medium mb-2">Estado</span>
-                  <select className="input w-full" value={detail.edition.status} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, status: e.target.value } })}>
-                    {['Borrador', 'Publicada', 'Archivado'].map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </label>
-                <label className="block">
-                  <span className="block text-sm font-medium mb-2">Numero de edicion</span>
-                  <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
-                </label>
-              </div>
+            {!isDetailsCollapsed && (
+              <div className="p-6 grid lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
 
-              <div className="flex flex-wrap gap-2 border-t pt-4">
-                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Exito', message: 'Cambios guardados', variant: 'success' }) }}>
-                  <IconSave /> <span>Guardar cambios</span>
-                </button>
-                {detail.edition.status === 'Borrador' && (
-                  <button className="btn bg-green-600 hover:bg-green-700 text-white inline-flex items-center gap-2" onClick={() => setConfirmDialog({ isOpen: true, title: 'Publicar edicion', message: 'Aprobar esta edicion y marcarla como Publicada?', onConfirm: handlePublish })}>
-                    <IconCheck /> <span>Publicar edicion</span>
-                  </button>
-                )}
-              </div>
-
-              <div
-                ref={pdfSectionRef}
-                tabIndex={-1}
-                className="border rounded-lg p-4 bg-white space-y-3 outline-none focus:ring-2 focus:ring-brand-500/60 focus:border-brand-300 transition-shadow relative"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div className="cursor-pointer flex-1" onClick={() => setExpanded({ ...expanded, pdf: !expanded.pdf })}>
-                    <h3 className="font-semibold text-brand-800 flex items-center gap-2">PDF de la edicion (visor simple) <span className="text-slate-400 text-xs">{expanded.pdf ? '▲ Minimizar' : '▼ Expandir'}</span></h3>
-                    <p className="text-sm text-slate-600">Sube el PDF final y muestralo en el visor.</p>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <label className="block">
+                      <span className="block text-sm font-medium mb-2">Codigo de verificacion</span>
+                      <input className="input w-full font-mono" value={detail.edition.code} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, code: e.target.value } })} />
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-medium mb-2">Fecha de publicacion</span>
+                      <input className="input w-full" type="date" value={detail.edition.date} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-medium mb-2">Estado</span>
+                      <select className="input w-full" value={detail.edition.status} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, status: e.target.value } })}>
+                        {['Borrador', 'Publicada', 'Archivado'].map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="block text-sm font-medium mb-2">Numero de edicion</span>
+                      <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
+                    </label>
                   </div>
-                  <label className="inline-flex items-center gap-2 cursor-pointer">
-                    <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); e.target.value = ''; }} />
-                    <span className="btn btn-outline inline-flex items-center gap-2">
-                      {uploadingPdf ? 'Subiendo...' : (<><IconUpload /> <span>Cargar PDF</span></>)}
-                    </span>
-                  </label>
-                </div>
-                {expanded.pdf && (
-                  <>
-                    {detail.edition.file_name && (
-                      <div className="text-sm text-slate-700">Archivo actual: <span className="font-semibold">{detail.edition.file_name}</span></div>
-                    )}
-                    {detail.edition.file_id ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                          <a className="btn btn-primary inline-flex items-center gap-2" href={viewerUrl} target="_blank" rel="noreferrer">
-                            <IconDownload /> <span>Ir a la edición</span>
-                          </a>
-                          <a className="btn btn-ghost inline-flex items-center gap-2" href={pdfUrl} target="_blank" rel="noreferrer">Abrir en pestana</a>
-                        </div>
-                        <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-4 space-y-3">
-                          <div className="flex items-center justify-between text-slate-200 text-sm">
-                            <span className="font-semibold">Visor Espressivo-PDF</span>
-                            <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
-                          </div>
-                          <FlipbookViewer src={pdfUrl} height={520} />
-                          <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-                            <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
-                            <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-600 bg-slate-50 border border-dashed border-slate-300 rounded p-3">
-                        Aun no has cargado el PDF de esta edicion. Sube el archivo diagramado y se mostrara aqui.
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-brand-800 cursor-pointer flex items-center gap-2 select-none" onClick={() => setExpanded({ ...expanded, pubs: !expanded.pubs })}>
-                    Publicaciones seleccionadas ({detail.orders.length}) <span className="text-slate-400 text-xs">{expanded.pubs ? '▲ Minimizar' : '▼ Expandir'}</span>
-                  </h3>
-                  <span className="text-xs text-slate-500">Agrega o quita publicaciones de la edición</span>
-                </div>
-                {expanded.pubs && (
-                  <>
-                    <div className="max-h-96 overflow-auto border rounded-lg p-3 bg-white space-y-2">
-                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
-                        const checked = detail.orders.some(x => x.id === o.id)
-                        const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
-                        return (
-                          <label key={o.id} className={`flex items-start gap-3 p-3 rounded border ${checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200'} hover:shadow-sm transition-all cursor-pointer`}>
-                            <input type="checkbox" className="mt-1" checked={checked} onChange={(e) => {
-                              const exists = detail.orders.some(x => x.id === o.id)
-                              const next = e.target.checked ? (exists ? detail.orders : [...detail.orders, o]) : detail.orders.filter(x => x.id !== o.id)
-                              setDetail({ ...detail, orders: next })
-                            }} />
-                            <div className="flex-1 text-sm">
-                              <div className="font-semibold text-brand-700">Orden #{String(o.id).padStart(8, '0')}</div>
-                              <div className="text-slate-700 mt-1">{o.name || 'Sin nombre'}</div>
-                              <div className="text-slate-500 text-xs mt-1">
-                                {meta?.tipo_sociedad && <span className="mr-2">- {meta.tipo_sociedad}</span>}
-                                {meta?.tipo_acto && <span>- {meta.tipo_acto}</span>}
-                                {meta?.tipo_convocatoria && <span>- {meta.tipo_convocatoria}</span>}
-                              </div>
-                              <div className="text-slate-400 text-xs mt-1">{o.date}</div>
+                  <div className="flex flex-wrap gap-2 border-t pt-4">
+                    <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Exito', message: 'Cambios guardados', variant: 'success' }) }}>
+                      <IconSave /> <span>Guardar cambios</span>
+                    </button>
+                    {detail.edition.status === 'Borrador' && (
+                      <button className="btn bg-green-600 hover:bg-green-700 text-white inline-flex items-center gap-2" onClick={() => setConfirmDialog({ isOpen: true, title: 'Publicar edicion', message: 'Aprobar esta edicion y marcarla como Publicada?', onConfirm: handlePublish })}>
+                        <IconCheck /> <span>Publicar edicion</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div
+                    ref={pdfSectionRef}
+                    tabIndex={-1}
+                    className="border rounded-lg p-4 bg-white space-y-3 outline-none focus:ring-2 focus:ring-brand-500/60 focus:border-brand-300 transition-shadow relative"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="cursor-pointer flex-1" onClick={() => setExpanded({ ...expanded, pdf: !expanded.pdf })}>
+                        <h3 className="font-semibold text-brand-800 flex items-center gap-2">PDF de la edicion (visor simple) <span className="text-slate-400 text-xs">{expanded.pdf ? '▲ Minimizar' : '▼ Expandir'}</span></h3>
+                        <p className="text-sm text-slate-600">Sube el PDF final y muestralo en el visor.</p>
+                      </div>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); e.target.value = ''; }} />
+                        <span className="btn btn-outline inline-flex items-center gap-2">
+                          {uploadingPdf ? 'Subiendo...' : (<><IconUpload /> <span>Cargar PDF</span></>)}
+                        </span>
+                      </label>
+                    </div>
+                    {expanded.pdf && (
+                      <>
+                        {detail.edition.file_name && (
+                          <div className="text-sm text-slate-700">Archivo actual: <span className="font-semibold">{detail.edition.file_name}</span></div>
+                        )}
+                        {detail.edition.file_id ? (
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              <a className="btn btn-primary inline-flex items-center gap-2" href={viewerUrl} target="_blank" rel="noreferrer">
+                                <IconDownload /> <span>Ir a la edición</span>
+                              </a>
+                              <a className="btn btn-ghost inline-flex items-center gap-2" href={pdfUrl} target="_blank" rel="noreferrer">Abrir en pestana</a>
                             </div>
-                            {checked && (
-                              <button type="button" className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-md flex-shrink-0" title="Remover de la edición" onClick={(e) => {
-                                e.preventDefault(); e.stopPropagation();
-                                setDetail({ ...detail, orders: detail.orders.filter(x => x.id !== o.id) })
-                              }}>
-                                <IconTrash />
-                              </button>
-                            )}
-                          </label>
-                        )
-                      })}
-                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
-                        <div className="text-center py-8 text-slate-500">
-                          No hay publicaciones disponibles.
+                            <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-4 space-y-3">
+                              <div className="flex items-center justify-between text-slate-200 text-sm">
+                                <span className="font-semibold">Visor Espressivo-PDF</span>
+                                <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
+                              </div>
+                              <FlipbookViewer src={pdfUrl} height={520} />
+                              <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                                <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
+                                <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-600 bg-slate-50 border border-dashed border-slate-300 rounded p-3">
+                            Aun no has cargado el PDF de esta edicion. Sube el archivo diagramado y se mostrara aqui.
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-brand-800 cursor-pointer flex items-center gap-2 select-none" onClick={() => setExpanded({ ...expanded, pubs: !expanded.pubs })}>
+                        Publicaciones seleccionadas ({detail.orders.length}) <span className="text-slate-400 text-xs">{expanded.pubs ? '▲ Minimizar' : '▼ Expandir'}</span>
+                      </h3>
+                      <span className="text-xs text-slate-500">Agrega o quita publicaciones de la edición</span>
+                    </div>
+                    {expanded.pubs && (
+                      <>
+                        <div className="max-h-96 overflow-auto border rounded-lg p-3 bg-white space-y-2">
+                          {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
+                            const checked = detail.orders.some(x => x.id === o.id)
+                            const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
+                            return (
+                              <label key={o.id} className={`flex items-start gap-3 p-3 rounded border ${checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200'} hover:shadow-sm transition-all cursor-pointer`}>
+                                <input type="checkbox" className="mt-1" checked={checked} onChange={(e) => {
+                                  const exists = detail.orders.some(x => x.id === o.id)
+                                  const next = e.target.checked ? (exists ? detail.orders : [...detail.orders, o]) : detail.orders.filter(x => x.id !== o.id)
+                                  setDetail({ ...detail, orders: next })
+                                }} />
+                                <div className="flex-1 text-sm">
+                                  <div className="font-semibold text-brand-700">Orden #{String(o.id).padStart(8, '0')}</div>
+                                  <div className="text-slate-700 mt-1">{o.name || 'Sin nombre'}</div>
+                                  <div className="text-slate-500 text-xs mt-1">
+                                    {meta?.tipo_sociedad && <span className="mr-2">- {meta.tipo_sociedad}</span>}
+                                    {meta?.tipo_acto && <span>- {meta.tipo_acto}</span>}
+                                    {meta?.tipo_convocatoria && <span>- {meta.tipo_convocatoria}</span>}
+                                  </div>
+                                  <div className="text-slate-400 text-xs mt-1">{o.date}</div>
+                                </div>
+                                {checked && (
+                                  <button type="button" className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-md flex-shrink-0" title="Remover de la edición" onClick={(e) => {
+                                    e.preventDefault(); e.stopPropagation();
+                                    setDetail({ ...detail, orders: detail.orders.filter(x => x.id !== o.id) })
+                                  }}>
+                                    <IconTrash />
+                                  </button>
+                                )}
+                              </label>
+                            )
+                          })}
+                          {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
+                            <div className="text-center py-8 text-slate-500">
+                              No hay publicaciones disponibles.
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3 flex gap-2 items-center">
+                          <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => {
+                            const ids = detail.orders.map(o => o.id)
+                            const r = await setEditionOrders(selId, ids)
+                            setDetail({ ...detail, edition: { ...detail.edition, orders_count: r.orders_count } })
+                            load()
+                            setAlertDialog({ isOpen: true, title: 'Exito', message: 'Publicaciones guardadas', variant: 'success' })
+                          }}>
+                            <IconSave /> <span>Guardar seleccion</span>
+                          </button>
+                          <span className="text-sm text-slate-600">
+                            {detail.orders.length} seleccionadas
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="border rounded-lg p-4 bg-white">
+                    <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
+                      Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
+                    </h3>
+                    {expanded.qr && (() => {
+                      const qrUrl = `${location.origin}/edicion/${encodeURIComponent(detail.edition.code)}`
+                      return (
+                        <>
+                          <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
+                          <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
+                            <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
+                          </div>
+                          <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.code}</div>
+                          <a href={qrUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:text-brand-800 underline text-xs break-all block mt-2">{qrUrl}</a>
+                          <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
+                            const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
+                            if (!canvas) return
+                            const url = canvas.toDataURL('image/png')
+                            const a = document.createElement('a')
+                            a.href = url; a.download = `QR-edicion-${detail.edition.code}.png`; a.click()
+                          }}>
+                            <IconDownload /> <span>Descargar QR</span>
+                          </button>
+                        </>
+                      )
+                    })()}
+                  </div>
+
+                  <div className="border rounded-lg p-4 bg-white space-y-3">
+                    <h3 className="font-semibold text-brand-800">Descargas</h3>
+                    {detail.edition.file_id ? (
+                      <>
+                        <a
+                          className="btn btn-primary w-full inline-flex items-center justify-center gap-2"
+                          href={`${pdfUrl}?download=1`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <IconDownload /> <span>Descargar PDF de edicion</span>
+                        </a>
+                        <p className="text-xs text-slate-600">
+                          PDF cargado manualmente y listo para compartir.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-600">Carga un PDF para habilitar la descarga.</p>
+                    )}
+                  </div>
+
+                  <div className="border rounded-lg p-4 bg-slate-50">
+                    <h3 className="font-semibold mb-2 text-brand-800">Informacion</h3>
+                    <dl className="text-sm space-y-2">
+                      <div>
+                        <dt className="text-slate-600">Estado:</dt>
+                        <dd className="font-semibold">{detail.edition.status}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-600">Publicaciones:</dt>
+                        <dd className="font-semibold">{detail.edition.orders_count}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-slate-600">Fecha:</dt>
+                        <dd className="font-semibold">{detail.edition.date}</dd>
+                      </div>
+                      {detail.edition.file_name && (
+                        <div>
+                          <dt className="text-slate-600">PDF:</dt>
+                          <dd className="font-semibold truncate">{detail.edition.file_name}</dd>
                         </div>
                       )}
-                    </div>
-                    <div className="mt-3 flex gap-2 items-center">
-                      <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => {
-                        const ids = detail.orders.map(o => o.id)
-                        const r = await setEditionOrders(selId, ids)
-                        setDetail({ ...detail, edition: { ...detail.edition, orders_count: r.orders_count } })
-                        load()
-                        setAlertDialog({ isOpen: true, title: 'Exito', message: 'Publicaciones guardadas', variant: 'success' })
-                      }}>
-                        <IconSave /> <span>Guardar seleccion</span>
-                      </button>
-                      <span className="text-sm text-slate-600">
-                        {detail.orders.length} seleccionadas
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-white">
-                <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
-                  Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
-                </h3>
-                {expanded.qr && (() => {
-                  const qrUrl = `${location.origin}/edicion/${encodeURIComponent(detail.edition.code)}`
-                  return (
-                    <>
-                      <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
-                      <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
-                        <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
-                      </div>
-                      <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.code}</div>
-                      <a href={qrUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:text-brand-800 underline text-xs break-all block mt-2">{qrUrl}</a>
-                      <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
-                        const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
-                        if (!canvas) return
-                        const url = canvas.toDataURL('image/png')
-                        const a = document.createElement('a')
-                        a.href = url; a.download = `QR-edicion-${detail.edition.code}.png`; a.click()
-                      }}>
-                        <IconDownload /> <span>Descargar QR</span>
-                      </button>
-                    </>
-                  )
-                })()}
-              </div>
-
-              <div className="border rounded-lg p-4 bg-white space-y-3">
-                <h3 className="font-semibold text-brand-800">Descargas</h3>
-                {detail.edition.file_id ? (
-                  <>
-                    <a
-                      className="btn btn-primary w-full inline-flex items-center justify-center gap-2"
-                      href={`${pdfUrl}?download=1`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <IconDownload /> <span>Descargar PDF de edicion</span>
-                    </a>
-                    <p className="text-xs text-slate-600">
-                      PDF cargado manualmente y listo para compartir.
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-sm text-slate-600">Carga un PDF para habilitar la descarga.</p>
-                )}
-              </div>
-
-              <div className="border rounded-lg p-4 bg-slate-50">
-                <h3 className="font-semibold mb-2 text-brand-800">Informacion</h3>
-                <dl className="text-sm space-y-2">
-                  <div>
-                    <dt className="text-slate-600">Estado:</dt>
-                    <dd className="font-semibold">{detail.edition.status}</dd>
+                    </dl>
                   </div>
-                  <div>
-                    <dt className="text-slate-600">Publicaciones:</dt>
-                    <dd className="font-semibold">{detail.edition.orders_count}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-600">Fecha:</dt>
-                    <dd className="font-semibold">{detail.edition.date}</dd>
-                  </div>
-                  {detail.edition.file_name && (
-                    <div>
-                      <dt className="text-slate-600">PDF:</dt>
-                      <dd className="font-semibold truncate">{detail.edition.file_name}</dd>
-                    </div>
-                  )}
-                </dl>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
