@@ -49,11 +49,15 @@ export default function Topbar() {
           <div className="text-xs font-bold uppercase text-white text-center">
             Precio por Folio: <span className="font-bold">
               {(() => {
-                const usd = typeof ticker.price === 'number' ? ticker.price : undefined
-                const rate = typeof ticker.rate === 'number' ? ticker.rate : undefined
-                const bs = usd && rate ? (usd * rate) : undefined
-                const fmt = (n?: number) => n === undefined ? '—' : n.toFixed(2).replace('.', ',')
-                return `${fmt(bs)} Bs. / ${fmt(usd)} USD`
+                const usd = Number(ticker.price)
+                const rate = Number(ticker.rate)
+                const isUsdValid = !isNaN(usd) && usd > 0
+                const isRateValid = !isNaN(rate) && rate > 0
+
+                const bs = isUsdValid && isRateValid ? (usd * rate) : undefined
+                const fmt = (n?: number) => n === undefined || isNaN(n) ? '—' : n.toFixed(2).replace('.', ',')
+
+                return `${fmt(bs)} Bs. / ${fmt(isUsdValid ? usd : undefined)} USD`
               })()}
             </span>
           </div>
