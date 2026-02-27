@@ -18,6 +18,7 @@ require_once __DIR__."/../src/RateController.php";
 require_once __DIR__."/../src/SuperAdminController.php";
 require_once __DIR__."/../src/PagesController.php";
 require_once __DIR__."/../src/FileController.php";
+require_once __DIR__."/../src/EditionController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
@@ -75,10 +76,24 @@ elseif ($uri === "/api/stats" && $method === "GET") { (new SystemController())->
 elseif ($uri === "/api/rate/bcv" && $method === "GET") { (new RateController())->bcv(); }
 elseif ($uri === "/api/settings" && $method === "GET") { (new SystemController())->getSettings(); }
 elseif ($uri === "/api/settings" && $method === "POST") { (new SystemController())->saveSettings(); }
-elseif ($uri === "/api/editions" && $method === "GET") { (new SystemController())->listEditions(); }
 elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController())->listPayments(); }
 elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
 elseif ($uri === "/api/system/fix" && $method === "GET") { (new SystemController())->emergencyFix(); }
+
+// --- EDITIONS ---
+elseif ($uri === "/api/editions" && $method === "GET") { (new EditionController())->list(); }
+elseif ($uri === "/api/editions" && $method === "POST") { (new EditionController())->create(); }
+elseif (preg_match("#^/api/editions/(\d+)$#", $uri, $m)) {
+    if ($method === "GET") (new EditionController())->get($m[1]);
+    if ($method === "PUT") (new EditionController())->update($m[1]);
+    if ($method === "DELETE") (new EditionController())->delete($m[1]);
+}
+elseif (preg_match("#^/api/editions/(\d+)/orders$#", $uri, $m) && $method === "POST") { (new EditionController())->setOrders($m[1]); }
+elseif (preg_match("#^/api/editions/(\d+)/publish$#", $uri, $m) && $method === "POST") { (new EditionController())->publish($m[1]); }
+elseif (preg_match("#^/api/editions/(\d+)/pdf$#", $uri, $m) && $method === "POST") { (new EditionController())->uploadPdf($m[1]); }
+elseif (preg_match("#^/api/e/(\d+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadById($m[1]); }
+elseif (preg_match("#^/api/e/([^/]+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadByCode($m[1]); }
+
 
 // --- 5. PUBLICATIONS & PAGES (Public) ---
 elseif (preg_match("#^/api/page/(.+)$#", $uri, $m) && $method === "GET") { (new PagesController())->publicGet($m[1]); }
