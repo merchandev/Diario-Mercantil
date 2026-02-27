@@ -258,7 +258,7 @@ export async function listEditions() {
   const res = await fetchAuth('/api/editions')
   return res.json() as Promise<{ items: Edition[] }>
 }
-export async function createEdition(body: { code: string; status?: string; date?: string; edition_no?: number; orders_count?: number; file_id?: number | null; file_name?: string }) {
+export async function createEdition(body: { code?: string; status?: string; date?: string; edition_no?: number; orders?: number[]; file_id?: number | null; file_name?: string }) {
   const res = await fetchAuth('/api/editions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }

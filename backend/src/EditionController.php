@@ -109,14 +109,20 @@ class EditionController {
   public function create(){
     $pdo = Database::pdo();
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
-    $code = trim($input['code'] ?? '');
     $status = trim($input['status'] ?? 'Borrador');
     $date = trim($input['date'] ?? gmdate('Y-m-d'));
     $edition_no = (int)($input['edition_no'] ?? 1);
-    $orders_count = (int)($input['orders_count'] ?? 0);
+    $orders = $input['orders'] ?? [];
+    if (!is_array($orders)) $orders = [];
+    $orders_count = count($orders);
+
+    // Auto-generate code
+    $dateObj = new DateTime($date);
+    $dateStr = $dateObj->format('dmy');
+    $code = "100{$edition_no}dm{$dateStr}";
+
     $fileId = isset($input['file_id']) ? (int)$input['file_id'] : null;
     $fileName = trim($input['file_name'] ?? '');
-    if ($code==='') Response::json(['error'=>'code_required'],400);
 
     if ($fileId && $fileName==='') {
       $f = $pdo->prepare('SELECT name FROM files WHERE id=?');
@@ -126,9 +132,38 @@ class EditionController {
     }
 
     $now = gmdate('c');
-    $stmt = $pdo->prepare('INSERT INTO editions(code,status,date,edition_no,orders_count,file_id,file_name,created_at) VALUES(?,?,?,?,?,?,?,?)');
-    $stmt->execute([$code,$status,$date,$edition_no,$orders_count,$fileId,$fileName,$now]);
-    Response::json(['ok'=>true,'id'=>$pdo->lastInsertId()]);
+    
+    $pdo->beginTransaction();
+    try {
+        $stmt = $pdo->prepare('INSERT INTO editions(code,status,date,edition_no,orders_count,file_id,file_name,created_at) VALUES(?,?,?,?,?,?,?,?)');
+        $stmt->execute([$code,$status,$date,$edition_no,$orders_count,$fileId,$fileName,$now]);
+        $editionId = $pdo->lastInsertId();
+
+        if ($orders_count > 0) {
+            $ins = $pdo->prepare('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
+            foreach ($orders as $oid) {
+                $ins->execute([$editionId, (int)$oid]);
+            }
+            
+            if ($status === 'Publicada') {
+                $inQuery = implode(',', array_fill(0, $orders_count, '?'));
+                $updateOrders = $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)");
+                $updateOrders->execute($orders);
+            }
+        }
+        $pdo->commit();
+        Response::json(['ok'=>true, 'id'=>$editionId, 'code'=>$code]);
+    } catch (PDOException $e) {
+        $pdo->rollBack();
+        if ($e->getCode() == 23000) {
+            Response::json(['error'=>'Ya existe una edición con el código generado ('.$code.')'], 400);
+        } else {
+            Response::json(['error'=>'Database error: '.$e->getMessage()], 500);
+        }
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+        Response::json(['error'=>'Error: '.$e->getMessage()], 500);
+    }
   }
 
   public function delete($id){
