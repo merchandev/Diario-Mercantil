@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { logout, getSettings, getBcvRate } from '../lib/api'
-import { IconLogout, IconUsers } from './icons'
+import { IconLogout, IconUsers, IconMenu } from './icons'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
 
-export default function Topbar() {
+export default function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { user } = useAuth()
   const [ticker, setTicker] = useState<{ price?: number; rate?: number }>({})
 
@@ -66,6 +66,13 @@ export default function Topbar() {
       {/* Info row on white background */}
       <div className="bg-white border-b border-slate-200">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-4">
+          <button
+            className="md:hidden btn btn-ghost p-2 -ml-2 text-slate-600 hover:text-brand-700 focus:outline-none"
+            onClick={onMenuToggle}
+            aria-label="Toggle Mobile Menu"
+          >
+            <IconMenu className="w-6 h-6" />
+          </button>
           <div className="flex-1" />
           <div className="hidden md:flex items-center gap-2">
             <div className="text-xs text-slate-600">Tasa BCV: {ticker.rate?.toFixed?.(2) ?? '—'} Bs/USD</div>

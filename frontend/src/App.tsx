@@ -97,6 +97,7 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Auto-logout after 60 mins of inactivity
   useEffect(() => {
@@ -178,9 +179,11 @@ export default function App() {
                 <Sidebar
                   onPublishClick={() => setShowPublishModal(true)}
                   onCollapseChange={setSidebarCollapsed}
+                  mobileMenuOpen={mobileMenuOpen}
+                  setMobileMenuOpen={setMobileMenuOpen}
                 />
                 <div className={`grid grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-                  <Topbar />
+                  <Topbar onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
                   <main className="p-6 space-y-6">
                     <Routes>
                       <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
