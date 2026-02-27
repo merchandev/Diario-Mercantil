@@ -152,7 +152,7 @@ export default function Ediciones() {
             </div>
             <div className="p-3 bg-white">
               <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {allOrders.filter(o => ['Verificada', 'Aprobado', 'Publicada'].includes(o.status)).map(o => {
+                {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
                   const isSelected = form.selectedOrders.includes(o.id)
                   const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                   return (
@@ -180,7 +180,7 @@ export default function Ediciones() {
                     </label>
                   )
                 })}
-                {allOrders.filter(o => ['Verificada', 'Aprobado', 'Publicada'].includes(o.status)).length === 0 && (
+                {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
                   <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                     <div className="text-3xl mb-2 opacity-50">📄</div>
                     <p className="text-sm font-medium">No hay publicaciones disponibles</p>
