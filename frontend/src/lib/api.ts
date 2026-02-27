@@ -89,6 +89,13 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   return res
 }
 
+export const api = {
+  get: (url: string) => fetchAuth(getUrl(url)).then(r => r.json()),
+  post: (url: string, body: any) => fetchAuth(getUrl(url), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
+  put: (url: string, body: any) => fetchAuth(getUrl(url), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json()),
+  delete: (url: string) => fetchAuth(getUrl(url), { method: 'DELETE' }).then(r => r.json()),
+}
+
 export async function login(body: { document: string; password: string }) {
   const res = await fetch(getUrl('/api/auth/login'), {
     method: 'POST',
