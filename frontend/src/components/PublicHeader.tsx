@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { getBcvRate, listPagesPublic } from '../lib/api'
+import { Link, useNavigate } from 'react-router-dom'
+import { getBcvRate, listPagesPublic, logout } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
+import { isAdminRole } from '../lib/roleUtils'
+import { IconUserCircle, IconLogout, IconHome } from './icons'
 
 function HeroSlider({ heightClass = "h-28 md:h-32", labelPrefix = "BANNER A" }: { heightClass?: string; labelPrefix?: string }) {
   const slides = [1, 2, 3]
@@ -64,6 +67,8 @@ function TopBannerRow() {
 }
 
 export default function PublicHeader() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const today = new Date().toLocaleDateString('es-VE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   const [usd, setUsd] = useState<string | undefined>(undefined)
   const [eur, setEur] = useState<string | undefined>(undefined)
@@ -151,10 +156,44 @@ export default function PublicHeader() {
               {it.label}
             </Link>
           ))}
-          <div className="ml-auto hidden md:flex items-center gap-2 shrink-0">
-            <Link to="/login" className="btn btn-outline h-9 text-xs">Iniciar sesión</Link>
-            <Link to="/login" className="btn btn-primary h-9 text-xs">Crear cuenta</Link>
-          </div>
+
+          {user ? (
+            <div className="ml-auto hidden md:flex items-center gap-4 shrink-0 border-l border-slate-200 pl-4">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="avatar" className="w-8 h-8 rounded-full border border-slate-200" />
+                ) : (
+                  <div className="bg-slate-100 p-1.5 rounded-full border border-slate-200">
+                    <IconUserCircle className="w-5 h-5 text-slate-400" />
+                  </div>
+                )}
+                <div className="flex flex-col">
+                  <span className="font-semibold text-slate-800 leading-tight">Hola, {user.name.split(' ')[0]}</span>
+                  <span className={`text-[10px] uppercase font-bold tracking-wider ${isAdminRole(user.role) ? 'text-brand-600' : 'text-slate-500'}`}>
+                    {isAdminRole(user.role) ? 'Admin' : 'Usuario'}
+                  </span>
+                </div>
+              </div>
+              <Link to={isAdminRole(user.role) ? "/dashboard" : "/solicitante"} className="btn btn-primary h-9 text-xs inline-flex items-center gap-2">
+                <IconHome className="w-4 h-4" /> <span>Mi panel</span>
+              </Link>
+              <button onClick={async () => {
+                try {
+                  await logout();
+                } catch (e) { }
+                localStorage.removeItem('token');
+                sessionStorage.removeItem('token');
+                window.location.href = '/login';
+              }} className="btn btn-ghost h-9 px-2 text-slate-500 hover:text-red-600" title="Cerrar sesión">
+                <IconLogout className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <div className="ml-auto hidden md:flex items-center gap-2 shrink-0">
+              <Link to="/login" className="btn btn-outline h-9 text-xs">Iniciar sesión</Link>
+              <Link to="/login" className="btn btn-primary h-9 text-xs">Crear cuenta</Link>
+            </div>
+          )}
         </div>
       </nav>
 

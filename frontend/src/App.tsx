@@ -98,10 +98,10 @@ export default function App() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
-  // Auto-logout after 45 mins of inactivity
+  // Auto-logout after 60 mins of inactivity
   useEffect(() => {
     let timer: any // Use any to avoid NodeJS type issues if types aren't installed
-    const TIMEOUT = 45 * 60 * 1000 // 45 minutes
+    const TIMEOUT = 60 * 60 * 1000 // 60 minutes
 
     const resetTimer = () => {
       clearTimeout(timer)
