@@ -330,16 +330,17 @@ export default function Ediciones() {
                                     }} />
                                   </label>
                                   {detail.edition.file_id && (
-                                    <div className="h-[500px] border rounded-lg overflow-hidden bg-slate-50 relative group shadow-inner">
-                                      <iframe
-                                        src={viewerUrl}
-                                        className="w-full h-full border-0 absolute inset-0 z-10"
-                                        title="Visor de PDF Definitivo"
-                                        loading="lazy"
-                                      />
-                                      <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 gap-3 z-0">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
-                                        <p className="text-sm font-medium">Cargando visor 3D...</p>
+                                    <div className="h-[550px] border rounded-lg overflow-hidden relative group shadow-inner bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex flex-col p-4">
+                                      <div className="flex items-center justify-between text-slate-200 text-sm mb-3 z-10 relative">
+                                        <span className="font-semibold">Visor Espressivo-PDF</span>
+                                        <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
+                                      </div>
+                                      <div className="flex-1 relative z-10 w-full max-w-full">
+                                        <FlipbookViewer src={pdfUrl} height={420} />
+                                      </div>
+                                      <div className="flex flex-wrap gap-2 text-xs text-slate-300 mt-4 z-10 relative justify-center">
+                                        <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
+                                        <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
                                       </div>
                                       <div className="absolute bottom-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <a
