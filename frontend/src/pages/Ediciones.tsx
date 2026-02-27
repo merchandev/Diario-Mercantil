@@ -20,6 +20,7 @@ export default function Ediciones() {
   const pdfSectionRef = useRef<HTMLDivElement | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => { } })
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'success' | 'error' | 'info' | 'warning' }>({ isOpen: false, title: '', message: '', variant: 'info' })
+  const [expanded, setExpanded] = useState({ pdf: true, pubs: true, qr: true })
 
   const load = async () => {
     try {
@@ -300,8 +301,8 @@ export default function Ediciones() {
                 className="border rounded-lg p-4 bg-white space-y-3 outline-none focus:ring-2 focus:ring-brand-500/60 focus:border-brand-300 transition-shadow relative"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold text-brand-800">PDF de la edicion (visor simple)</h3>
+                  <div className="cursor-pointer flex-1" onClick={() => setExpanded({ ...expanded, pdf: !expanded.pdf })}>
+                    <h3 className="font-semibold text-brand-800 flex items-center gap-2">PDF de la edicion (visor simple) <span className="text-slate-400 text-xs">{expanded.pdf ? '▲ Minimizar' : '▼ Expandir'}</span></h3>
                     <p className="text-sm text-slate-600">Sube el PDF final y muestralo en el visor.</p>
                   </div>
                   <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -311,105 +312,133 @@ export default function Ediciones() {
                     </span>
                   </label>
                 </div>
-                {detail.edition.file_name && (
-                  <div className="text-sm text-slate-700">Archivo actual: <span className="font-semibold">{detail.edition.file_name}</span></div>
-                )}
-                {detail.edition.file_id ? (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      <a className="btn btn-primary inline-flex items-center gap-2" href={viewerUrl} target="_blank" rel="noreferrer">
-                        <IconDownload /> <span>Ir a la edición</span>
-                      </a>
-                      <a className="btn btn-ghost inline-flex items-center gap-2" href={pdfUrl} target="_blank" rel="noreferrer">Abrir en pestana</a>
-                    </div>
-                    <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-4 space-y-3">
-                      <div className="flex items-center justify-between text-slate-200 text-sm">
-                        <span className="font-semibold">Visor Espressivo-PDF</span>
-                        <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
+                {expanded.pdf && (
+                  <>
+                    {detail.edition.file_name && (
+                      <div className="text-sm text-slate-700">Archivo actual: <span className="font-semibold">{detail.edition.file_name}</span></div>
+                    )}
+                    {detail.edition.file_id ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <a className="btn btn-primary inline-flex items-center gap-2" href={viewerUrl} target="_blank" rel="noreferrer">
+                            <IconDownload /> <span>Ir a la edición</span>
+                          </a>
+                          <a className="btn btn-ghost inline-flex items-center gap-2" href={pdfUrl} target="_blank" rel="noreferrer">Abrir en pestana</a>
+                        </div>
+                        <div className="border rounded-lg overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 p-4 space-y-3">
+                          <div className="flex items-center justify-between text-slate-200 text-sm">
+                            <span className="font-semibold">Visor Espressivo-PDF</span>
+                            <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
+                          </div>
+                          <FlipbookViewer src={pdfUrl} height={520} />
+                          <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                            <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
+                            <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+                          </div>
+                        </div>
                       </div>
-                      <FlipbookViewer src={pdfUrl} height={520} />
-                      <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-                        <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
-                        <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+                    ) : (
+                      <div className="text-sm text-slate-600 bg-slate-50 border border-dashed border-slate-300 rounded p-3">
+                        Aun no has cargado el PDF de esta edicion. Sube el archivo diagramado y se mostrara aqui.
                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-600 bg-slate-50 border border-dashed border-slate-300 rounded p-3">
-                    Aun no has cargado el PDF de esta edicion. Sube el archivo diagramado y se mostrara aqui.
-                  </div>
+                    )}
+                  </>
                 )}
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-brand-800">Publicaciones seleccionadas ({detail.orders.length})</h3>
+                  <h3 className="font-semibold text-brand-800 cursor-pointer flex items-center gap-2 select-none" onClick={() => setExpanded({ ...expanded, pubs: !expanded.pubs })}>
+                    Publicaciones seleccionadas ({detail.orders.length}) <span className="text-slate-400 text-xs">{expanded.pubs ? '▲ Minimizar' : '▼ Expandir'}</span>
+                  </h3>
                   <span className="text-xs text-slate-500">Agrega o quita publicaciones de la edición</span>
                 </div>
-                <div className="max-h-96 overflow-auto border rounded-lg p-3 bg-white space-y-2">
-                  {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
-                    const checked = detail.orders.some(x => x.id === o.id)
-                    const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
-                    return (
-                      <label key={o.id} className={`flex items-start gap-3 p-3 rounded border ${checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200'} hover:shadow-sm transition-all cursor-pointer`}>
-                        <input type="checkbox" className="mt-1" checked={checked} onChange={(e) => {
-                          const exists = detail.orders.some(x => x.id === o.id)
-                          const next = e.target.checked ? (exists ? detail.orders : [...detail.orders, o]) : detail.orders.filter(x => x.id !== o.id)
-                          setDetail({ ...detail, orders: next })
-                        }} />
-                        <div className="flex-1 text-sm">
-                          <div className="font-semibold text-brand-700">Orden #{String(o.id).padStart(8, '0')}</div>
-                          <div className="text-slate-700 mt-1">{o.name || 'Sin nombre'}</div>
-                          <div className="text-slate-500 text-xs mt-1">
-                            {meta?.tipo_sociedad && <span className="mr-2">- {meta.tipo_sociedad}</span>}
-                            {meta?.tipo_acto && <span>- {meta.tipo_acto}</span>}
-                            {meta?.tipo_convocatoria && <span>- {meta.tipo_convocatoria}</span>}
-                          </div>
-                          <div className="text-slate-400 text-xs mt-1">{o.date}</div>
+                {expanded.pubs && (
+                  <>
+                    <div className="max-h-96 overflow-auto border rounded-lg p-3 bg-white space-y-2">
+                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
+                        const checked = detail.orders.some(x => x.id === o.id)
+                        const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
+                        return (
+                          <label key={o.id} className={`flex items-start gap-3 p-3 rounded border ${checked ? 'bg-brand-50 border-brand-300' : 'bg-white border-slate-200'} hover:shadow-sm transition-all cursor-pointer`}>
+                            <input type="checkbox" className="mt-1" checked={checked} onChange={(e) => {
+                              const exists = detail.orders.some(x => x.id === o.id)
+                              const next = e.target.checked ? (exists ? detail.orders : [...detail.orders, o]) : detail.orders.filter(x => x.id !== o.id)
+                              setDetail({ ...detail, orders: next })
+                            }} />
+                            <div className="flex-1 text-sm">
+                              <div className="font-semibold text-brand-700">Orden #{String(o.id).padStart(8, '0')}</div>
+                              <div className="text-slate-700 mt-1">{o.name || 'Sin nombre'}</div>
+                              <div className="text-slate-500 text-xs mt-1">
+                                {meta?.tipo_sociedad && <span className="mr-2">- {meta.tipo_sociedad}</span>}
+                                {meta?.tipo_acto && <span>- {meta.tipo_acto}</span>}
+                                {meta?.tipo_convocatoria && <span>- {meta.tipo_convocatoria}</span>}
+                              </div>
+                              <div className="text-slate-400 text-xs mt-1">{o.date}</div>
+                            </div>
+                            {checked && (
+                              <button type="button" className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 p-1.5 rounded-md flex-shrink-0" title="Remover de la edición" onClick={(e) => {
+                                e.preventDefault(); e.stopPropagation();
+                                setDetail({ ...detail, orders: detail.orders.filter(x => x.id !== o.id) })
+                              }}>
+                                <IconTrash />
+                              </button>
+                            )}
+                          </label>
+                        )
+                      })}
+                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
+                        <div className="text-center py-8 text-slate-500">
+                          No hay publicaciones disponibles.
                         </div>
-                      </label>
-                    )
-                  })}
-                  {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
-                    <div className="text-center py-8 text-slate-500">
-                      No hay publicaciones disponibles.
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="mt-3 flex gap-2 items-center">
-                  <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => {
-                    const ids = detail.orders.map(o => o.id)
-                    const r = await setEditionOrders(selId, ids)
-                    setDetail({ ...detail, edition: { ...detail.edition, orders_count: r.orders_count } })
-                    load()
-                    setAlertDialog({ isOpen: true, title: 'Exito', message: 'Publicaciones guardadas', variant: 'success' })
-                  }}>
-                    <IconSave /> <span>Guardar seleccion</span>
-                  </button>
-                  <span className="text-sm text-slate-600">
-                    {detail.orders.length} seleccionadas
-                  </span>
-                </div>
+                    <div className="mt-3 flex gap-2 items-center">
+                      <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => {
+                        const ids = detail.orders.map(o => o.id)
+                        const r = await setEditionOrders(selId, ids)
+                        setDetail({ ...detail, edition: { ...detail.edition, orders_count: r.orders_count } })
+                        load()
+                        setAlertDialog({ isOpen: true, title: 'Exito', message: 'Publicaciones guardadas', variant: 'success' })
+                      }}>
+                        <IconSave /> <span>Guardar seleccion</span>
+                      </button>
+                      <span className="text-sm text-slate-600">
+                        {detail.orders.length} seleccionadas
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="border rounded-lg p-4 bg-white">
-                <h3 className="font-semibold mb-2 text-brand-800">Codigo QR</h3>
-                <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
-                <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
-                  <QRCode value={`${location.origin}/edicion/${encodeURIComponent(detail.edition.code)}`} size={200} includeMargin={false} level="M" renderAs="canvas" />
-                </div>
-                <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.code}</div>
-                <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
-                  const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
-                  if (!canvas) return
-                  const url = canvas.toDataURL('image/png')
-                  const a = document.createElement('a')
-                  a.href = url; a.download = `QR-edicion-${detail.edition.code}.png`; a.click()
-                }}>
-                  <IconDownload /> <span>Descargar QR</span>
-                </button>
+                <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
+                  Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
+                </h3>
+                {expanded.qr && (() => {
+                  const qrUrl = `${location.origin}/edicion/${encodeURIComponent(detail.edition.code)}`
+                  return (
+                    <>
+                      <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
+                      <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
+                        <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
+                      </div>
+                      <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.code}</div>
+                      <a href={qrUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:text-brand-800 underline text-xs break-all block mt-2">{qrUrl}</a>
+                      <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
+                        const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
+                        if (!canvas) return
+                        const url = canvas.toDataURL('image/png')
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `QR-edicion-${detail.edition.code}.png`; a.click()
+                      }}>
+                        <IconDownload /> <span>Descargar QR</span>
+                      </button>
+                    </>
+                  )
+                })()}
               </div>
 
               <div className="border rounded-lg p-4 bg-white space-y-3">
