@@ -6,6 +6,19 @@ class EditionController {
   private function locateUploadedFile(?int $fileId, ?string $originalName): ?string {
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     if (!$uploadDir || !is_dir($uploadDir)) return null;
+
+    if ($fileId) {
+        $pdo = Database::pdo();
+        $stmt = $pdo->prepare('SELECT path FROM files WHERE id=?');
+        $stmt->execute([$fileId]);
+        $path = $stmt->fetchColumn();
+        if ($path && file_exists($uploadDir.'/'.$path)) {
+            return $uploadDir.'/'.$path;
+        }
+        $files = glob($uploadDir.'/'.$fileId.'_edition_*');
+        if (!empty($files)) return $files[0];
+    }
+
     $files = glob($uploadDir.'/*');
     foreach ($files as $fp) {
       $base = basename($fp);
@@ -116,7 +129,10 @@ class EditionController {
     if (!is_array($orders)) $orders = [];
     $orders_count = count($orders);
 
-    // Auto-generate code
+    // Auto-generate edition number and code
+    $maxEd = (int)$pdo->query('SELECT MAX(edition_no) FROM editions')->fetchColumn();
+    $edition_no = $maxEd + 1;
+
     $dateObj = new DateTime($date);
     $dateStr = $dateObj->format('dmy');
     $code = "100{$edition_no}dm{$dateStr}";
@@ -284,16 +300,22 @@ class EditionController {
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
     $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($name));
-    $dest = $uploadDir.'/'.uniqid('edition_', true).'_'.$safeName;
-    if (!move_uploaded_file($tmp, $dest)) return Response::json(['error'=>'No se pudo guardar el PDF'],500);
 
     $pdo->beginTransaction();
     try {
-      $checksum = hash_file('sha256', $dest);
+      $checksum = hash_file('sha256', $tmp);
       $now = gmdate('c');
+      // Insert to get ID
       $stmt = $pdo->prepare('INSERT INTO files(name,size,type,checksum,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
       $stmt->execute([$name,$size,'pdf',$checksum,'uploaded',$now,$now]);
       $fileId = (int)$pdo->lastInsertId();
+      
+      $path = $fileId . '_edition_' . $safeName;
+      $dest = $uploadDir . '/' . $path;
+      
+      if (!move_uploaded_file($tmp, $dest)) throw new Exception('No se pudo guardar el archivo');
+      
+      $pdo->prepare("UPDATE files SET path=? WHERE id=?")->execute([$path, $fileId]);
       $pdo->prepare('UPDATE editions SET file_id=?, file_name=? WHERE id=?')->execute([$fileId,$name,$id]);
       $pdo->commit();
       $edition['file_id'] = $fileId;

@@ -133,10 +133,10 @@ export default function Ediciones() {
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de Publicación</span>
               <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
             </label>
-            <label className="block">
-              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Número de Edición</span>
-              <input className="input w-full bg-slate-50" type="number" min={1} value={form.edition_no} onChange={e => setForm({ ...form, edition_no: +e.target.value })} required />
-            </label>
+            <div className="mb-4">
+              <label className="block text-sm font-semibold mb-1 text-slate-700">Número de Edición</label>
+              <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value="Automático" title="El número de edición se genera automáticamente" />
+            </div>
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final</span>
               <label className="btn btn-outline border-dashed hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 text-slate-600 w-full flex items-center justify-center gap-2 cursor-pointer h-[42px] transition-colors">
