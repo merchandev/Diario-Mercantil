@@ -13,7 +13,7 @@ export default function Home() {
   console.log('[Home] Component rendering')
   return (
     <div>
-      <main className="mx-auto max-w-7xl px-4 py-6 grid gap-6 lg:grid-cols-[220px_1fr_300px] items-start">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 md:py-8 grid gap-6 lg:grid-cols-[220px_1fr_300px] items-start">
         <div className="space-y-6 order-2 lg:order-1">
           <BannerBox label="BANNER B" className="aspect-[9/20]" />
           <BannerBox label="BANNER B2" className="aspect-[9/16]" />
@@ -21,7 +21,7 @@ export default function Home() {
         </div>
 
         <section className="order-1 lg:order-2 space-y-6">
-          <BannerBox label="BANNER C (principal)" className="aspect-[21/9]" />
+          <BannerBox label="BANNER C (principal)" className="aspect-[16/9] sm:aspect-[21/9]" />
           <div className="grid sm:grid-cols-2 gap-6">
             <article className="card p-4">
               <div className="aspect-video rounded-xl bg-slate-100 mb-3" />
@@ -48,8 +48,8 @@ export default function Home() {
         </aside>
       </main>
 
-      <section className="mx-auto max-w-7xl px-4 pb-10">
-        <div className="grid md:grid-cols-3 gap-6">
+      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
             <article key={i} className="card p-4">
               <div className="aspect-[4/3] rounded-xl bg-slate-100 mb-3" />
@@ -60,12 +60,12 @@ export default function Home() {
         </div>
       </section>
       <footer className="bg-white border-t border-slate-200">
-        <div className="mx-auto max-w-7xl px-4 py-8 grid md:grid-cols-2 gap-6 items-center">
-          <div>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-2 gap-6 items-center">
+          <div className="text-center md:text-left">
             <div className="text-lg font-semibold">Suscríbete al boletín</div>
             <p className="text-sm text-slate-600">Recibe lo más importante cada mañana.</p>
           </div>
-          <form className="flex gap-2">
+          <form className="flex flex-col sm:flex-row gap-2">
             <input type="email" placeholder="tu@correo.com" className="input flex-1" />
             <button className="btn btn-primary">Suscribirme</button>
           </form>
