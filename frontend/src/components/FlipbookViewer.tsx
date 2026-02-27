@@ -63,8 +63,12 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
 
   // Load PDF.js worker dynamically
   useEffect(() => {
-    // Using a reliable CDN for the worker to avoid Vite build/dynamic import issues in production
-    GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
+    // We import the standard JS worker instead of MJS or CDN to avoid tracking prevention and Nginx MIME type issues.
+    import('pdfjs-dist/build/pdf.worker.min.js?url').then(workerModule => {
+      GlobalWorkerOptions.workerSrc = workerModule.default
+    }).catch(err => {
+      console.error('Failed to load PDF.js worker:', err)
+    })
   }, [])
 
 
