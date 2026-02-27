@@ -5,8 +5,11 @@ import * as pdfjs from 'pdfjs-dist'
 const { GlobalWorkerOptions, getDocument } = pdfjs
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut, Grid, X, Loader2 } from 'lucide-react'
 
-// Worker will be loaded dynamically when component mounts
+// Import worker as a static URL for Vite to process
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url'
 
+// Set worker source immediately
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 type Props = {
   src: string
   minHeight?: number
@@ -61,16 +64,7 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
     }
   }, [src])
 
-  // Load PDF.js worker dynamically
-  useEffect(() => {
-    // We import the standard JS worker instead of MJS or CDN to avoid tracking prevention and Nginx MIME type issues.
-    import('pdfjs-dist/build/pdf.worker.min.js?url').then(workerModule => {
-      GlobalWorkerOptions.workerSrc = workerModule.default
-    }).catch(err => {
-      console.error('Failed to load PDF.js worker:', err)
-    })
-  }, [])
-
+  // Worker is now loaded statically at the top of the file to prevent timing issues
 
   function cloneBuffer(buf: ArrayBuffer): ArrayBuffer {
     const copy = new ArrayBuffer(buf.byteLength)

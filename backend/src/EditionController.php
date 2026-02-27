@@ -194,6 +194,13 @@ class EditionController {
     $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
     $ins = $pdo->prepare('INSERT OR IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
     foreach ($ids as $oid) { $ins->execute([$id,(int)$oid]); }
+    
+    // Also mark them as Publicada so they reflect correctly in the system
+    if (!empty($ids)) {
+        $inQuery = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)")->execute($ids);
+    }
+    
     $cnt = (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE edition_id='.(int)$id)->fetchColumn();
     $pdo->prepare('UPDATE editions SET orders_count=? WHERE id=?')->execute([$cnt,$id]);
     $pdo->commit();

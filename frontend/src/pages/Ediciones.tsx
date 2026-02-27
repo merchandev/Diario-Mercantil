@@ -344,10 +344,10 @@ export default function Ediciones() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-brand-800">Publicaciones seleccionadas ({detail.orders.length})</h3>
-                  <span className="text-xs text-slate-500">Solo se listan las publicaciones con estado Publicada</span>
+                  <span className="text-xs text-slate-500">Agrega o quita publicaciones de la edición</span>
                 </div>
                 <div className="max-h-96 overflow-auto border rounded-lg p-3 bg-white space-y-2">
-                  {allOrders.filter(o => o.status === 'Publicada').map(o => {
+                  {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
                     const checked = detail.orders.some(x => x.id === o.id)
                     const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                     return (
@@ -370,9 +370,9 @@ export default function Ediciones() {
                       </label>
                     )
                   })}
-                  {allOrders.filter(o => o.status === 'Publicada').length === 0 && (
+                  {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
                     <div className="text-center py-8 text-slate-500">
-                      No hay publicaciones publicadas disponibles.
+                      No hay publicaciones disponibles.
                     </div>
                   )}
                 </div>
