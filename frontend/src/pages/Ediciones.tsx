@@ -147,12 +147,12 @@ export default function Ediciones() {
 
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <div className="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
-              <span className="block text-sm font-semibold text-slate-700">1. Seleccionar Publicaciones ("Verificada")</span>
+              <span className="block text-sm font-semibold text-slate-700">1. Seleccionar Publicaciones</span>
               <span className="text-xs font-medium px-2.5 py-1 bg-brand-100 text-brand-700 rounded-full">{form.selectedOrders.length} seleccionadas</span>
             </div>
             <div className="p-3 bg-white">
               <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {allOrders.filter(o => o.status === 'Verificada').map(o => {
+                {allOrders.filter(o => ['Verificada', 'Aprobado', 'Publicada'].includes(o.status)).map(o => {
                   const isSelected = form.selectedOrders.includes(o.id)
                   const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                   return (
@@ -180,10 +180,10 @@ export default function Ediciones() {
                     </label>
                   )
                 })}
-                {allOrders.filter(o => o.status === 'Verificada').length === 0 && (
+                {allOrders.filter(o => ['Verificada', 'Aprobado', 'Publicada'].includes(o.status)).length === 0 && (
                   <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                     <div className="text-3xl mb-2 opacity-50">📄</div>
-                    <p className="text-sm font-medium">No hay publicaciones pendientes</p>
+                    <p className="text-sm font-medium">No hay publicaciones disponibles</p>
                     <p className="text-xs mt-1">Todas las órdenes aprobadas ya han sido publicadas o no hay solicitudes nuevas.</p>
                   </div>
                 )}

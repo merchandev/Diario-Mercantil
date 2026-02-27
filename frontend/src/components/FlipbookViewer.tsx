@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import HTMLFlipBook from 'react-pageflip'
 import { fetchAuth } from '../lib/api'
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist'
+import * as pdfjs from 'pdfjs-dist'
+const { GlobalWorkerOptions, getDocument } = pdfjs
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut, Grid, X, Loader2 } from 'lucide-react'
 
 // Worker will be loaded dynamically when component mounts
@@ -62,15 +63,8 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
 
   // Load PDF.js worker dynamically
   useEffect(() => {
-    const loadWorker = async () => {
-      try {
-        const workerModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-        GlobalWorkerOptions.workerSrc = workerModule.default as string
-      } catch (err) {
-        console.error('Failed to load PDF.js worker:', err)
-      }
-    }
-    loadWorker()
+    // Using a reliable CDN for the worker to avoid Vite build/dynamic import issues in production
+    GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`
   }, [])
 
 
