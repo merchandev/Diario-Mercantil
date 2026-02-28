@@ -241,8 +241,8 @@ class SystemController {
             $pdo->prepare("INSERT INTO settings(`key`, `value`) VALUES('price_per_folio_usd', '1.5') ON DUPLICATE KEY UPDATE `key`=`key`")->execute();
             $log[] = "Setting price_per_folio_usd verificado.";
 
-            $stmt = $pdo->prepare("INSERT INTO users (document, name, password_hash, role, phone, email, person_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute(['merchandev', 'Super Admin', $hash, 'admin', '000000', 'admin@sys.com', 'juridica', $now, $now]);
+            $stmt = $pdo->prepare("INSERT INTO users (document, name, password_hash, role, phone, email, person_type, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute(['merchandev', 'Super Admin', $hash, 'admin', '000000', 'admin@sys.com', 'juridica', 'active', $now, $now]);
             $log[] = "Usuario merchandev reiniciado correntamente.";
 
             Response::json(["status"=>"FIX_APPLIED", "log"=>$log]);
