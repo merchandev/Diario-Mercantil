@@ -211,11 +211,15 @@ class SystemController {
                 $log[] = "Columna usuario agregada: $col";
             }
 
-            // 2. Repair Files (Add path)
+            // 2. Repair Files (Add path and deleted_at)
             $colsF = $pdo->query("DESCRIBE files")->fetchAll(PDO::FETCH_COLUMN);
             if (!in_array('path', $colsF)) {
                 $pdo->exec("ALTER TABLE files ADD COLUMN path VARCHAR(255) NULL");
                 $log[] = "Columna files.path agregada.";
+            }
+            if (!in_array('deleted_at', $colsF)) {
+                $pdo->exec("ALTER TABLE files ADD COLUMN deleted_at DATETIME NULL");
+                $log[] = "Columna files.deleted_at agregada.";
             }
 
             // 3. Repair Tokens
