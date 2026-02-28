@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import FlipbookViewer from '../components/FlipbookViewer'
+import MagazineViewer from '../components/MagazineViewer'
 
 type EditionDetail = {
   code: string
@@ -85,7 +85,7 @@ export default function VisorEspressivoPDF() {
           {edition?.file_id ? (
             <div className="space-y-3">
               <div className="relative">
-                <FlipbookViewer src={pdfUrl} height={620} />
+                <MagazineViewer src={pdfUrl} />
               </div>
               <div className="flex flex-wrap items-center justify-between mt-4">
                 <div className="flex flex-wrap gap-2 text-xs text-slate-300">

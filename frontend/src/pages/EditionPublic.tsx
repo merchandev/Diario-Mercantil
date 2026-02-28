@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
+import MagazineViewer from '../components/MagazineViewer'
 
 type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null }
 type Order = { id: number; name: string; document: string; status: string; date: string }
@@ -28,7 +29,7 @@ export default function EditionPublic() {
     <div className="max-w-6xl mx-auto p-6 space-y-4">
       <div className="card p-4">
         {edition.file_id ? (
-          <ProtectedPdfViewer src={pdfUrl} height={640} />
+          <MagazineViewer src={pdfUrl} />
         ) : (
           <div className="p-6 text-sm text-slate-600">Esta edicion aun no tiene un PDF disponible.</div>
         )}
