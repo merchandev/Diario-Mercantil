@@ -140,7 +140,7 @@ export default function Ediciones() {
           <p className="text-sm text-slate-600 mt-1">Configura la fecha, número de edición, sube el PDF y selecciona las publicaciones a incluir.</p>
         </div>
 
-        <form onSubmit={onCreate} className="p-5 space-y-6 bg-white">
+        <div className="p-5 space-y-6 bg-white">
           <div className="grid md:grid-cols-3 gap-6">
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de Publicación</span>
@@ -252,13 +252,13 @@ export default function Ediciones() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button type="submit" className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf || form.selectedOrders.length === 0}>
+                <button type="button" onClick={onCreate} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf || form.selectedOrders.length === 0}>
                   {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición</span></>)}
                 </button>
               </div>
             </>
           )}
-        </form>
+        </div>
       </div>
 
       <div className="card shadow-sm border border-slate-200 overflow-hidden">

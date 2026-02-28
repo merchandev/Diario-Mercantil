@@ -131,8 +131,8 @@ class EditionController {
 
     // Auto-generate edition number and code (Format: dm-e-<edition_no>-<date>)
     $dateObj = new DateTime($date);
-    $dateStr = $dateObj->format('y-m-d'); // Short year to prevent extra long string
-    $dateStrNum = $dateObj->format('dmy');
+    $dateStr = $dateObj->format('Y-m-d');
+    $dateStrNum = $dateObj->format('dmY'); // Use full year Y (e.g., 2026 instead of 26)
     $code = "dm{$edition_no}{$dateStrNum}";
 
     $fileId = isset($input['file_id']) ? (int)$input['file_id'] : null;
