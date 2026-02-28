@@ -8,15 +8,25 @@ class FileController {
     $pdo = Database::pdo();
     $q = $_GET['q'] ?? '';
     $status = $_GET['status'] ?? '';
-    // SQLite/MySQL compat: if deleted_at doesn't exist yet or is null
-    $sql = 'SELECT * FROM files WHERE (deleted_at IS NULL OR deleted_at = "")';
+    
     $params = [];
-    if ($q !== '') { $sql .= ' AND name LIKE ?'; $params[] = "%$q%"; }
-    if ($status !== '') { $sql .= ' AND status = ?'; $params[] = $status; }
-    $sql .= ' ORDER BY id DESC LIMIT 200';
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-    Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $baseSql = 'FROM files WHERE 1=1';
+    
+    if ($q !== '') { $baseSql .= ' AND name LIKE ?'; $params[] = "%$q%"; }
+    if ($status !== '') { $baseSql .= ' AND status = ?'; $params[] = $status; }
+    
+    try {
+        $sql = "SELECT * $baseSql AND (deleted_at IS NULL OR deleted_at = '') ORDER BY id DESC LIMIT 200";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Exception $e) {
+        // Fallback if deleted_at column does not exist yet
+        $sqlFallback = "SELECT * $baseSql ORDER BY id DESC LIMIT 200";
+        $stmt = $pdo->prepare($sqlFallback);
+        $stmt->execute($params);
+        Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    }
   }
 
   public function get($id) {
