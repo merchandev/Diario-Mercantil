@@ -96,12 +96,12 @@ export default function Configuracion() {
         {tab === 'Directorio Legal' && (
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <div className="flex items-center justify-between mb-2"><div className="font-medium">Áreas de Ejercicio Profesional</div>
-                <div className="flex gap-2">
-                  <button className="btn btn-outline" onClick={() => {
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2"><div className="font-medium">Áreas de Ejercicio Profesional</div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={() => {
                     const sel = (document.getElementById('areas-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (!id) return; const cur = areas.find(a => a.id === id); const name = prompt('Modificar área', cur?.name || ''); if (name && name.trim()) updateDirArea(id, name.trim()).then(loadDir)
                   }}>Modificar</button>
-                  <button className="btn btn-primary" onClick={() => { const name = prompt('Nueva área'); if (name && name.trim()) createDirArea(name.trim()).then(loadDir) }}>Nueva Área</button>
+                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={() => { const name = prompt('Nueva área'); if (name && name.trim()) createDirArea(name.trim()).then(loadDir) }}>Nueva Área</button>
                 </div>
               </div>
               <select id="areas-list" multiple className="w-full h-64 border rounded p-2" size={12}>
@@ -110,12 +110,12 @@ export default function Configuracion() {
               <div className="mt-2 text-right"><button className="text-rose-700 hover:underline" onClick={() => { const sel = (document.getElementById('areas-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (id && confirm('¿Eliminar área?')) deleteDirArea(id).then(loadDir) }}>Eliminar</button></div>
             </div>
             <div>
-              <div className="flex items-center justify-between mb-2"><div className="font-medium">Colegios</div>
-                <div className="flex gap-2">
-                  <button className="btn btn-outline" onClick={() => {
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2"><div className="font-medium">Colegios</div>
+                <div className="flex flex-wrap gap-2">
+                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={() => {
                     const sel = (document.getElementById('colegios-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (!id) return; const cur = colleges.find(c => c.id === id); const name = prompt('Modificar colegio', cur?.name || ''); if (name && name.trim()) updateDirCollege(id, name.trim()).then(loadDir)
                   }}>Modificar</button>
-                  <button className="btn btn-primary" onClick={() => { const name = prompt('Nuevo colegio'); if (name && name.trim()) createDirCollege(name.trim()).then(loadDir) }}>Nuevo Colegio</button>
+                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={() => { const name = prompt('Nuevo colegio'); if (name && name.trim()) createDirCollege(name.trim()).then(loadDir) }}>Nuevo Colegio</button>
                 </div>
               </div>
               <select id="colegios-list" multiple className="w-full h-64 border rounded p-2" size={12}>

@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import StatusPill from './StatusPill'
 
-export default function FileTable({rows}:{rows:any[]}){
+export default function FileTable({ rows }: { rows: any[] }) {
   return (
-    <div className="overflow-auto card">
-      <table className="min-w-full text-sm">
+    <div className="card overflow-x-auto pb-2 pt-1">
+      <table className="min-w-[600px] w-full text-left text-sm">
         <thead className="bg-slate-50">
           <tr>
             <th className="text-left p-3">Nombre</th>
@@ -16,12 +16,12 @@ export default function FileTable({rows}:{rows:any[]}){
           </tr>
         </thead>
         <tbody>
-          {rows.map(r=> (
+          {rows.map(r => (
             <tr key={r.id} className="border-t">
               <td className="p-3">{r.name}</td>
-              <td className="p-3">{(r.size/1024/1024).toFixed(2)} MB</td>
+              <td className="p-3">{(r.size / 1024 / 1024).toFixed(2)} MB</td>
               <td className="p-3 uppercase">{r.type}</td>
-              <td className="p-3"><StatusPill status={r.status}/></td>
+              <td className="p-3"><StatusPill status={r.status} /></td>
               <td className="p-3">{new Date(r.created_at).toLocaleString()}</td>
               <td className="p-3">
                 <Link className="btn btn-ghost" to={`/files/${r.id}`}>Ver</Link>

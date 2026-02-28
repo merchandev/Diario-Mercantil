@@ -88,7 +88,7 @@ export default function Promo() {
                             <h3 className="text-lg font-medium text-brand-900 mb-1">{info.label}</h3>
                             <p className="text-sm text-slate-500 mb-4">{info.description}</p>
 
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <button
                                     onClick={() => openModal(key)}
                                     className="btn btn-outline"

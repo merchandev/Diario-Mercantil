@@ -184,8 +184,9 @@ export default function App() {
                 />
                 <div className={`grid grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                   <Topbar onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
-                  <main className="p-6 space-y-6">
-                    <Routes>
+                  <main className="p-4 md:p-6 w-full overflow-x-hidden md:overflow-visible relative">
+                    <div className="mx-auto w-full max-w-6xl space-y-4 md:space-y-6">
+                      <Routes>
                       <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
                       <Route path="ediciones" element={<RequireAdmin><LazyRoute><Ediciones /></LazyRoute></RequireAdmin>} />
                       <Route path="publicaciones" element={<RequireAdmin><LazyRoute><Publicaciones /></LazyRoute></RequireAdmin>} />
@@ -210,6 +211,7 @@ export default function App() {
                       <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
+                    </div>
                   </main>
                 </div>
                 <PublishChoiceModal open={showPublishModal} onClose={() => setShowPublishModal(false)} />

@@ -212,8 +212,8 @@ export default function Ediciones() {
         <div className="bg-slate-50 px-5 py-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800">Historial de Ediciones</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
+        <div className="overflow-x-auto pb-2">
+          <table className="min-w-[800px] w-full text-left text-sm">
             <thead>
               <tr className="bg-brand-800 text-white">
                 <th className="text-left px-4 py-2">Codigo</th>

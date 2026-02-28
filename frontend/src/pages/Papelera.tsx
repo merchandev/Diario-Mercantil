@@ -7,7 +7,7 @@ export default function Papelera() {
   const [items, setItems] = useState<LegalRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [confirmDialog, setConfirmDialog] = useState<{isOpen:boolean; title:string; message:string; variant:'danger'|'warning'|'info'; onConfirm:()=>void}>({isOpen:false, title:'', message:'', variant:'info', onConfirm:()=>{}})
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'danger' | 'warning' | 'info'; onConfirm: () => void }>({ isOpen: false, title: '', message: '', variant: 'info', onConfirm: () => { } })
 
   const loadTrash = async () => {
     setLoading(true)
@@ -31,7 +31,7 @@ export default function Papelera() {
       title: 'Restaurar publicación',
       message: '¿Restaurar esta publicación?',
       variant: 'info',
-      onConfirm: async()=>{
+      onConfirm: async () => {
         try {
           await restoreLegal(id)
           loadTrash()
@@ -49,7 +49,7 @@ export default function Papelera() {
       title: 'Eliminar permanentemente',
       message: '⚠️ ADVERTENCIA: Esta acción eliminará permanentemente la publicación y NO se puede deshacer.\n\n¿Estás seguro de que deseas continuar?',
       variant: 'danger',
-      onConfirm: async()=>{
+      onConfirm: async () => {
         try {
           await permanentDeleteLegal(id)
           loadTrash()
@@ -67,7 +67,7 @@ export default function Papelera() {
       title: 'Vaciar papelera',
       message: `⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${items.length} publicación(es) de la papelera y NO se puede deshacer.\n\n¿Estás completamente seguro?`,
       variant: 'danger',
-      onConfirm: async()=>{
+      onConfirm: async () => {
         try {
           const r = await emptyTrash()
           alert(r.message || `Se eliminaron ${r.count} publicaciones`)
@@ -87,7 +87,7 @@ export default function Papelera() {
       title: 'Eliminar seleccionadas',
       message: `⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${selected.size} publicación(es) y NO se puede deshacer.\n\n¿Estás seguro?`,
       variant: 'danger',
-      onConfirm: async()=>{
+      onConfirm: async () => {
         try {
           for (const id of Array.from(selected)) {
             await permanentDeleteLegal(id)
@@ -142,21 +142,21 @@ export default function Papelera() {
 
   return (
     <section className="space-y-4">
-      <ConfirmDialog {...confirmDialog} onCancel={()=> setConfirmDialog({...confirmDialog, isOpen:false})} />
-      <div className="flex items-center justify-between">
+      <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold flex items-center gap-2">
             <IconTrash className="w-6 h-6" />
             Papelera de reciclaje
           </h1>
           <p className="text-sm text-slate-600 mt-1">
-            Las publicaciones se eliminarán automáticamente después de 30 días
+            Las publicaciones se eliminan después de 30 días
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {selected.size > 0 && (
             <button
-              className="btn bg-red-600 text-white hover:bg-red-700"
+              className="btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto mt-2 sm:mt-0"
               onClick={handleDeleteSelected}
             >
               Eliminar seleccionadas ({selected.size})
@@ -164,7 +164,7 @@ export default function Papelera() {
           )}
           {items.length > 0 && (
             <button
-              className="btn bg-red-700 text-white hover:bg-red-800"
+              className="btn bg-red-700 text-white hover:bg-red-800 w-full sm:w-auto mt-2 sm:mt-0"
               onClick={handleEmptyTrash}
             >
               🗑️ Vaciar papelera ({items.length})
@@ -189,8 +189,8 @@ export default function Papelera() {
       )}
 
       {!loading && items.length > 0 && (
-        <div className="card overflow-auto">
-          <table className="min-w-full text-sm">
+        <div className="card overflow-x-auto pb-2 pt-1">
+          <table className="min-w-[800px] w-full text-left text-sm">
             <thead>
               <tr className="bg-brand-800 text-white">
                 <th className="px-4 py-2">

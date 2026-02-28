@@ -122,27 +122,38 @@ export default function Publicaciones() {
           <strong>Error:</strong> {error}
         </div>
       )}
-      <div className="card p-3 grid md:grid-cols-4 gap-3">
+      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="relative">
           <span className="absolute inset-y-0 left-3 grid place-items-center text-slate-400 w-5"><IconSearch /></span>
-          <input className="input pl-9" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
+          <input className="input pl-9 w-full" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
         </div>
-        <select className="input" value={status} onChange={e => setStatus(e.target.value)}>
+        <select className="input w-full" value={status} onChange={e => setStatus(e.target.value)}>
           {estOpts.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
-        <input className="input" type="date" value={reqFrom} onChange={e => setReqFrom(e.target.value)} placeholder="Fecha de solicitud (desde)" />
-        <input className="input" type="date" value={reqTo} onChange={e => setReqTo(e.target.value)} placeholder="Fecha de solicitud (hasta)" />
-        <input className="input" type="date" value={pubFrom} onChange={e => setPubFrom(e.target.value)} placeholder="Fecha de publicación (desde)" />
-        <input className="input" type="date" value={pubTo} onChange={e => setPubTo(e.target.value)} placeholder="Fecha de publicación (hasta)" />
-        <div className="md:col-span-4 flex gap-2">
-          <button className="btn btn-primary inline-flex items-center gap-2" onClick={reload} disabled={loading}>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">Solicitud desde</span>
+          <input className="input w-full" type="date" value={reqFrom} onChange={e => setReqFrom(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">Solicitud hasta</span>
+          <input className="input w-full" type="date" value={reqTo} onChange={e => setReqTo(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">Publicación desde</span>
+          <input className="input w-full" type="date" value={pubFrom} onChange={e => setPubFrom(e.target.value)} />
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-500 font-medium">Publicación hasta</span>
+          <input className="input w-full" type="date" value={pubTo} onChange={e => setPubTo(e.target.value)} />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-4 flex gap-2 mt-2">
+          <button className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2" onClick={reload} disabled={loading}>
             {loading ? <span className="animate-spin">⏳</span> : <IconSearch />}
             <span>{loading ? 'Cargando...' : 'Filtrar'}</span>
           </button>
-          {/* Botón de 'Limpiar' retirado a petición: evita confusión con borrar registros */}
         </div>
       </div>
-      <div className="card overflow-auto">
+      <div className="card overflow-x-auto pb-2 pt-1">
         {loading && (
           <div className="p-8 text-center text-slate-500">
             <div className="animate-spin inline-block w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full mb-2"></div>
@@ -155,7 +166,7 @@ export default function Publicaciones() {
           </div>
         )}
         {!loading && rows.length > 0 && (
-          <table className="min-w-full text-sm">
+          <table className="min-w-[800px] w-full text-left text-sm">
             <thead>
               <tr className="bg-brand-800 text-white">
                 <th className="text-left px-4 py-2">N° de orden</th>
@@ -202,63 +213,65 @@ export default function Publicaciones() {
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
-            <div>
+            <div className="overflow-hidden">
               <h3 className="font-semibold mb-2">Historial de Pagos</h3>
-              <table className="min-w-full text-sm border">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="text-left px-2 py-1">Ref.</th>
-                    <th className="text-left px-2 py-1">Fecha</th>
-                    <th className="text-left px-2 py-1">Banco</th>
-                    <th className="text-left px-2 py-1">Tipo</th>
-                    <th className="text-left px-2 py-1">Monto (Bs.)</th>
-                    <th className="text-left px-2 py-1">Estado</th>
-                    <th className="text-right px-2 py-1">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map(p => (
-                    <tr key={p.id} className="border-t">
-                      <td className="px-2 py-1">{p.ref}</td>
-                      <td className="px-2 py-1">{p.date}</td>
-                      <td className="px-2 py-1">{p.bank}</td>
-                      <td className="px-2 py-1">{p.type}</td>
-                      <td className="px-2 py-1">{Number(p.amount_bs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="px-2 py-1">{p.status}</td>
-                      <td className="px-2 py-1 text-right"><button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => {
-                        setConfirmDialog({
-                          isOpen: true,
-                          title: 'Eliminar pago',
-                          message: '¿Eliminar este pago?',
-                          variant: 'danger',
-                          onConfirm: async () => {
-                            await deleteLegalPayment(sel.id, p.id)
-                            const d = await getLegal(sel.id)
-                            setSel(d.item)
-                            setPayments(d.payments)
-                          }
-                        })
-                      }}><IconTrash /> <span>Eliminar</span></button></td>
+              <div className="overflow-x-auto pb-2">
+                <table className="min-w-[800px] w-full text-left text-sm border">
+                  <thead>
+                    <tr className="bg-gray-100">
+                      <th className="text-left px-2 py-1">Ref.</th>
+                      <th className="text-left px-2 py-1">Fecha</th>
+                      <th className="text-left px-2 py-1">Banco</th>
+                      <th className="text-left px-2 py-1">Tipo</th>
+                      <th className="text-left px-2 py-1">Monto (Bs.)</th>
+                      <th className="text-left px-2 py-1">Estado</th>
+                      <th className="text-right px-2 py-1">Acciones</th>
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t">
-                    <td className="px-2 py-1 font-semibold" colSpan={4}>Total pagado</td>
-                    <td className="px-2 py-1 font-semibold">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tfoot>
-              </table>
-              <form onSubmit={onAddPayment} className="mt-3 grid md:grid-cols-3 gap-2 items-end">
-                <input className="input" name="ref" placeholder="Ref." />
-                <input className="input" type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} />
-                <input className="input" name="bank" placeholder="Banco" />
-                <input className="input" name="type" placeholder="Tipo" />
-                <input className="input" name="amount_bs" type="number" step="0.01" placeholder="Monto Bs." />
-                <select className="input" name="pstatus" defaultValue="Verificado"><option>Verificado</option><option>Pendiente</option></select>
-                <input className="input md:col-span-3" name="comment" placeholder="Comentario (opcional)" />
-                <button className="btn btn-primary md:col-span-3 inline-flex items-center gap-2"><IconPlus /> <span>Agregar pago</span></button>
+                  </thead>
+                  <tbody>
+                    {payments.map(p => (
+                      <tr key={p.id} className="border-t">
+                        <td className="px-2 py-1">{p.ref}</td>
+                        <td className="px-2 py-1">{p.date}</td>
+                        <td className="px-2 py-1">{p.bank}</td>
+                        <td className="px-2 py-1">{p.type}</td>
+                        <td className="px-2 py-1">{Number(p.amount_bs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="px-2 py-1">{p.status}</td>
+                        <td className="px-2 py-1 text-right"><button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => {
+                          setConfirmDialog({
+                            isOpen: true,
+                            title: 'Eliminar pago',
+                            message: '¿Eliminar este pago?',
+                            variant: 'danger',
+                            onConfirm: async () => {
+                              await deleteLegalPayment(sel.id, p.id)
+                              const d = await getLegal(sel.id)
+                              setSel(d.item)
+                              setPayments(d.payments)
+                            }
+                          })
+                        }}><IconTrash /> <span>Eliminar</span></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t">
+                      <td className="px-2 py-1 font-semibold" colSpan={4}>Total pagado</td>
+                      <td className="px-2 py-1 font-semibold">{totalPaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <form onSubmit={onAddPayment} className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
+                <input className="input w-full" name="ref" placeholder="Ref." />
+                <input className="input w-full" type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} />
+                <input className="input w-full" name="bank" placeholder="Banco" />
+                <input className="input w-full" name="type" placeholder="Tipo" />
+                <input className="input w-full" name="amount_bs" type="number" step="0.01" placeholder="Monto Bs." />
+                <select className="input w-full" name="pstatus" defaultValue="Verificado"><option>Verificado</option><option>Pendiente</option></select>
+                <input className="input w-full sm:col-span-2 md:col-span-3" name="comment" placeholder="Comentario (opcional)" />
+                <button className="btn btn-primary w-full sm:col-span-2 md:col-span-3 inline-flex items-center justify-center gap-2"><IconPlus /> <span>Agregar pago</span></button>
               </form>
             </div>
             <div>

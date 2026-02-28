@@ -75,8 +75,8 @@ export default function Historial() {
       {!loading && rows.length > 0 && (
         <>
           <p className="text-sm text-slate-700">Estimado(a) usuario: En este apartado podrá consultar el resumen de todas sus publicaciones gestionadas en el sistema, ya sean documentos o convocatorias. Aquí puede visualizar: el número de la orden de servicio, tipo de publicación, razón social asociada, fecha de solicitud y fecha de publicación; detalles de la solicitud, incluyendo los documentos enviados y los datos del pago registrado; estado actual y, cuando corresponda, descargar la edición.</p>
-          <div className="card overflow-auto">
-            <table className="min-w-full text-sm">
+          <div className="card overflow-x-auto pb-2 pt-1">
+            <table className="min-w-[800px] w-full text-left text-sm">
               <thead>
                 <tr className="bg-brand-800 text-white">
                   <th className="text-left px-4 py-2">N° de orden</th>

@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { listEditions, type Edition } from '../lib/api'
 import { Link } from 'react-router-dom'
 
-export default function EdicionesPublic(){
+export default function EdicionesPublic() {
   const [rows, setRows] = useState<Edition[]>([])
   const [q, setQ] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const load = async()=>{
+  const load = async () => {
     setLoading(true)
     try {
       const r = await listEditions()
@@ -20,26 +20,26 @@ export default function EdicionesPublic(){
       setLoading(false)
     }
   }
-  useEffect(()=>{ load() },[])
+  useEffect(() => { load() }, [])
 
-  const filtered = useMemo(()=>{
+  const filtered = useMemo(() => {
     const fFrom = from ? new Date(from) : null
     const fTo = to ? new Date(to) : null
     return [...rows]
-      .filter(ed=>{
-        const t = (String(ed.code||'') + ' ' + String(ed.edition_no||'') + ' ' + String(ed.status||'')).toLowerCase()
+      .filter(ed => {
+        const t = (String(ed.code || '') + ' ' + String(ed.edition_no || '') + ' ' + String(ed.status || '')).toLowerCase()
         if (q && !t.includes(q.toLowerCase())) return false
         const d = ed.date ? new Date(ed.date) : (ed.created_at ? new Date(ed.created_at) : null)
         if (fFrom && d && d < fFrom) return false
-        if (fTo && d && d > new Date(new Date(to).getTime()+24*60*60*1000-1)) return false
+        if (fTo && d && d > new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1)) return false
         return true
       })
-      .sort((a,b)=>{
+      .sort((a, b) => {
         const da = a.date ? new Date(a.date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0)
         const db = b.date ? new Date(b.date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0)
         return db - da
       })
-  }, [rows,q,from,to])
+  }, [rows, q, from, to])
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -49,27 +49,27 @@ export default function EdicionesPublic(){
 
         <div className="card p-4 grid md:grid-cols-[1fr,auto,auto,auto] gap-3 items-end">
           <label className="text-sm">Buscar
-            <input className="input w-full mt-1" placeholder="Codigo, numero o estado" value={q} onChange={e=>setQ(e.target.value)} />
+            <input className="input w-full mt-1" placeholder="Codigo, numero o estado" value={q} onChange={e => setQ(e.target.value)} />
           </label>
           <label className="text-sm">Desde
-            <input type="date" className="input mt-1" value={from} onChange={e=>setFrom(e.target.value)} />
+            <input type="date" className="input mt-1" value={from} onChange={e => setFrom(e.target.value)} />
           </label>
           <label className="text-sm">Hasta
-            <input type="date" className="input mt-1" value={to} onChange={e=>setTo(e.target.value)} />
+            <input type="date" className="input mt-1" value={to} onChange={e => setTo(e.target.value)} />
           </label>
           <div className="flex gap-2">
             <button onClick={load} className="btn btn-outline">Actualizar</button>
-            <button onClick={()=>{setQ(''); setFrom(''); setTo('')}} className="btn btn-ghost">Limpiar</button>
+            <button onClick={() => { setQ(''); setFrom(''); setTo('') }} className="btn btn-ghost">Limpiar</button>
           </div>
         </div>
 
-        <div className="card overflow-auto">
+        <div className="card overflow-x-auto pb-2 pt-1">
           {loading ? (
             <div className="p-6 text-sm text-slate-600">Cargando...</div>
-          ) : filtered.length===0 ? (
+          ) : filtered.length === 0 ? (
             <div className="p-6 text-sm text-slate-600">No hay ediciones para mostrar.</div>
           ) : (
-            <table className="min-w-full text-sm">
+            <table className="min-w-[800px] w-full text-left text-sm">
               <thead>
                 <tr className="text-left border-b">
                   <th className="p-3">Fecha</th>
@@ -80,16 +80,16 @@ export default function EdicionesPublic(){
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((ed:any)=>{
+                {filtered.map((ed: any) => {
                   const dateTxt = ed.date || ed.created_at
                   const pdfUrl = ed.file_url || (ed.code ? `/api/e/${encodeURIComponent(ed.code)}/download` : '')
                   const hasPdf = Boolean(ed.file_id || ed.file_url)
                   return (
-                    <tr key={ed.id||ed.code} className="border-b last:border-0">
+                    <tr key={ed.id || ed.code} className="border-b last:border-0">
                       <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
                       <td className="p-3">{ed.edition_no ? `Nro ${ed.edition_no}` : '-'}</td>
-                      <td className="p-3 font-mono">{ed.code||'-'}</td>
-                      <td className="p-3">{ed.status||'-'}</td>
+                      <td className="p-3 font-mono">{ed.code || '-'}</td>
+                      <td className="p-3">{ed.status || '-'}</td>
                       <td className="p-3">
                         <div className="flex items-center justify-end gap-2">
                           {ed.code && <Link className="btn btn-outline h-9 text-xs" to={`/edicion/${encodeURIComponent(ed.code)}`}>Ver en linea</Link>}

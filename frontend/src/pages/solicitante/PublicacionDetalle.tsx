@@ -121,10 +121,10 @@ export default function PublicacionDetalleSolicitante() {
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Estado</label>
                 <span className={`pill ${req.status === 'Publicada' ? 'bg-green-100 text-green-700' :
-                    req.status === 'En trámite' ? 'bg-blue-100 text-blue-700' :
-                      req.status === 'Por verificar' ? 'bg-yellow-100 text-yellow-700' :
-                        req.status === 'Rechazado' ? 'bg-red-100 text-red-700' :
-                          'bg-slate-100 text-slate-700'
+                  req.status === 'En trámite' ? 'bg-blue-100 text-blue-700' :
+                    req.status === 'Por verificar' ? 'bg-yellow-100 text-yellow-700' :
+                      req.status === 'Rechazado' ? 'bg-red-100 text-red-700' :
+                        'bg-slate-100 text-slate-700'
                   }`}>
                   {req.status}
                 </span>
@@ -247,8 +247,8 @@ export default function PublicacionDetalleSolicitante() {
               <p className="text-slate-500 text-center py-4">No hay pagos registrados</p>
             ) : (
               <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
+                <div className="overflow-x-auto pb-2">
+                  <table className="min-w-[800px] w-full text-left text-sm">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2">Referencia</th>

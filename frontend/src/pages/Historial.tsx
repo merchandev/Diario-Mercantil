@@ -76,8 +76,8 @@ export default function Historial() {
           {rows.length === 0 ? (
             <EmptyState message="No se encontraron publicaciones que coincidan con los criterios de búsqueda." />
           ) : (
-            <div className="card overflow-auto">
-              <table className="min-w-full text-sm">
+            <div className="card overflow-x-auto pb-2 pt-1">
+              <table className="min-w-[800px] w-full text-left text-sm">
                 <thead>
                   <tr className="bg-brand-800 text-white">
                     <th className="text-left px-4 py-2">N° de orden</th>

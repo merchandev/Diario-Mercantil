@@ -137,8 +137,8 @@ export default function Users() {
 
                 {/* Users List */}
                 <div className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 rounded-2xl overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                    <div className="overflow-x-auto pb-2">
+                        <table className="min-w-[800px] w-full text-left">
                             <thead className="bg-purple-500/10 border-b border-purple-500/20">
                                 <tr>
                                     <th className="px-6 py-4 text-purple-300 font-medium text-sm">Usuario</th>
