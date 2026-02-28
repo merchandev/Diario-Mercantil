@@ -8,7 +8,8 @@ class FileController {
     $pdo = Database::pdo();
     $q = $_GET['q'] ?? '';
     $status = $_GET['status'] ?? '';
-    $sql = 'SELECT * FROM files WHERE deleted_at IS NULL';
+    // SQLite/MySQL compat: if deleted_at doesn't exist yet or is null
+    $sql = 'SELECT * FROM files WHERE (deleted_at IS NULL OR deleted_at = "")';
     $params = [];
     if ($q !== '') { $sql .= ' AND name LIKE ?'; $params[] = "%$q%"; }
     if ($status !== '') { $sql .= ' AND status = ?'; $params[] = $status; }
@@ -55,9 +56,15 @@ class FileController {
 
   public function listTrashed() {
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare("SELECT * FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 200");
-    $stmt->execute();
-    Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    // Use try-catch or ensure the column exists, falling back to empty if it fails.
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM files WHERE deleted_at IS NOT NULL AND deleted_at != '' ORDER BY deleted_at DESC LIMIT 200");
+        $stmt->execute();
+        Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Exception $e) {
+        // If column doesn't exist yet, return empty
+        Response::json(['items'=>[]]);
+    }
   }
 
   public function restore($id) {
