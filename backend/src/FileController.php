@@ -212,4 +212,27 @@ class FileController {
     readfile($filePath);
     exit;
   }
+
+  // Serve Avatar content
+  public function serveAvatar($filename) {
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+    $uploadDir = realpath(__DIR__.'/..').'/storage/avatars';
+    $filePath = $uploadDir . '/' . basename($filename);
+
+    if (!file_exists($filePath)) {
+        http_response_code(404);
+        die(json_encode(['error' => 'Avatar not found']));
+    }
+
+    $mime = mime_content_type($filePath);
+    header('Content-Type: '.$mime);
+    header('Content-Length: ' . filesize($filePath));
+    header('Cache-Control: public, max-age=86400');
+    readfile($filePath);
+    exit;
+  }
 }

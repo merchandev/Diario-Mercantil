@@ -138,12 +138,16 @@ class UserController {
         $stmt->execute([$user['id']]);
         $lastUpdate = $stmt->fetchColumn();
         
-        if ($lastUpdate) {
-            $lastDate = new DateTime($lastUpdate);
-            $now = new DateTime();
-            $diff = $now->diff($lastDate);
-            if ($diff->y == 0 && $diff->m < 3) {
-                Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+        if (!empty($lastUpdate) && $lastUpdate !== '0000-00-00 00:00:00') {
+            try {
+                $lastDate = new DateTime($lastUpdate);
+                $now = new DateTime();
+                $diff = $now->diff($lastDate);
+                if ($diff->y == 0 && $diff->m < 3) {
+                    Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+                }
+            } catch (Exception $e) {
+                // Ignore parsing errors, assume allowed
             }
         }
 
@@ -191,7 +195,8 @@ class UserController {
     } catch (Throwable $e) {
         // Expose error msg specifically here
         http_response_code(500);
-        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        header('Content-Type: application/json');
+        echo json_encode(["error" => "server_error", "message" => $e->getMessage(), "trace" => $e->getTraceAsString()]);
         exit;
     }
   }
