@@ -146,14 +146,14 @@ export default function Ediciones() {
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de Publicación</span>
               <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
             </label>
-            <div className="mb-4">
-              <label className="block text-sm font-semibold mb-1 text-slate-700">Número de Edición</label>
+            <label className="block">
+              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Número de Edición</span>
               <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value={form.edition_no} title="El número de edición se genera automáticamente en orden consecutivo" />
-            </div>
+            </label>
 
             {!qrGenerated ? (
               <div className="flex items-end">
-                <button type="button" className="btn btn-primary w-full h-[42px] mb-[3px] shadow-sm select-none" onClick={() => {
+                <button type="button" className="btn btn-primary w-full h-[42px] shadow-sm select-none" onClick={() => {
                   const dateObj = new Date(form.date);
                   // Convert to user local time zone equivalent to get correct 'ddmmyy' string for the form context
                   const d = String(dateObj.getUTCDate()).padStart(2, '0');
