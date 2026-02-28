@@ -46,8 +46,9 @@ class EditionController {
 
   public function publicByCode($code){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT * FROM editions WHERE code=?');
-    $ed->execute([$code]);
+    // Allow matching exact or by date suffix (e.g. 28022026 matches dm328022026)
+    $ed = $pdo->prepare('SELECT * FROM editions WHERE code=? OR code LIKE ? ORDER BY id DESC LIMIT 1');
+    $ed->execute([$code, '%'.$code]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
     $edition['file_url'] = $edition['file_id'] ? '/api/e/'.urlencode((string)$edition['code']).'/download' : null;

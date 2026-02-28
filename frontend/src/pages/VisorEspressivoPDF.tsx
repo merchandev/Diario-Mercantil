@@ -25,7 +25,7 @@ export default function VisorEspressivoPDF() {
     }
     setLoading(true)
     setError('')
-    fetch(`/api/e/${encodeURIComponent(code)}`)
+    fetch(`/api/dm/e-${encodeURIComponent(code)}`)
       .then(async (res) => {
         if (!res.ok) {
           throw new Error(await res.text())
