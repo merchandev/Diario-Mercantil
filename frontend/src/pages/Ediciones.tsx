@@ -181,7 +181,7 @@ export default function Ediciones() {
             <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg flex flex-col items-center justify-center space-y-3 mb-6 animate-in fade-in slide-in-from-top-2">
               <h3 className="text-brand-800 font-semibold text-center">Código y QR Generados</h3>
               <div ref={newQrWrapRef} className="bg-white p-3 rounded-md shadow-sm border border-slate-100">
-                <QRCode value={`${location.origin}/dm/e-${generatedCode.replace(`dm${form.edition_no}`, '')}`} size={160} level="M" renderAs="canvas" />
+                <QRCode value={`${location.origin}/dm/e-${form.date.split('-').reverse().join('')}`} size={160} level="M" renderAs="canvas" />
               </div>
               <div className="font-mono text-slate-700 bg-white px-3 py-1 rounded border border-slate-200 shadow-inner">
                 {generatedCode}
@@ -490,7 +490,7 @@ export default function Ediciones() {
                                 Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
                               {expanded.qr && (() => {
-                                const qrUrl = `${location.origin}/dm/e-${detail.edition.date.split('-').reverse().join('').slice(0, 6)}`
+                                const qrUrl = `${location.origin}/dm/e-${detail.edition.date.split('-').reverse().join('')}`
                                 return (
                                   <>
                                     <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
