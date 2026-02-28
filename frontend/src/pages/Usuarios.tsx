@@ -110,14 +110,14 @@ export default function Usuarios() {
                 <td className="px-4 py-2">{u.name}</td>
                 <td className="px-4 py-2">{u.role}</td>
                 <td className="px-4 py-2 text-right">
-                  <div className="flex gap-2 flex-wrap justify-end">
-                    <button className="btn btn-outline" onClick={() => setEditUser(u)}>Editar</button>
-                    <button className="btn btn-outline" onClick={() => setPromptDialog({ isOpen: true, title: 'Cambiar contraseña', message: 'Ingrese la nueva contraseña:', onConfirm: async (pw) => { if (!pw) return; await setUserPassword(u.id, pw); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Contraseña actualizada.', variant: 'success' }) } })}>Clave</button>
-                    <button className="btn btn-outline" onClick={() => openStatus(u)}>Estado</button>
-                    <a className="btn btn-outline" href={`/dashboard/publicaciones?q=${encodeURIComponent(u.document || u.name)}&auto=1`}>
+                  <div className="flex gap-1 flex-wrap justify-end">
+                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setEditUser(u)}>Editar</button>
+                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setPromptDialog({ isOpen: true, title: 'Cambiar contraseña', message: 'Ingrese la nueva contraseña:', onConfirm: async (pw) => { if (!pw) return; await setUserPassword(u.id, pw); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Contraseña actualizada.', variant: 'success' }) } })}>Clave</button>
+                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => openStatus(u)}>Estado</button>
+                    <a className="btn btn-outline px-2 py-1 text-xs" href={`/dashboard/publicaciones?q=${encodeURIComponent(u.document || u.name)}&auto=1`}>
                       Ver publicaciones
                     </a>
-                    <button className="btn btn-danger" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: '¿Está seguro de eliminar este usuario?', onConfirm: async () => { await deleteUser(u.id); reload() } })}>Eliminar</button>
+                    <button className="btn btn-danger px-2 py-1 text-xs" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: '¿Está seguro de eliminar este usuario?', onConfirm: async () => { await deleteUser(u.id); reload() } })}>Eliminar</button>
                   </div>
                 </td>
               </tr>

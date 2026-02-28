@@ -44,10 +44,9 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
         }
     }
 
-    const copyUrl = (id: number) => {
+    const openUrl = (id: number) => {
         const url = `${import.meta.env.VITE_BACKEND_URL || ''}/api/uploads/${id}`
-        navigator.clipboard.writeText(url)
-        alert('URL copiada al portapapeles')
+        window.open(url, '_blank')
     }
 
     const isImage = (type: string) => ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(type.toLowerCase())
@@ -117,14 +116,14 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
 
                             {/* Overlay */}
                             {!selectable && (
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 text-white" onClick={e => e.stopPropagation()}>
-                                    <p className="text-xs font-medium truncate mb-1" title={file.name}>{file.name}</p>
+                                <div className="absolute inset-0 bg-slate-900/90 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3 text-white" onClick={e => e.stopPropagation()}>
+                                    <p className="text-xs font-medium truncate mb-2" title={file.name}>{file.name}</p>
                                     <div className="flex gap-2 text-xs">
                                         <button
-                                            onClick={() => copyUrl(file.id)}
-                                            className="flex-1 bg-white/20 hover:bg-white/30 py-1 rounded text-center transition-colors"
+                                            onClick={() => openUrl(file.id)}
+                                            className="flex-1 bg-white/20 hover:bg-white/30 py-1.5 rounded text-center transition-colors font-semibold"
                                         >
-                                            Copiar URL
+                                            Abrir Archivo
                                         </button>
                                     </div>
                                 </div>

@@ -474,7 +474,7 @@ export async function createUser(body: { document: string; name: string; passwor
   const res = await fetchAuth('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json() as Promise<{ id: number }>
 }
-export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string }) {
+export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string; phone?: string; person_type?: string }) {
   const res = await fetchAuth(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }
