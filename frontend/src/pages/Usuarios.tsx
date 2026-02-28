@@ -4,6 +4,7 @@ import RolesModal from '../components/RolesModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PromptDialog from '../components/PromptDialog'
 import AlertDialog from '../components/AlertDialog'
+import { Edit2, Key, Activity, Eye, Trash2 } from 'lucide-react'
 
 export default function Usuarios() {
   const [rows, setRows] = useState<UserSummary[]>([])
@@ -110,14 +111,14 @@ export default function Usuarios() {
                 <td className="px-4 py-2">{u.name}</td>
                 <td className="px-4 py-2">{u.role}</td>
                 <td className="px-4 py-2 text-right">
-                  <div className="flex gap-1 flex-wrap justify-end">
-                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setEditUser(u)}>Editar</button>
-                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => setPromptDialog({ isOpen: true, title: 'Cambiar contraseña', message: 'Ingrese la nueva contraseña:', onConfirm: async (pw) => { if (!pw) return; await setUserPassword(u.id, pw); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Contraseña actualizada.', variant: 'success' }) } })}>Clave</button>
-                    <button className="btn btn-outline px-2 py-1 text-xs" onClick={() => openStatus(u)}>Estado</button>
-                    <a className="btn btn-outline px-2 py-1 text-xs" href={`/dashboard/publicaciones?q=${encodeURIComponent(u.document || u.name)}&auto=1`}>
-                      Ver publicaciones
+                  <div className="flex items-center justify-end gap-1">
+                    <button className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" onClick={() => setEditUser(u)} title="Editar"><Edit2 className="w-4 h-4" /></button>
+                    <button className="p-1.5 text-slate-600 hover:bg-slate-50 rounded" onClick={() => setPromptDialog({ isOpen: true, title: 'Cambiar contraseña', message: 'Ingrese la nueva contraseña:', onConfirm: async (pw) => { if (!pw) return; await setUserPassword(u.id, pw); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Contraseña actualizada.', variant: 'success' }) } })} title="Cambiar clave"><Key className="w-4 h-4" /></button>
+                    <button className="p-1.5 text-slate-600 hover:bg-slate-50 rounded" onClick={() => openStatus(u)} title="Estado de publicaciones"><Activity className="w-4 h-4" /></button>
+                    <a className="p-1.5 text-slate-600 hover:bg-slate-50 rounded" href={`/dashboard/publicaciones?q=${encodeURIComponent(u.document || u.name)}&auto=1`} title="Ver publicaciones">
+                      <Eye className="w-4 h-4" />
                     </a>
-                    <button className="btn btn-danger px-2 py-1 text-xs" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: '¿Está seguro de eliminar este usuario?', onConfirm: async () => { await deleteUser(u.id); reload() } })}>Eliminar</button>
+                    <button className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: '¿Está seguro de eliminar este usuario?', onConfirm: async () => { await deleteUser(u.id); reload() } })} title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>

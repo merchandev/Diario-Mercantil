@@ -218,6 +218,23 @@ export async function deleteFile(id: number) {
   return res.json()
 }
 
+export async function listTrashedFiles() {
+  const res = await fetchAuth('/api/files/trash')
+  return res.json() as Promise<{ items: FileRow[] }>
+}
+export async function restoreFile(id: number) {
+  const res = await fetchAuth(`/api/files/${id}/restore`, { method: 'POST' })
+  return res.json() as Promise<{ ok: boolean }>
+}
+export async function permanentDeleteFile(id: number) {
+  const res = await fetchAuth(`/api/files/trash/${id}`, { method: 'DELETE' })
+  return res.json() as Promise<{ ok: boolean }>
+}
+export async function emptyFileTrash() {
+  const res = await fetchAuth('/api/files/trash', { method: 'DELETE' })
+  return res.json() as Promise<{ ok: boolean; count: number }>
+}
+
 // Publications
 export type Publication = { id: number; slug: string; title: string; status: string; created_at: string; updated_at: string; content?: string }
 export async function listPublications(params?: { q?: string }) {

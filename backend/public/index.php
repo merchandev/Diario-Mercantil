@@ -61,6 +61,14 @@ elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GE
 elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
 // Files
 elseif (preg_match("#^/api/uploads/(\d+)$#", $uri, $m)) { (new FileController())->serve($m[1]); }
+elseif ($uri === "/api/files/trash" && $method === "GET") { (new FileController())->listTrashed(); }
+elseif ($uri === "/api/files/trash" && $method === "DELETE") { (new FileController())->emptyTrash(); }
+elseif (preg_match("#^/api/files/trash/(\d+)$#", $uri, $m) && $method === "DELETE") { (new FileController())->permanentDelete($m[1]); }
+elseif (preg_match("#^/api/files/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new FileController())->restore($m[1]); }
+elseif (preg_match("#^/api/files/(\d+)$#", $uri, $m)) {
+    if ($method === "GET") (new FileController())->get($m[1]);
+    if ($method === "DELETE") (new FileController())->softDelete($m[1]);
+}
 elseif ($uri === "/api/files" && $method === "GET") { (new FileController())->list(); }
 elseif ($uri === "/api/files" && $method === "POST") { (new UploadController())->upload(); }
 elseif (preg_match("#^/api/legal/(\d+)/files$#", $uri, $m)) {

@@ -8,7 +8,7 @@ class FileController {
     $pdo = Database::pdo();
     $q = $_GET['q'] ?? '';
     $status = $_GET['status'] ?? '';
-    $sql = 'SELECT * FROM files WHERE 1=1';
+    $sql = 'SELECT * FROM files WHERE deleted_at IS NULL';
     $params = [];
     if ($q !== '') { $sql .= ' AND name LIKE ?'; $params[] = "%$q%"; }
     if ($status !== '') { $sql .= ' AND status = ?'; $params[] = $status; }
@@ -47,11 +47,58 @@ class FileController {
     Response::json(['ok'=>true]);
   }
 
-  public function delete($id) {
+  public function softDelete($id) {
     $pdo = Database::pdo();
+    $pdo->prepare('UPDATE files SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
+    Response::json(['ok'=>true]);
+  }
+
+  public function listTrashed() {
+    $pdo = Database::pdo();
+    $stmt = $pdo->prepare("SELECT * FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 200");
+    $stmt->execute();
+    Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+  }
+
+  public function restore($id) {
+    $pdo = Database::pdo();
+    $pdo->prepare("UPDATE files SET deleted_at = NULL WHERE id=?")->execute([$id]);
+    Response::json(['ok'=>true]);
+  }
+
+  public function permanentDelete($id) {
+    $pdo = Database::pdo();
+    $f = $pdo->prepare('SELECT path FROM files WHERE id=?');
+    $f->execute([$id]);
+    $file = $f->fetch(PDO::FETCH_ASSOC);
+    if ($file && $file['path']) {
+        $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
+        $fullPath = $uploadDir . '/' . $file['path'];
+        if (file_exists($fullPath)) @unlink($fullPath);
+    }
+    
     $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$id]);
     $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
+  }
+
+  public function emptyTrash() {
+    $pdo = Database::pdo();
+    $stmt = $pdo->query("SELECT id, path FROM files WHERE deleted_at IS NOT NULL");
+    $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
+    $count = 0;
+    foreach ($files as $f) {
+        if ($f['path']) {
+            $fullPath = $uploadDir . '/' . $f['path'];
+            if (file_exists($fullPath)) @unlink($fullPath);
+        }
+        $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$f['id']]);
+        $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$f['id']]);
+        $count++;
+    }
+    Response::json(['ok'=>true, 'count'=>$count]);
   }
 
   public function sse() {
