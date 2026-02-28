@@ -133,21 +133,23 @@ class UserController {
         $user = AuthController::requireAuth();
         $pdo = Database::pdo();
         
-        // Check constraint: Can only change every 3 months
-        $stmt = $pdo->prepare("SELECT avatar_updated_at FROM users WHERE id=?");
-        $stmt->execute([$user['id']]);
-        $lastUpdate = $stmt->fetchColumn();
-        
-        if (!empty($lastUpdate) && $lastUpdate !== '0000-00-00 00:00:00') {
-            try {
-                $lastDate = new DateTime($lastUpdate);
-                $now = new DateTime();
-                $diff = $now->diff($lastDate);
-                if ($diff->y == 0 && $diff->m < 3) {
-                    Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+        // Check constraint: Can only change every 3 months (admins are exempt)
+        if ($user['role'] !== 'admin') {
+            $stmt = $pdo->prepare("SELECT avatar_updated_at FROM users WHERE id=?");
+            $stmt->execute([$user['id']]);
+            $lastUpdate = $stmt->fetchColumn();
+            
+            if (!empty($lastUpdate) && $lastUpdate !== '0000-00-00 00:00:00') {
+                try {
+                    $lastDate = new DateTime($lastUpdate);
+                    $now = new DateTime();
+                    $diff = $now->diff($lastDate);
+                    if ($diff->y == 0 && $diff->m < 3) {
+                        Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+                    }
+                } catch (Exception $e) {
+                    // Ignore parsing errors, assume allowed
                 }
-            } catch (Exception $e) {
-                // Ignore parsing errors, assume allowed
             }
         }
 
