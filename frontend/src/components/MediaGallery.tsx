@@ -108,9 +108,10 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                                     loading="lazy"
                                 />
                             ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-2">
-                                    <IconDocs className="w-12 h-12 mb-2" />
-                                    <span className="text-xs text-center break-all font-medium uppercase">{file.type}</span>
+                                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 p-3 bg-slate-50">
+                                    <IconDocs className="w-10 h-10 mb-2 text-slate-400" />
+                                    <span className="text-xs text-center break-words font-medium line-clamp-3 w-full" title={file.name}>{file.name}</span>
+                                    <span className="text-[10px] text-slate-400 mt-1 uppercase font-bold">{file.type}</span>
                                 </div>
                             )}
 
