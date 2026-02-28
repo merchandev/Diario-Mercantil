@@ -41,6 +41,12 @@ elseif (preg_match("#^/api/users/(\d+)$#", $uri, $m)) {
     if ($method === "PUT") (new UserController())->update($m[1]);
     if ($method === "DELETE") (new UserController())->delete($m[1]);
 }
+// Profile specific
+elseif ($uri === "/api/user/profile" && $method === "PUT") { 
+    $u = AuthController::requireAuth(); 
+    (new UserController())->update($u['id']); 
+}
+elseif ($uri === "/api/user/avatar" && $method === "POST") { (new UserController())->uploadAvatar(); }
 
 // --- 3. LEGAL (Requests) ---
 elseif ($uri === "/api/legal/upload-pdf" && $method === "POST") { (new LegalController())->uploadPdf(); }

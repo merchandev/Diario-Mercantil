@@ -54,8 +54,8 @@ export default function Perfil() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setMessage({ type: 'error', text: 'La imagen debe ser menor a 2MB' })
+      if (file.size > 10 * 1024 * 1024) {
+        setMessage({ type: 'error', text: 'La imagen debe ser menor a 10MB' })
         return
       }
       if (!file.type.startsWith('image/')) {
@@ -129,8 +129,8 @@ export default function Perfil() {
       {/* Message */}
       {message && (
         <div className={`p-4 rounded-lg ${message.type === 'success'
-            ? 'bg-green-50 border border-green-200 text-green-700'
-            : 'bg-red-50 border border-red-200 text-red-700'
+          ? 'bg-green-50 border border-green-200 text-green-700'
+          : 'bg-red-50 border border-red-200 text-red-700'
           }`}>
           {message.text}
         </div>
@@ -142,14 +142,14 @@ export default function Perfil() {
           <h2 className="text-lg font-semibold text-slate-800 mb-4">Foto de Perfil</h2>
           <div className="flex items-center gap-6">
             <div className="relative">
-              <div className="w-32 h-32 rounded-full bg-slate-400 overflow-hidden flex items-center justify-center">
+              <div className="h-24 w-24 rounded-full bg-slate-400 grid place-items-center mb-4 overflow-hidden ring-4 ring-white/10 shadow-lg">
                 {avatarPreview ? (
                   <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <IconUserCircle className="w-20 h-20 text-slate-600" />
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-circle-user text-slate-200" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="10" r="3"></circle><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"></path></svg>
                 )}
               </div>
-              <label className="absolute bottom-0 right-0 w-10 h-10 bg-brand-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-brand-700 transition shadow-lg">
+              <label className="absolute bottom-4 right-0 w-10 h-10 bg-brand-600 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-brand-700 transition shadow-lg">
                 <IconCamera className="w-5 h-5" />
                 <input
                   type="file"
@@ -159,9 +159,9 @@ export default function Perfil() {
                 />
               </label>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 -mt-4">
               <p className="text-sm text-slate-700 font-medium mb-1">Cambiar foto de perfil</p>
-              <p className="text-xs text-slate-500">JPG, PNG o GIF. Máximo 2MB</p>
+              <p className="text-xs text-slate-500">JPG, PNG o GIF. Máximo 10MB</p>
               {avatarFile && (
                 <p className="text-xs text-brand-600 mt-2">
                   ✓ Imagen seleccionada: {avatarFile.name}

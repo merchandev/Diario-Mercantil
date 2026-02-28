@@ -203,6 +203,8 @@ class SystemController {
             if (!in_array('phone', $cols)) $missingUsers['phone'] = "VARCHAR(20) NULL";
             if (!in_array('email', $cols)) $missingUsers['email'] = "VARCHAR(100) NULL";
             if (!in_array('person_type', $cols)) $missingUsers['person_type'] = "VARCHAR(20) DEFAULT 'natural'";
+            if (!in_array('avatar_url', $cols)) $missingUsers['avatar_url'] = "VARCHAR(255) NULL";
+            if (!in_array('avatar_updated_at', $cols)) $missingUsers['avatar_updated_at'] = "DATETIME NULL";
             if (!in_array('created_at', $cols)) $missingUsers['created_at'] = "DATETIME NULL";
             if (!in_array('updated_at', $cols)) $missingUsers['updated_at'] = "DATETIME NULL";
 

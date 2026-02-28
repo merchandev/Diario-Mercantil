@@ -62,11 +62,11 @@ export default function Sidebar({
         {/* Profile elements: Requesting specifically to be hidden on mobile */}
         {!collapsed && (
           <div className="hidden md:flex flex-col items-center mb-8 mt-2">
-            <div className="h-20 w-20 rounded-full bg-slate-400 grid place-items-center text-4xl mb-4 overflow-hidden ring-4 ring-white/10 shadow-lg">
+            <div className="h-24 w-24 rounded-full bg-slate-400 grid place-items-center mb-4 overflow-hidden ring-4 ring-white/10 shadow-lg">
               {user?.avatar_url ? (
                 <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
               ) : (
-                <IconUserCircle className="text-slate-200" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-circle-user text-slate-200" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="10" r="3"></circle><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"></path></svg>
               )}
             </div>
             <div className="text-center">
