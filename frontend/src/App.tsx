@@ -138,6 +138,7 @@ export default function App() {
           <Route path="publicaciones/:orden/:razon?" element={<LazyRoute><PublicacionPublic /></LazyRoute>} />
           <Route path="publicacion/:slug" element={<LazyRoute><PublicView /></LazyRoute>} />
           <Route path="edicion/:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
+          <Route path="dm/e-:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
           <Route path="visor-espresivo/:code" element={<LazyRoute><VisorEspressivoPDF /></LazyRoute>} />
           <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
           <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />
@@ -187,30 +188,30 @@ export default function App() {
                   <main className="p-4 md:p-6 w-full overflow-x-hidden md:overflow-visible relative">
                     <div className="mx-auto w-full max-w-6xl space-y-4 md:space-y-6">
                       <Routes>
-                      <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
-                      <Route path="ediciones" element={<RequireAdmin><LazyRoute><Ediciones /></LazyRoute></RequireAdmin>} />
-                      <Route path="publicaciones" element={<RequireAdmin><LazyRoute><Publicaciones /></LazyRoute></RequireAdmin>} />
-                      <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
-                      <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
-                      <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
-                      <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
-                      <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
-                      <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
-                      {/* Applicant (solicitante) routes */}
-                      {/* Reemplazamos el formulario antiguo por el nuevo de solicitante */}
-                      <Route path="publicar/documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
-                      <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
-                      <Route path="publicar/documento-pdf" element={<LazyRoute><PublicarDocumentoPDF /></LazyRoute>} />
-                      <Route path="publicar/convocatoria" element={<LazyRoute><PublicarConvocatoria /></LazyRoute>} />
-                      <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
-                      <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
-                      <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
-                      <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
-                      <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
-                      <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />
-                      <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
+                        <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />
+                        <Route path="ediciones" element={<RequireAdmin><LazyRoute><Ediciones /></LazyRoute></RequireAdmin>} />
+                        <Route path="publicaciones" element={<RequireAdmin><LazyRoute><Publicaciones /></LazyRoute></RequireAdmin>} />
+                        <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
+                        <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
+                        <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
+                        <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
+                        <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
+                        <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
+                        {/* Applicant (solicitante) routes */}
+                        {/* Reemplazamos el formulario antiguo por el nuevo de solicitante */}
+                        <Route path="publicar/documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
+                        <Route path="medios-de-pago" element={<LazyRoute><MediosPagoInfo /></LazyRoute>} />
+                        <Route path="publicar/documento-pdf" element={<LazyRoute><PublicarDocumentoPDF /></LazyRoute>} />
+                        <Route path="publicar/convocatoria" element={<LazyRoute><PublicarConvocatoria /></LazyRoute>} />
+                        <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
+                        <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
+                        <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
+                        <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
+                        <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
+                        <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />
+                        <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
                     </div>
                   </main>
                 </div>

@@ -16,6 +16,8 @@ export default function Ediciones() {
   const [createPdf, setCreatePdf] = useState<File | null>(null)
   const [selId, setSelId] = useState<number | undefined>(undefined)
   const [detail, setDetail] = useState<{ edition: Edition; orders: LegalRequest[] } | null>(null)
+  const [qrGenerated, setQrGenerated] = useState(false)
+  const [generatedCode, setGeneratedCode] = useState('')
   const [allOrders, setAllOrders] = useState<LegalRequest[]>([])
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
@@ -63,6 +65,8 @@ export default function Ediciones() {
       }
       setForm({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
       setCreatePdf(null)
+      setQrGenerated(false)
+      setGeneratedCode('')
       await load()
       if (newId) {
         const [det, leg] = await Promise.all([getEdition(newId), listLegal()])
@@ -145,66 +149,105 @@ export default function Ediciones() {
               <label className="block text-sm font-semibold mb-1 text-slate-700">Número de Edición</label>
               <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value={form.edition_no} title="El número de edición se genera automáticamente en orden consecutivo" />
             </div>
-            <label className="block">
-              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final</span>
-              <label className="btn btn-outline border-dashed hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 text-slate-600 w-full flex items-center justify-center gap-2 cursor-pointer h-[42px] transition-colors">
-                <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; setCreatePdf(f || null); }} />
-                <IconUpload /> <span className="truncate">{createPdf ? createPdf.name : 'Click para subir PDF'}</span>
-              </label>
-            </label>
-          </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
-              <span className="block text-sm font-semibold text-slate-700">1. Seleccionar Publicaciones</span>
-              <span className="text-xs font-medium px-2.5 py-1 bg-brand-100 text-brand-700 rounded-full">{form.selectedOrders.length} seleccionadas</span>
-            </div>
-            <div className="p-3 bg-white">
-              <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
-                  const isSelected = form.selectedOrders.includes(o.id)
-                  const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
-                  return (
-                    <label key={o.id} className={`flex items-start gap-3 p-3 rounded-lg border-2 ${isSelected ? 'bg-brand-50 border-brand-500 shadow-sm' : 'bg-white border-slate-100'} hover:border-brand-300 transition-all cursor-pointer`}>
-                      <input type="checkbox" className="mt-1 w-4 h-4 text-brand-600 rounded focus:ring-brand-500" checked={isSelected} onChange={(e) => {
-                        setForm(prev => ({
-                          ...prev,
-                          selectedOrders: e.target.checked
-                            ? [...prev.selectedOrders, o.id]
-                            : prev.selectedOrders.filter(id => id !== o.id)
-                        }))
-                      }} />
-                      <div className="flex-1 text-sm">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
-                          <span className="text-xs text-slate-400">{o.date}</span>
-                        </div>
-                        <div className="text-slate-700 font-medium mt-0.5">{o.name || 'Sin nombre asociado'}</div>
-                        <div className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-2">
-                          {meta?.tipo_sociedad && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_sociedad}</span>}
-                          {meta?.tipo_acto && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_acto}</span>}
-                          {meta?.tipo_convocatoria && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_convocatoria}</span>}
-                        </div>
-                      </div>
-                    </label>
-                  )
-                })}
-                {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
-                  <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                    <div className="text-3xl mb-2 opacity-50">📄</div>
-                    <p className="text-sm font-medium">No hay publicaciones disponibles</p>
-                    <p className="text-xs mt-1">Todas las órdenes aprobadas ya han sido publicadas o no hay solicitudes nuevas.</p>
-                  </div>
-                )}
+            {!qrGenerated ? (
+              <div className="flex items-end">
+                <button type="button" className="btn btn-primary w-full h-[42px] mb-[3px] shadow-sm select-none" onClick={() => {
+                  const dateObj = new Date(form.date);
+                  // Convert to user local time zone equivalent to get correct 'ddmmyy' string for the form context
+                  const d = String(dateObj.getUTCDate()).padStart(2, '0');
+                  const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
+                  const y = String(dateObj.getUTCFullYear()).slice(2);
+                  const dateStrNum = `${d}${m}${y}`;
+                  setGeneratedCode(`dm${form.edition_no}${dateStrNum}`);
+                  setQrGenerated(true);
+                }}>
+                  Generar QR
+                </button>
               </div>
-            </div>
+            ) : (
+              <label className="block">
+                <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final</span>
+                <label className="btn btn-outline border-dashed hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 text-slate-600 w-full flex items-center justify-center gap-2 cursor-pointer h-[42px] transition-colors">
+                  <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; setCreatePdf(f || null); }} />
+                  <IconUpload /> <span className="truncate">{createPdf ? createPdf.name : 'Click para subir PDF'}</span>
+                </label>
+              </label>
+            )}
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-100">
-            <button type="submit" className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf}>
-              {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear y Publicar Edición Definitiva</span></>)}
-            </button>
-          </div>
+          {qrGenerated && (
+            <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg flex flex-col items-center justify-center space-y-3 mb-6 animate-in fade-in slide-in-from-top-2">
+              <h3 className="text-brand-800 font-semibold text-center">Código y QR Generados</h3>
+              <div className="bg-white p-3 rounded-md shadow-sm border border-slate-100">
+                <QRCode value={`${location.origin}/dm/e-${generatedCode.replace(`dm${form.edition_no}`, '')}`} size={160} level="M" />
+              </div>
+              <div className="font-mono text-slate-700 bg-white px-3 py-1 rounded border border-slate-200 shadow-inner">
+                {generatedCode}
+              </div>
+              <span className="text-xs text-brand-600 font-medium">Ahora puedes adjuntar el PDF y seleccionar las publicaciones para finalizar la edición.</span>
+              <button type="button" className="text-xs text-slate-500 hover:text-slate-700 underline mt-2" onClick={() => { setQrGenerated(false); setGeneratedCode(''); }}>
+                Deshacer
+              </button>
+            </div>
+          )}
+
+          {qrGenerated && (
+            <>
+
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-4 py-3 flex justify-between items-center border-b border-slate-200">
+                  <span className="block text-sm font-semibold text-slate-700">1. Seleccionar Publicaciones</span>
+                  <span className="text-xs font-medium px-2.5 py-1 bg-brand-100 text-brand-700 rounded-full">{form.selectedOrders.length} seleccionadas</span>
+                </div>
+                <div className="p-3 bg-white">
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                    {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
+                      const isSelected = form.selectedOrders.includes(o.id)
+                      const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
+                      return (
+                        <label key={o.id} className={`flex items-start gap-3 p-3 rounded-lg border-2 ${isSelected ? 'bg-brand-50 border-brand-500 shadow-sm' : 'bg-white border-slate-100'} hover:border-brand-300 transition-all cursor-pointer`}>
+                          <input type="checkbox" className="mt-1 w-4 h-4 text-brand-600 rounded focus:ring-brand-500" checked={isSelected} onChange={(e) => {
+                            setForm(prev => ({
+                              ...prev,
+                              selectedOrders: e.target.checked
+                                ? [...prev.selectedOrders, o.id]
+                                : prev.selectedOrders.filter(id => id !== o.id)
+                            }))
+                          }} />
+                          <div className="flex-1 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
+                              <span className="text-xs text-slate-400">{o.date}</span>
+                            </div>
+                            <div className="text-slate-700 font-medium mt-0.5">{o.name || 'Sin nombre asociado'}</div>
+                            <div className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-2">
+                              {meta?.tipo_sociedad && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_sociedad}</span>}
+                              {meta?.tipo_acto && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_acto}</span>}
+                              {meta?.tipo_convocatoria && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_convocatoria}</span>}
+                            </div>
+                          </div>
+                        </label>
+                      )
+                    })}
+                    {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
+                      <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                        <div className="text-3xl mb-2 opacity-50">📄</div>
+                        <p className="text-sm font-medium">No hay publicaciones disponibles</p>
+                        <p className="text-xs mt-1">Todas las órdenes aprobadas ya han sido publicadas o no hay solicitudes nuevas.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4 border-t border-slate-100">
+                <button type="submit" className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf}>
+                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear y Publicar Edición Definitiva</span></>)}
+                </button>
+              </div>
+            </>
+          )}
         </form>
       </div>
 
@@ -437,7 +480,7 @@ export default function Ediciones() {
                                 Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
                               {expanded.qr && (() => {
-                                const qrUrl = `${location.origin}/edicion/${encodeURIComponent(detail.edition.code)}`
+                                const qrUrl = `${location.origin}/dm/e-${detail.edition.date.split('-').reverse().join('').slice(0, 6)}`
                                 return (
                                   <>
                                     <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>

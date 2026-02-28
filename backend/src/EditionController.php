@@ -129,13 +129,11 @@ class EditionController {
     if (!is_array($orders)) $orders = [];
     $orders_count = count($orders);
 
-    // Auto-generate edition number and code
-    $maxEd = (int)$pdo->query('SELECT MAX(edition_no) FROM editions')->fetchColumn();
-    $edition_no = $maxEd + 1;
-
+    // Auto-generate edition number and code (Format: dm-e-<edition_no>-<date>)
     $dateObj = new DateTime($date);
-    $dateStr = $dateObj->format('dmy');
-    $code = "100{$edition_no}dm{$dateStr}";
+    $dateStr = $dateObj->format('y-m-d'); // Short year to prevent extra long string
+    $dateStrNum = $dateObj->format('dmy');
+    $code = "dm{$edition_no}{$dateStrNum}";
 
     $fileId = isset($input['file_id']) ? (int)$input['file_id'] : null;
     $fileName = trim($input['file_name'] ?? '');

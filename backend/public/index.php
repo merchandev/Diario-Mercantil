@@ -108,7 +108,7 @@ elseif (preg_match("#^/api/editions/(\d+)/publish$#", $uri, $m) && $method === "
 elseif (preg_match("#^/api/editions/(\d+)/pdf$#", $uri, $m) && $method === "POST") { (new EditionController())->uploadPdf($m[1]); }
 elseif (preg_match("#^/api/e/(\d+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadById($m[1]); }
 elseif (preg_match("#^/api/e/([^/]+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadByCode($m[1]); }
-elseif (preg_match("#^/api/e/([^/]+)$#", $uri, $m) && $method === "GET") { (new EditionController())->publicByCode($m[1]); }
+elseif (preg_match("#^/api/dm/e-([^/]+)$#", $uri, $m) && $method === "GET") { (new EditionController())->publicByCode($m[1]); }
 
 
 // --- 5. PUBLICATIONS & PAGES (Public) ---
