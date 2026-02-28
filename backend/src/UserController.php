@@ -129,63 +129,70 @@ class UserController {
   }
   
   public function uploadAvatar() {
-    $user = AuthController::requireAuth();
-    $pdo = Database::pdo();
-    
-    // Check constraint: Can only change every 3 months
-    $stmt = $pdo->prepare("SELECT avatar_updated_at FROM users WHERE id=?");
-    $stmt->execute([$user['id']]);
-    $lastUpdate = $stmt->fetchColumn();
-    
-    if ($lastUpdate) {
-        $lastDate = new DateTime($lastUpdate);
-        $now = new DateTime();
-        $diff = $now->diff($lastDate);
-        if ($diff->m < 3 && $diff->y == 0) {
-            Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+    try {
+        $user = AuthController::requireAuth();
+        $pdo = Database::pdo();
+        
+        // Check constraint: Can only change every 3 months
+        $stmt = $pdo->prepare("SELECT avatar_updated_at FROM users WHERE id=?");
+        $stmt->execute([$user['id']]);
+        $lastUpdate = $stmt->fetchColumn();
+        
+        if ($lastUpdate) {
+            $lastDate = new DateTime($lastUpdate);
+            $now = new DateTime();
+            $diff = $now->diff($lastDate);
+            if ($diff->y == 0 && $diff->m < 3) {
+                Response::json(["error"=>"Solo puedes cambiar tu foto de perfil una vez cada 3 meses."], 403);
+            }
         }
-    }
 
-    if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
-        Response::json(["error"=>"No se subió ninguna imagen o hubo un error en la subida.", "sys_err" => $_FILES['avatar']['error'] ?? 'missing'], 400);
-    }
-    
-    $file = $_FILES['avatar'];
-    if ($file['size'] > 10 * 1024 * 1024) {
-        Response::json(["error"=>"La imagen debe ser menor a 10MB."], 400);
-    }
-    
-    $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!in_array($file['type'], $allowedTypes)) {
-        Response::json(["error"=>"Solo se permiten imágenes (JPG, PNG, GIF, WEBP)."], 400);
-    }
-    
-    $baseUploadDir = realpath(__DIR__.'/..').'/storage/avatars';
-    if (!is_dir($baseUploadDir)) mkdir($baseUploadDir, 0777, true);
-    
-    $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-    if (!$ext) {
-        switch($file['type']) {
-            case 'image/jpeg': $ext = 'jpg'; break;
-            case 'image/png': $ext = 'png'; break;
-            case 'image/gif': $ext = 'gif'; break;
-            case 'image/webp': $ext = 'webp'; break;
-            default: $ext = 'jpg';
+        if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+            Response::json(["error"=>"No se subió ninguna imagen o hubo un error en la subida.", "sys_err" => $_FILES['avatar']['error'] ?? 'missing'], 400);
         }
+        
+        $file = $_FILES['avatar'];
+        if ($file['size'] > 10 * 1024 * 1024) {
+            Response::json(["error"=>"La imagen debe ser menor a 10MB."], 400);
+        }
+        
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!in_array($file['type'], $allowedTypes)) {
+            Response::json(["error"=>"Solo se permiten imágenes (JPG, PNG, GIF, WEBP)."], 400);
+        }
+        
+        $baseUploadDir = realpath(__DIR__.'/..').'/storage/avatars';
+        if (!is_dir($baseUploadDir)) mkdir($baseUploadDir, 0777, true);
+        
+        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
+        if (!$ext) {
+            switch($file['type']) {
+                case 'image/jpeg': $ext = 'jpg'; break;
+                case 'image/png': $ext = 'png'; break;
+                case 'image/gif': $ext = 'gif'; break;
+                case 'image/webp': $ext = 'webp'; break;
+                default: $ext = 'jpg';
+            }
+        }
+        
+        $uniqueName = 'avatar_' . $user['id'] . '_' . time() . '.' . $ext;
+        $dest = $baseUploadDir . '/' . $uniqueName;
+        
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            Response::json(["error"=>"Error al guardar la imagen en el servidor."], 500);
+        }
+        
+        $publicUrl = '/api/uploads/avatars/' . $uniqueName;
+        
+        $update = $pdo->prepare("UPDATE users SET avatar_url=?, avatar_updated_at=NOW() WHERE id=?");
+        $update->execute([$publicUrl, $user['id']]);
+        
+        Response::json(["ok"=>true, "avatar_url"=>$publicUrl]);
+    } catch (Throwable $e) {
+        // Expose error msg specifically here
+        http_response_code(500);
+        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        exit;
     }
-    
-    $uniqueName = 'avatar_' . $user['id'] . '_' . time() . '.' . $ext;
-    $dest = $baseUploadDir . '/' . $uniqueName;
-    
-    if (!move_uploaded_file($file['tmp_name'], $dest)) {
-        Response::json(["error"=>"Error al guardar la imagen en el servidor."], 500);
-    }
-    
-    $publicUrl = '/api/uploads/avatars/' . $uniqueName;
-    
-    $update = $pdo->prepare("UPDATE users SET avatar_url=?, avatar_updated_at=NOW() WHERE id=?");
-    $update->execute([$publicUrl, $user['id']]);
-    
-    Response::json(["ok"=>true, "avatar_url"=>$publicUrl]);
   }
 }
