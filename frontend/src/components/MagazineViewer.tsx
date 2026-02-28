@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import HTMLFlipBook from 'react-pageflip';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 import { IconChevronLeft, IconChevronRight, IconMaximize, IconMinimize } from '@tabler/icons-react';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
@@ -116,8 +116,7 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                     {!loading && numPages > 0 && dimensions.width > 100 && (
                         <div className="rotate-0 shadow-2xl relative w-full h-full flex items-center justify-center">
                             {/* @ts-ignore - react-pageflip types are slightly incompatible with React 18 but it works */}
-                            {/* @ts-ignore - react-pageflip */}
-<HTMLFlipBook
+                            <HTMLFlipBook
                                 width={dimensions.width}
                                 height={dimensions.height}
                                 size="stretch"
