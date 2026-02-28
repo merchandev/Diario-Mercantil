@@ -87,9 +87,20 @@ export default function VisorEspressivoPDF() {
               <div className="relative">
                 <FlipbookViewer src={pdfUrl} height={620} />
               </div>
-              <div className="flex flex-wrap gap-2 text-xs text-slate-300">
-
-                <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+              <div className="flex flex-wrap items-center justify-between mt-4">
+                <div className="flex flex-wrap gap-2 text-xs text-slate-300">
+                  <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
+                  <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+                </div>
+                <a
+                  href={`${pdfUrl}?download=1`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-primary shadow-lg inline-flex items-center gap-2 px-4 py-2 shrink-0 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                  <span>Descargar Edición (PDF)</span>
+                </a>
               </div>
             </div>
           ) : (

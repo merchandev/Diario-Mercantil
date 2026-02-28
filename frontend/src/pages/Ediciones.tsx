@@ -158,7 +158,7 @@ export default function Ediciones() {
                   // Convert to user local time zone equivalent to get correct 'ddmmyy' string for the form context
                   const d = String(dateObj.getUTCDate()).padStart(2, '0');
                   const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-                  const y = String(dateObj.getUTCFullYear()).slice(2);
+                  const y = String(dateObj.getUTCFullYear());
                   const dateStrNum = `${d}${m}${y}`;
                   setGeneratedCode(`dm${form.edition_no}${dateStrNum}`);
                   setQrGenerated(true);
