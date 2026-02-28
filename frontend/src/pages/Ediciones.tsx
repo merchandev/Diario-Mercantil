@@ -21,6 +21,7 @@ export default function Ediciones() {
   const [allOrders, setAllOrders] = useState<LegalRequest[]>([])
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
+  const newQrWrapRef = useRef<HTMLDivElement | null>(null)
   const pdfSectionRef = useRef<HTMLDivElement | null>(null)
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => { } })
   const [alertDialog, setAlertDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'success' | 'error' | 'info' | 'warning' }>({ isOpen: false, title: '', message: '', variant: 'info' })
@@ -162,7 +163,7 @@ export default function Ediciones() {
                   setGeneratedCode(`dm${form.edition_no}${dateStrNum}`);
                   setQrGenerated(true);
                 }}>
-                  Generar QR
+                  Nueva Edición
                 </button>
               </div>
             ) : (
@@ -179,12 +180,21 @@ export default function Ediciones() {
           {qrGenerated && (
             <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg flex flex-col items-center justify-center space-y-3 mb-6 animate-in fade-in slide-in-from-top-2">
               <h3 className="text-brand-800 font-semibold text-center">Código y QR Generados</h3>
-              <div className="bg-white p-3 rounded-md shadow-sm border border-slate-100">
-                <QRCode value={`${location.origin}/dm/e-${generatedCode.replace(`dm${form.edition_no}`, '')}`} size={160} level="M" />
+              <div ref={newQrWrapRef} className="bg-white p-3 rounded-md shadow-sm border border-slate-100">
+                <QRCode value={`${location.origin}/dm/e-${generatedCode.replace(`dm${form.edition_no}`, '')}`} size={160} level="M" renderAs="canvas" />
               </div>
               <div className="font-mono text-slate-700 bg-white px-3 py-1 rounded border border-slate-200 shadow-inner">
                 {generatedCode}
               </div>
+              <button type="button" className="btn btn-outline btn-sm inline-flex items-center gap-2 mt-1" onClick={() => {
+                const canvas = newQrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
+                if (!canvas) return
+                const url = canvas.toDataURL('image/png')
+                const a = document.createElement('a')
+                a.href = url; a.download = `QR-edicion-${generatedCode}.png`; a.click()
+              }}>
+                <IconDownload className="w-4 h-4" /> <span>Descargar QR</span>
+              </button>
               <span className="text-xs text-brand-600 font-medium">Ahora puedes adjuntar el PDF y seleccionar las publicaciones para finalizar la edición.</span>
               <button type="button" className="text-xs text-slate-500 hover:text-slate-700 underline mt-2" onClick={() => { setQrGenerated(false); setGeneratedCode(''); }}>
                 Deshacer
