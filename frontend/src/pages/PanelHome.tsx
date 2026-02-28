@@ -53,7 +53,7 @@ export default function PanelHome() {
 
       <h2 className="text-lg font-semibold mt-8 mb-4">Herramientas de Sistema</h2>
       <div className="grid md:grid-cols-3 gap-4">
-        <a href={`http://${window.location.hostname}:8081`} target="_blank" rel="noopener noreferrer" className="card p-4 hover:shadow transition border-l-4 border-l-blue-500">
+        <a href={`http://${window.location.hostname}:8080`} target="_blank" rel="noopener noreferrer" className="card p-4 hover:shadow transition border-l-4 border-l-blue-500">
           <div className="text-sm text-slate-500">Base de Datos</div>
           <div className="text-lg font-semibold flex items-center gap-2">
             phpMyAdmin
