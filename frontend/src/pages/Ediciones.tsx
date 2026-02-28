@@ -252,8 +252,8 @@ export default function Ediciones() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button type="submit" className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf}>
-                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear y Publicar Edición Definitiva</span></>)}
+                <button type="submit" className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf || form.selectedOrders.length === 0}>
+                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición</span></>)}
                 </button>
               </div>
             </>
