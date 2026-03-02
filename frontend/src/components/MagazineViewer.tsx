@@ -126,7 +126,6 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                                 maxHeight={1533}
                                 maxShadowOpacity={0.5}
                                 showCover={true}
-                                mobileScrollSupport={true}
                                 className="flipbook-demo mx-auto"
                                 ref={bookRef}
                                 onFlip={(e: any) => setPage(e.data)}
