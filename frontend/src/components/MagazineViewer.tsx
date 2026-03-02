@@ -5,10 +5,9 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { IconChevronLeft, IconChevronRight, IconMaximize, IconMinimize } from '@tabler/icons-react';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.js',
-    import.meta.url,
-).toString();
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url';
+
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface MagazineViewerProps {
     src: string;
@@ -33,6 +32,11 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
 
     const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages);
+        setLoading(false);
+    };
+
+    const onDocumentLoadError = (error: Error) => {
+        console.error('Error al cargar PDF:', error);
         setLoading(false);
     };
 
@@ -113,6 +117,7 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                 <Document
                     file={src}
                     onLoadSuccess={onDocumentLoadSuccess}
+                    onLoadError={onDocumentLoadError}
                     className="flex justify-center"
                     loading={null}
                 >
