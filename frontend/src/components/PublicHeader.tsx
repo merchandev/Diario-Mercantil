@@ -256,9 +256,9 @@ export default function PublicHeader() {
       <section className="bg-slate-100 py-[10px]">
         <div className="mx-auto max-w-7xl px-4 flex items-center gap-4 text-sm">
           <span className="px-2 py-1 rounded-lg bg-brand-600 text-white text-xs">EN DIRECTO</span>
-          <div className="flex-1 flex gap-6 overflow-x-auto">
-            <div className="text-slate-600">Tipo de cambio (BCV) hoy: <span className="font-medium text-slate-900">{usd ? `Bs/USD ${usd}` : '—'}</span> | <span className="font-medium text-slate-900">{eur ? `Bs/EUR ${eur}` : '—'}</span></div>
-            <div className="text-slate-600">Unidad tributaria (SENIAT): <span className="font-medium text-slate-900">{unitTax ? `${unitTax} Bs.` : '—'}</span></div>
+          <div className="flex-1 min-w-0 flex gap-6 overflow-x-auto pb-1">
+            <div className="text-slate-600 whitespace-nowrap">Tipo de cambio (BCV) hoy: <span className="font-medium text-slate-900">{usd ? `Bs/USD ${usd}` : '—'}</span> | <span className="font-medium text-slate-900">{eur ? `Bs/EUR ${eur}` : '—'}</span></div>
+            <div className="text-slate-600 whitespace-nowrap">Unidad tributaria (SENIAT): <span className="font-medium text-slate-900">{unitTax ? `${unitTax} Bs.` : '—'}</span></div>
           </div>
         </div>
       </section>

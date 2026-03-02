@@ -99,11 +99,13 @@ export default function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) 
               </div>
             )}
             {isAdminRole(user?.role) && (
-              <a href="/dashboard/usuarios" className="btn btn-outline inline-flex items-center gap-2">
-                <IconUsers /> <span>Usuarios</span>
+              <a href="/dashboard/usuarios" className="btn btn-outline inline-flex items-center gap-2 px-2 sm:px-4 text-xs sm:text-sm">
+                <IconUsers /> <span className="hidden sm:inline">Usuarios</span>
               </a>
             )}
-            <button onClick={onLogout} className="btn btn-ghost inline-flex items-center gap-2"><IconLogout /> <span>Salir</span></button>
+            <button onClick={onLogout} className="btn btn-ghost inline-flex items-center gap-2 px-2 sm:px-4 text-xs sm:text-sm">
+              <IconLogout /> <span className="hidden sm:inline">Salir</span>
+            </button>
           </div>
         </div>
       </div>
