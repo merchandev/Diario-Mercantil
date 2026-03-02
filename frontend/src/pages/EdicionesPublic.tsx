@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { listEditions, type Edition } from '../lib/api'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 
 export default function EdicionesPublic() {
+  const [searchParams] = useSearchParams()
   const [rows, setRows] = useState<Edition[]>([])
-  const [q, setQ] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  const [q, setQ] = useState(searchParams.get('q') || '')
+  const [from, setFrom] = useState(searchParams.get('from') || '')
+  const [to, setTo] = useState(searchParams.get('to') || '')
   const [loading, setLoading] = useState(false)
 
   const load = async () => {
