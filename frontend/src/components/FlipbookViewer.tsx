@@ -6,7 +6,7 @@ const { GlobalWorkerOptions, getDocument } = pdfjs
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, ZoomIn, ZoomOut, Grid, X, Loader2 } from 'lucide-react'
 
 // Import worker as a static URL for Vite to process
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.js?url'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 // Set worker source immediately
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl

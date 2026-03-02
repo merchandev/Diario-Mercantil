@@ -121,7 +121,7 @@ class SystemController {
     // --- PAGES (CMS) ---
     public function listPagesPublic(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT slug, title, content FROM pages WHERE status='published' OR published=1");
+        $stmt = $pdo->query("SELECT slug, title, content FROM pages WHERE status='published'");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 
