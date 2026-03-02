@@ -121,7 +121,7 @@ class SystemController {
     // --- PAGES (CMS) ---
     public function listPagesPublic(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT slug, title, content FROM pages WHERE status='published'");
+        $stmt = $pdo->query("SELECT slug, title, content FROM pages WHERE published=1");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 
@@ -140,19 +140,19 @@ class SystemController {
         
         $title = trim($in['title'] ?? '');
         $content = $in['content'] ?? '';
-        $status = $in['status'] ?? 'published';
+        $published = ($in['status'] ?? 'published') === 'published' ? 1 : 0;
         $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $title)));
 
         if ($title === '') Response::json(['error'=>'Title required'], 400);
 
-        $stmt = $pdo->prepare("INSERT INTO pages(title, slug, content, status, created_at, updated_at) VALUES(?,?,?,?,NOW(),NOW())");
+        $stmt = $pdo->prepare("INSERT INTO pages(title, slug, content, published, created_at, updated_at) VALUES(?,?,?,?,NOW(),NOW())");
         try {
-            $stmt->execute([$title, $slug, $content, $status]);
+            $stmt->execute([$title, $slug, $content, $published]);
             Response::json(['id'=>(int)$pdo->lastInsertId(), 'slug'=>$slug]);
         } catch(PDOException $e) {
             if ($e->getCode() == 23000) { // Duplicate slug
                 $slug .= '-' . uniqid();
-                $stmt->execute([$title, $slug, $content, $status]);
+                $stmt->execute([$title, $slug, $content, $published]);
                 Response::json(['id'=>(int)$pdo->lastInsertId(), 'slug'=>$slug]);
             } else {
                 throw $e;
@@ -167,10 +167,10 @@ class SystemController {
 
         $title = trim($in['title'] ?? '');
         $content = $in['content'] ?? '';
-        $status = $in['status'] ?? 'published';
+        $published = ($in['status'] ?? 'published') === 'published' ? 1 : 0;
         
-        $sql = "UPDATE pages SET content=?, status=?, updated_at=NOW()";
-        $params = [$content, $status];
+        $sql = "UPDATE pages SET content=?, published=?, updated_at=NOW()";
+        $params = [$content, $published];
 
         if ($title !== '') {
             $sql .= ", title=?";
@@ -240,6 +240,24 @@ class SystemController {
             // 4. Ensure Settings
             $pdo->prepare("INSERT INTO settings(`key`, `value`) VALUES('price_per_folio_usd', '1.5') ON DUPLICATE KEY UPDATE `key`=`key`")->execute();
             $log[] = "Setting price_per_folio_usd verificado.";
+
+            // 5. Repair Pages Table
+            $colsP = [];
+            try { $colsP = $pdo->query("DESCRIBE pages")->fetchAll(PDO::FETCH_COLUMN); } catch (Throwable $e) {}
+            if (empty($colsP)) {
+                $pdo->exec("CREATE TABLE pages (id INT AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(255) NOT NULL UNIQUE, title VARCHAR(255) NOT NULL, content TEXT, published TINYINT(1) DEFAULT 1, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)");
+                $log[] = "Tabla pages creada.";
+            } else {
+                if (!in_array('published', $colsP)) {
+                    if (in_array('status', $colsP)) {
+                        $pdo->exec("ALTER TABLE pages CHANGE status published TINYINT(1) DEFAULT 1");
+                        $log[] = "Columna pages.status renombrada a published.";
+                    } else {
+                        $pdo->exec("ALTER TABLE pages ADD COLUMN published TINYINT(1) DEFAULT 1");
+                        $log[] = "Columna pages.published agregada.";
+                    }
+                }
+            }
 
             $stmt = $pdo->prepare("INSERT INTO users (document, name, password_hash, role, phone, email, person_type, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute(['merchandev', 'Super Admin', $hash, 'admin', '000000', 'admin@sys.com', 'juridica', 'active', $now, $now]);
