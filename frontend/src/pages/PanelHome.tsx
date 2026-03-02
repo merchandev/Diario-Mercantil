@@ -11,6 +11,30 @@ export default function PanelHome() {
     setLoading(true)
     try { const r = await clearStats(); setStats(r) } finally { setLoading(false) }
   }
+
+  const onClearCache = async () => {
+    if (!confirm('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión, limpiará los datos almacenados localmente y recargará todo el sitio original.')) return
+
+    try {
+      localStorage.clear()
+      sessionStorage.clear()
+
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations()
+        for (const r of regs) await r.unregister()
+      }
+
+      if ('caches' in window) {
+        const names = await caches.keys()
+        for (const name of names) await caches.delete(name)
+      }
+    } catch (e) {
+      console.error('Error limpiando caché:', e)
+    }
+
+    // Force hard reload to ignore browser cache
+    window.location.href = window.location.href.split('#')[0] + '?clear=' + new Date().getTime()
+  }
   const cards = [
     { t: 'Publicaciones', v: String(stats.publications) },
     { t: 'Ediciones', v: String(stats.editions) },
@@ -23,7 +47,14 @@ export default function PanelHome() {
           <h1 className="text-xl font-semibold">Inicio</h1>
           <p className="text-sm text-slate-600">Resumen rápido y accesos a las secciones clave.</p>
         </div>
-        <button className="btn btn-ghost" onClick={onClear} disabled={loading}>{loading ? 'Limpiando...' : 'Limpiar datos'}</button>
+        <div className="flex gap-2">
+          <button className="btn btn-outline" onClick={onClearCache} disabled={loading}>
+            Vaciar Caché
+          </button>
+          <button className="btn btn-ghost" onClick={onClear} disabled={loading}>
+            {loading ? 'Limpiando...' : 'Limpiar datos'}
+          </button>
+        </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
         {cards.map((c) => (
