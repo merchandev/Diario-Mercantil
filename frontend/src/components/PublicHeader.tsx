@@ -163,7 +163,7 @@ export default function PublicHeader() {
           </button>
 
           {/* Nav Links - Desktop / Mobile Container */}
-          <div className={`${isMenuOpen ? 'flex' : 'hidden'} md:flex absolute md:relative top-full left-0 w-full md:w-auto bg-white/95 md:bg-transparent backdrop-blur md:backdrop-blur-none border-b md:border-b-0 border-slate-200 md:h-12 flex-col md:flex-row shadow-lg md:shadow-none p-4 md:p-0 gap-4 md:gap-6 z-50 transition-all origin-top`}>
+          <div className={`${isMenuOpen ? 'flex' : 'hidden'} md:flex absolute md:relative top-full left-0 w-full md:flex-1 md:justify-center md:items-center bg-white/95 md:bg-transparent backdrop-blur md:backdrop-blur-none border-b md:border-b-0 border-slate-200 md:h-12 flex-col md:flex-row shadow-lg md:shadow-none p-4 md:p-0 gap-4 md:gap-6 z-50 transition-all origin-top`}>
             {menu.map((it) => (
               <Link key={it.label} to={it.to} onClick={() => setIsMenuOpen(false)} className="text-[13px] md:whitespace-nowrap font-medium tracking-wide text-slate-700 hover:text-brand-700 block md:inline">
                 {it.label}
