@@ -138,7 +138,7 @@ export default function App() {
           <Route path="publicaciones/:orden/:razon?" element={<LazyRoute><PublicacionPublic /></LazyRoute>} />
           <Route path="publicacion/:slug" element={<LazyRoute><PublicView /></LazyRoute>} />
           <Route path="edicion/:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
-          <Route path="dm/e-:code" element={<LazyRoute><EditionPublic /></LazyRoute>} />
+          <Route path="dm/:fullCode" element={<LazyRoute><EditionPublic /></LazyRoute>} />
           <Route path="visor-espresivo/:code" element={<LazyRoute><VisorEspressivoPDF /></LazyRoute>} />
           <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
           <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />

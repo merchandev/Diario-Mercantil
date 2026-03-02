@@ -8,7 +8,8 @@ type Edition = { id: number; code: string; status: string; date: string; edition
 type Order = { id: number; name: string; document: string; status: string; date: string }
 
 export default function EditionPublic() {
-  const { code } = useParams()
+  const { code, fullCode } = useParams()
+  const activeCode = code || (fullCode?.startsWith('e-') ? fullCode.slice(2) : fullCode)
   const [edition, setEdition] = useState<Edition | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [err, setErr] = useState('')
@@ -20,19 +21,19 @@ export default function EditionPublic() {
   const [searchRazon, setSearchRazon] = useState('')
 
   useEffect(() => {
-    if (!code) return
-    fetch(`/api/dm/e-${encodeURIComponent(code)}`)
+    if (!activeCode) return
+    fetch(`/api/dm/e-${encodeURIComponent(activeCode)}`)
       .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
       .then(d => { setEdition(d.edition); setOrders(d.orders || []) })
       .catch(e => setErr(typeof e === 'string' ? e : (e?.message || 'Error')))
-  }, [code])
+  }, [activeCode])
 
   useEffect(() => {
     // Cargar ediciones recientes para los widgets de abajo
     listEditions().then(res => {
-      setRecentEditions(res.items.filter(e => e.code !== code && e.status === 'Publicada').slice(0, 4))
+      setRecentEditions(res.items.filter(e => e.code !== activeCode && e.status === 'Publicada').slice(0, 4))
     }).catch(console.error)
-  }, [code])
+  }, [activeCode])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
