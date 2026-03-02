@@ -35,6 +35,25 @@ export default function SuperAdminDashboard() {
         navigate('/lotus/')
     }
 
+    const onClearCache = async () => {
+        if (!confirm('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión central y limpiará datos almacenados.')) return
+        try {
+            localStorage.clear()
+            sessionStorage.clear()
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations()
+                for (const r of regs) await r.unregister()
+            }
+            if ('caches' in window) {
+                const names = await caches.keys()
+                for (const name of names) await caches.delete(name)
+            }
+        } catch (e) {
+            console.error('Error limpiando caché:', e)
+        }
+        window.location.href = window.location.href.split('#')[0] + '?clear=' + new Date().getTime()
+    }
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
@@ -79,9 +98,14 @@ export default function SuperAdminDashboard() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <div className="mb-8">
-                    <h2 className="text-3xl font-bold text-white mb-2">Panel de Control</h2>
-                    <p className="text-purple-300">Acceso completo a todas las funcionalidades del sistema</p>
+                <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">Panel de Control</h2>
+                        <p className="text-purple-300">Acceso completo a todas las funcionalidades del sistema</p>
+                    </div>
+                    <button onClick={onClearCache} className="px-4 py-2 bg-purple-500/20 hover:bg-purple-500/40 border border-purple-500/50 rounded-lg text-white font-medium transition-colors shadow-lg">
+                        Vaciar Caché
+                    </button>
                 </div>
 
                 {/* Cards Grid */}
