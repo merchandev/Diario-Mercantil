@@ -238,7 +238,7 @@ class SystemController {
             $now = gmdate("Y-m-d H:i:s");
             
             // 4. Ensure Settings
-            $pdo->prepare("INSERT INTO settings(`key`, `value`) VALUES('price_per_folio_usd', '1.5') ON DUPLICATE KEY UPDATE `key`=`key`")->execute();
+            $pdo->prepare("INSERT INTO settings(`key`, `value`, `created_at`, `updated_at`) VALUES('price_per_folio_usd', '1.5', ?, ?) ON DUPLICATE KEY UPDATE `key`=`key`")->execute([$now, $now]);
             $log[] = "Setting price_per_folio_usd verificado.";
 
             // 5. Repair Pages Table
