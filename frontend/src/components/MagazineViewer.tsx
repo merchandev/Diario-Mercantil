@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import HTMLFlipBook from 'react-pageflip';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -15,9 +15,7 @@ interface MagazineViewerProps {
 
 const PageContent = React.forwardRef<HTMLDivElement, { pageNumber: number; width: number; height: number }>(({ pageNumber, width, height }, ref) => {
     return (
-        <div ref={ref} className="page bg-white shadow-2xl rounded-sm overflow-hidden flex items-center justify-center relative group">
-            {/* Spine shadow for realism */}
-            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none opacity-50 group-even:right-0 group-even:left-auto group-even:bg-gradient-to-l"></div>
+        <div ref={ref} className="page bg-white rounded-3xl overflow-hidden shadow-[0_35px_50px_rgba(0,0,0,0.35)] flex items-center justify-center relative">
             <div className="w-full h-full flex items-center justify-center p-0 m-0">
                 <Page
                     pageNumber={pageNumber}
@@ -25,7 +23,7 @@ const PageContent = React.forwardRef<HTMLDivElement, { pageNumber: number; width
                     height={height}
                     renderTextLayer={false}
                     renderAnnotationLayer={false}
-                    className="max-w-full max-h-full transition-transform duration-500 ease-in-out"
+                    className="max-w-full max-h-full object-contain"
                 />
             </div>
         </div>
@@ -51,31 +49,27 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
         setLoading(false);
     };
 
+    const handleResize = useCallback(() => {
+        if (!containerRef.current) return;
+        const { clientWidth, clientHeight } = containerRef.current;
+
+        const targetRatio = 1 / 1.414;
+        let h = clientHeight - 60;
+        let w = h * targetRatio;
+
+        if (w * 2 > clientWidth - 60) {
+            w = (clientWidth - 60) / 2;
+            h = w / targetRatio;
+        }
+
+        setDimensions({ width: Math.max(320, Math.floor(w)), height: Math.max(420, Math.floor(h)) });
+    }, []);
+
     useEffect(() => {
-        const handleResize = () => {
-            if (!containerRef.current) return;
-            const { clientWidth, clientHeight } = containerRef.current;
-
-            // Calculate aspect ratio for A4 portrait
-            const targetRatio = 1 / 1.414;
-
-            // Use as much height as possible
-            let h = clientHeight - 20;
-            let w = h * targetRatio;
-
-            // If two pages are too wide for the screen, scale down based on width
-            if (w * 2 > clientWidth - 40) {
-                w = (clientWidth - 40) / 2;
-                h = w / targetRatio;
-            }
-
-            setDimensions({ width: Math.floor(w), height: Math.floor(h) });
-        };
-
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, [isFullscreen]);
+    }, [handleResize]);
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -103,44 +97,58 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
         bookRef.current?.pageFlip()?.flipPrev();
     };
 
+    const pageLabel = useMemo(() => {
+        if (page === 0) return 'Portada';
+        if (page === numPages - 1 && numPages % 2 === 0) return 'Contraportada';
+        return `Páginas ${page}-${page + 1}`;
+    }, [page, numPages]);
+
     return (
         <div
             ref={containerRef}
-            style={{ backgroundColor: '#8F1920' }}
-            className={`relative w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[95vh] min-h-[650px] rounded-2xl shadow-2xl border border-white/5'}`}
+            className={`relative w-full overflow-hidden transition-all duration-500 ease-in-out bg-gradient-to-br from-slate-950 via-slate-900 to-black ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'min-h-[640px] rounded-[28px] shadow-[0_40px_90px_rgba(0,0,0,0.65)] border border-white/10'}`}
         >
-            {/* Controls */}
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.06),_transparent_55%)]" />
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_bottom,_rgba(255,255,255,0.04),_transparent_50%)]" />
+
+            <div className="absolute top-4 left-4 z-30 space-y-1 text-white text-xs uppercase tracking-[0.4em]">
+                <p className="text-white/50">Visor</p>
+                <p className="text-white/90 text-base font-semibold">Espressivo PDF</p>
+            </div>
+
+            <div className="absolute top-4 right-4 z-30 flex gap-2">
                 <button
                     onClick={toggleFullscreen}
-                    className="bg-white/90 backdrop-blur text-slate-700 p-2.5 rounded-full shadow-lg hover:bg-brand-600 hover:text-white transition-all border border-slate-200 hover:scale-105"
+                    className="w-11 h-11 rounded-xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all shadow-lg"
                     title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
                 >
                     {isFullscreen ? <IconMinimize className="w-5 h-5" /> : <IconMaximize className="w-5 h-5" />}
                 </button>
             </div>
 
-            {/* Loading Overlay */}
+            <div className="absolute inset-x-0 top-16 px-6 z-20">
+                <div className="max-w-4xl mx-auto rounded-full border border-white/20 bg-slate-900/60 backdrop-blur px-5 py-2 text-center text-xs text-slate-200 shadow-lg">
+                    {numPages ? `${pageLabel} · ${numPages} páginas` : 'Cargando contenido...'}
+                </div>
+            </div>
+
             {loading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md z-20 transition-opacity duration-500">
-                    <div className="relative w-20 h-20 mb-6">
-                        <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
-                        <div className="absolute inset-0 border-4 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
-                    </div>
-                    <p className="text-slate-300 font-medium tracking-wide animate-pulse">Preparando la revista digital...</p>
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white/80">
+                    <div className="animate-pulse rounded-full w-16 h-16 border-4 border-white/30 border-t-transparent mb-4"></div>
+                    <p>Preparando la edición digital</p>
                 </div>
             )}
 
-            <div className="relative w-full h-full flex items-center justify-center p-4 md:p-8 perspective-1000">
+            <div className="relative w-full h-full flex items-center justify-center px-4 py-16">
                 <Document
                     file={src}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
-                    className="flex justify-center"
+                    className="flex justify-center w-full h-full"
                     loading={null}
                 >
                     {!loading && numPages > 0 && dimensions.width > 100 && (
-                        <div className="transform-gpu transition-transform duration-700 ease-out hover:scale-[1.02] shadow-2xl relative w-full h-full flex items-center justify-center rounded-sm">
+                        <div className="w-full flex justify-center">
                             {/* @ts-ignore */}
                             <HTMLFlipBook
                                 width={dimensions.width}
@@ -148,16 +156,16 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                                 size="stretch"
                                 minWidth={200}
                                 maxWidth={2000}
-                                minHeight={300}
-                                maxHeight={3000}
-                                maxShadowOpacity={0.6}
+                                minHeight={400}
+                                maxHeight={2500}
+                                maxShadowOpacity={0.65}
                                 showCover={true}
-                                className="flipbook-demo mx-auto shadow-2xl drop-shadow-2xl"
+                                className="relative shadow-[0_40px_120px_rgba(0,0,0,0.55)] rounded-[28px]"
                                 ref={bookRef}
                                 onFlip={(e: any) => setPage(e.data)}
                                 useMouseEvents={true}
                                 swipeDistance={30}
-                                flippingTime={1200}
+                                flippingTime={900}
                             >
                                 {Array.from(new Array(numPages), (el, index) => (
                                     <PageContent
@@ -171,32 +179,27 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                         </div>
                     )}
                 </Document>
-
-                {/* Navigation Arrows */}
-                {!loading && numPages > 0 && (
-                    <>
-                        <button
-                            onClick={prevButtonClick}
-                            disabled={page === 0}
-                            className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 bg-slate-800/80 backdrop-blur-md p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white hover:bg-brand-600 hover:scale-110 hover:shadow-brand-500/50 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none z-30 group"
-                        >
-                            <IconChevronLeft className="w-6 h-6 md:w-8 md:h-8 group-hover:-translate-x-1 transition-transform" />
-                        </button>
-                        <button
-                            onClick={nextButtonClick}
-                            disabled={page >= numPages - 1}
-                            className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 bg-slate-800/80 backdrop-blur-md p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white hover:bg-brand-600 hover:scale-110 hover:shadow-brand-500/50 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none z-30 group"
-                        >
-                            <IconChevronRight className="w-6 h-6 md:w-8 md:h-8 group-hover:translate-x-1 transition-transform" />
-                        </button>
-                    </>
-                )}
             </div>
 
-            {!loading && (
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur px-6 py-2 rounded-full text-white/90 text-sm font-medium tracking-wide shadow-lg">
-                    {page === 0 ? 'Portada' : (page === numPages - 1 && numPages % 2 === 0 ? 'Contraportada' : `Páginas ${page}-${page + 1}`)} / {numPages}
-                </div>
+            {!loading && numPages > 0 && (
+                <>
+                    <button
+                        onClick={prevButtonClick}
+                        disabled={page === 0}
+                        className="absolute left-8 bottom-6 z-30 flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-xl transition hover:scale-[1.02]"
+                    >
+                        <IconChevronLeft className="w-4 h-4" />
+                        Anterior
+                    </button>
+                    <button
+                        onClick={nextButtonClick}
+                        disabled={page >= numPages - 1}
+                        className="absolute right-8 bottom-6 z-30 flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-xl transition hover:scale-[1.02]"
+                    >
+                        Siguiente
+                        <IconChevronRight className="w-4 h-4" />
+                    </button>
+                </>
             )}
         </div>
     );
