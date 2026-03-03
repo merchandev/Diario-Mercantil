@@ -43,7 +43,7 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
     return w / ratio
   }, [containerWidth])
 
-  const viewerHeight = height ?? Math.max(minHeight, naturalHeight)
+  const viewerHeight = height ?? Math.max(minHeight, naturalHeight, 800)
 
   const loadBuffer = useCallback(async () => {
     if (!src) return
@@ -326,12 +326,12 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
             useMouseEvents={!readMode}
           >
             {pages.map((p) => (
-              <div key={p.num} className="page bg-white relative overflow-hidden shadow-2xl rounded-sm">
-                <div className="w-full h-full flex items-center justify-center bg-white">
-                  <img src={p.dataUrl} alt="" className="w-full h-full object-contain pointer-events-none" />
+              <div key={p.num} className="page bg-white relative overflow-hidden shadow-2xl rounded-sm group">
+                <div className="w-full h-full flex items-center justify-center bg-white p-0">
+                  <img src={p.dataUrl} alt="" className="max-w-full max-h-full object-contain pointer-events-none" />
                 </div>
                 {/* Gradient spine effect for realism */}
-                <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent pointer-events-none opacity-50 z-10" />
+                <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent pointer-events-none opacity-40 z-10" />
               </div>
             ))}
           </HTMLFlipBook>

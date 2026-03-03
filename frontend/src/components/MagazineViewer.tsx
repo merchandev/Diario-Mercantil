@@ -13,12 +13,21 @@ interface MagazineViewerProps {
     src: string;
 }
 
-const PageContent = React.forwardRef<HTMLDivElement, { pageNumber: number; width: number }>(({ pageNumber, width }, ref) => {
+const PageContent = React.forwardRef<HTMLDivElement, { pageNumber: number; width: number; height: number }>(({ pageNumber, width, height }, ref) => {
     return (
         <div ref={ref} className="page bg-white shadow-2xl rounded-sm overflow-hidden flex items-center justify-center relative group">
             {/* Spine shadow for realism */}
             <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none opacity-50 group-even:right-0 group-even:left-auto group-even:bg-gradient-to-l"></div>
-            <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer={false} className="transition-transform duration-500 ease-in-out" />
+            <div className="w-full h-full flex items-center justify-center p-0 m-0">
+                <Page
+                    pageNumber={pageNumber}
+                    width={width}
+                    height={height}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    className="max-w-full max-h-full transition-transform duration-500 ease-in-out"
+                />
+            </div>
         </div>
     );
 });
@@ -50,16 +59,17 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
             // Calculate aspect ratio for A4 portrait
             const targetRatio = 1 / 1.414;
 
-            // Reduce padding to make the book much larger
-            let w = (clientWidth / 2) - 10;
-            let h = w / targetRatio;
+            // Use as much height as possible
+            let h = clientHeight - 20;
+            let w = h * targetRatio;
 
-            if (h > clientHeight - 20) {
-                h = clientHeight - 20;
-                w = h * targetRatio;
+            // If two pages are too wide for the screen, scale down based on width
+            if (w * 2 > clientWidth - 40) {
+                w = (clientWidth - 40) / 2;
+                h = w / targetRatio;
             }
 
-            setDimensions({ width: Math.max(w, 200), height: Math.max(h, 300) });
+            setDimensions({ width: Math.floor(w), height: Math.floor(h) });
         };
 
         handleResize();
@@ -97,7 +107,7 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
         <div
             ref={containerRef}
             style={{ backgroundColor: '#8F1920' }}
-            className={`relative w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[85vh] min-h-[650px] rounded-2xl shadow-2xl border border-white/10'}`}
+            className={`relative w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[95vh] min-h-[650px] rounded-2xl shadow-2xl border border-white/5'}`}
         >
             {/* Controls */}
             <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -136,10 +146,10 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                                 width={dimensions.width}
                                 height={dimensions.height}
                                 size="stretch"
-                                minWidth={315}
-                                maxWidth={1000}
-                                minHeight={400}
-                                maxHeight={1533}
+                                minWidth={200}
+                                maxWidth={2000}
+                                minHeight={300}
+                                maxHeight={3000}
                                 maxShadowOpacity={0.6}
                                 showCover={true}
                                 className="flipbook-demo mx-auto shadow-2xl drop-shadow-2xl"
@@ -150,7 +160,12 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                                 flippingTime={1200}
                             >
                                 {Array.from(new Array(numPages), (el, index) => (
-                                    <PageContent key={`page_${index + 1}`} pageNumber={index + 1} width={dimensions.width} />
+                                    <PageContent
+                                        key={`page_${index + 1}`}
+                                        pageNumber={index + 1}
+                                        width={dimensions.width}
+                                        height={dimensions.height}
+                                    />
                                 ))}
                             </HTMLFlipBook>
                         </div>
