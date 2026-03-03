@@ -257,7 +257,7 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
   return (
     <div
       ref={containerRef}
-      className="relative bg-slate-900 rounded-xl shadow-2xl overflow-hidden border border-white/10"
+      className="relative w-full bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] rounded-2xl shadow-2xl overflow-hidden border border-slate-700/50 transition-all duration-500"
       style={{ height: height ? height : 'auto', minHeight: '600px' }}
     >
       {/* Floating Controls */}
@@ -281,9 +281,12 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
       </div>
 
       {loading && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900 text-slate-400">
-          <Loader2 className="w-10 h-10 animate-spin mb-3 text-emerald-500" />
-          <p className="text-sm font-medium">Procesando documento...</p>
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md transition-opacity duration-500">
+          <div className="relative w-20 h-20 mb-6">
+            <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
+          </div>
+          <p className="text-slate-300 font-medium tracking-wide animate-pulse">Procesando documento...</p>
         </div>
       )}
 
@@ -318,21 +321,17 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
             className="mx-auto flipbook-shadow"
             ref={flipBookRef}
             onFlip={onFlip}
-            startPage={currentPageIndex}
             drawShadow={true}
-            flippingTime={800}
+            flippingTime={1000}
             useMouseEvents={!readMode}
           >
             {pages.map((p) => (
-              <div key={p.num} className="page bg-white relative overflow-hidden">
-                <div className="w-full h-full flex items-center justify-center bg-slate-50">
-                  <img src={p.dataUrl} alt="" className="max-w-full max-h-full shadow-sm select-none" />
-                </div>
-                <div className="absolute bottom-3 right-3 text-[10px] sm:text-xs text-slate-400 font-medium font-mono uppercase tracking-wider bg-white/80 px-2 py-0.5 rounded-full">
-                  Página {p.num}
+              <div key={p.num} className="page bg-white relative overflow-hidden shadow-2xl rounded-sm">
+                <div className="w-full h-full flex items-center justify-center bg-white">
+                  <img src={p.dataUrl} alt="" className="w-full h-full object-contain pointer-events-none" />
                 </div>
                 {/* Gradient spine effect for realism */}
-                <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-black/5 to-transparent pointer-events-none mix-blend-multiply" />
+                <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent pointer-events-none opacity-50 z-10" />
               </div>
             ))}
           </HTMLFlipBook>

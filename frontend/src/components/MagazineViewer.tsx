@@ -15,8 +15,10 @@ interface MagazineViewerProps {
 
 const PageContent = React.forwardRef<HTMLDivElement, { pageNumber: number; width: number }>(({ pageNumber, width }, ref) => {
     return (
-        <div ref={ref} className="page bg-white shadow-md rounded-sm overflow-hidden flex items-center justify-center">
-            <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer={false} />
+        <div ref={ref} className="page bg-white shadow-2xl rounded-sm overflow-hidden flex items-center justify-center relative group">
+            {/* Spine shadow for realism */}
+            <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-black/20 to-transparent z-10 pointer-events-none opacity-50 group-even:right-0 group-even:left-auto group-even:bg-gradient-to-l"></div>
+            <Page pageNumber={pageNumber} width={width} renderTextLayer={false} renderAnnotationLayer={false} className="transition-transform duration-500 ease-in-out" />
         </div>
     );
 });
@@ -48,15 +50,16 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
             // Calculate aspect ratio for A4 portrait
             const targetRatio = 1 / 1.414;
 
-            let w = clientWidth / 2 - 20; // Two pages side by side
+            // Give more breathing room (padding)
+            let w = (clientWidth / 2) - 40;
             let h = w / targetRatio;
 
-            if (h > clientHeight - 40) {
-                h = clientHeight - 40;
+            if (h > clientHeight - 80) {
+                h = clientHeight - 80;
                 w = h * targetRatio;
             }
 
-            setDimensions({ width: w, height: h });
+            setDimensions({ width: Math.max(w, 200), height: Math.max(h, 300) });
         };
 
         handleResize();
@@ -93,7 +96,7 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
     return (
         <div
             ref={containerRef}
-            className={`relative w-full bg-slate-100 flex flex-col items-center justify-center overflow-hidden transition-all duration-300 ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[80vh] min-h-[600px] rounded-xl shadow-inner border border-slate-200'}`}
+            className={`relative w-full bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[85vh] min-h-[600px] rounded-2xl shadow-2xl border border-slate-700/50'}`}
         >
             {/* Controls */}
             <div className="absolute top-4 right-4 z-10 flex gap-2">
@@ -106,14 +109,18 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                 </button>
             </div>
 
+            {/* Loading Overlay */}
             {loading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100/80 backdrop-blur-sm z-20">
-                    <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
-                    <p className="text-slate-600 font-medium">Cargando revista digital...</p>
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 backdrop-blur-md z-20 transition-opacity duration-500">
+                    <div className="relative w-20 h-20 mb-6">
+                        <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
+                        <div className="absolute inset-0 border-4 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
+                    </div>
+                    <p className="text-slate-300 font-medium tracking-wide animate-pulse">Preparando la revista digital...</p>
                 </div>
             )}
 
-            <div className="relative w-full h-full flex items-center justify-center p-8">
+            <div className="relative w-full h-full flex items-center justify-center p-4 md:p-8 perspective-1000">
                 <Document
                     file={src}
                     onLoadSuccess={onDocumentLoadSuccess}
@@ -122,8 +129,8 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                     loading={null}
                 >
                     {!loading && numPages > 0 && dimensions.width > 100 && (
-                        <div className="rotate-0 shadow-2xl relative w-full h-full flex items-center justify-center">
-                            {/* @ts-ignore - react-pageflip types are slightly incompatible with React 18 but it works */}
+                        <div className="transform-gpu transition-transform duration-700 ease-out hover:scale-[1.02] shadow-2xl relative w-full h-full flex items-center justify-center rounded-sm">
+                            {/* @ts-ignore */}
                             <HTMLFlipBook
                                 width={dimensions.width}
                                 height={dimensions.height}
@@ -132,13 +139,14 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                                 maxWidth={1000}
                                 minHeight={400}
                                 maxHeight={1533}
-                                maxShadowOpacity={0.5}
+                                maxShadowOpacity={0.6}
                                 showCover={true}
-                                className="flipbook-demo mx-auto"
+                                className="flipbook-demo mx-auto shadow-2xl drop-shadow-2xl"
                                 ref={bookRef}
                                 onFlip={(e: any) => setPage(e.data)}
                                 useMouseEvents={true}
                                 swipeDistance={30}
+                                flippingTime={1200}
                             >
                                 {Array.from(new Array(numPages), (el, index) => (
                                     <PageContent key={`page_${index + 1}`} pageNumber={index + 1} width={dimensions.width} />
@@ -154,16 +162,16 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
                         <button
                             onClick={prevButtonClick}
                             disabled={page === 0}
-                            className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur p-3 rounded-full shadow-lg text-brand-800 hover:bg-brand-50 hover:scale-110 transition-all disabled:opacity-30 disabled:hover:scale-100 z-10"
+                            className="absolute left-2 md:left-8 top-1/2 -translate-y-1/2 bg-slate-800/80 backdrop-blur-md p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white hover:bg-brand-600 hover:scale-110 hover:shadow-brand-500/50 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none z-30 group"
                         >
-                            <IconChevronLeft className="w-6 h-6" />
+                            <IconChevronLeft className="w-6 h-6 md:w-8 md:h-8 group-hover:-translate-x-1 transition-transform" />
                         </button>
                         <button
                             onClick={nextButtonClick}
                             disabled={page >= numPages - 1}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur p-3 rounded-full shadow-lg text-brand-800 hover:bg-brand-50 hover:scale-110 transition-all disabled:opacity-30 disabled:hover:scale-100 z-10"
+                            className="absolute right-2 md:right-8 top-1/2 -translate-y-1/2 bg-slate-800/80 backdrop-blur-md p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(0,0,0,0.5)] text-white hover:bg-brand-600 hover:scale-110 hover:shadow-brand-500/50 transition-all duration-300 disabled:opacity-0 disabled:pointer-events-none z-30 group"
                         >
-                            <IconChevronRight className="w-6 h-6" />
+                            <IconChevronRight className="w-6 h-6 md:w-8 md:h-8 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </>
                 )}
