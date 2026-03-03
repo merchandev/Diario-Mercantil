@@ -238,96 +238,100 @@ export default function FlipbookViewer({ src, minHeight = 420, height }: Props) 
     <div
       ref={containerRef}
       style={{ minHeight: `${viewerHeight}px` }}
-      className="relative w-full rounded-[32px] border border-white/15 shadow-[0_35px_80px_rgba(0,0,0,0.45)] overflow-hidden bg-gradient-to-br from-slate-950 to-slate-900 transition"
+      className="relative w-full overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-[#771919] via-[#6F0E15] to-[#4a090c] shadow-[0_40px_120px_rgba(0,0,0,0.65)]"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.08),_transparent_60%)] pointer-events-none" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#771919] to-[#6F0E15] opacity-90" />
 
-      <div className="absolute top-6 inset-x-0 z-10 px-6">
-        <div className="mx-auto max-w-4xl bg-white/5 text-white border border-white/10 rounded-2xl px-4 py-2 shadow-lg backdrop-blur flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-[0.2em] text-slate-200">
-            Página {currentPageIndex + 1} / {pages.length || '--'}
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={toggleReadMode}
-              className="w-10 h-10 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center transition"
-              title="Modo lectura"
-            >
-              <ZoomIn size={18} />
-            </button>
-            <button
-              onClick={toggleGridView}
-              className="w-10 h-10 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center transition"
-              title="Ver todas las páginas"
-            >
-              <Grid size={18} />
-            </button>
-          </div>
+      <div className="relative z-10 flex min-h-[620px] w-full flex-col items-center justify-center gap-6 px-4 py-10 text-center text-white">
+        <div className="flex flex-col items-center gap-2 text-xs uppercase tracking-[0.35em] text-white/70">
+          <span>Visor</span>
+          <span className="text-[0.55rem] tracking-[0.45em]">Espressivo PDF</span>
         </div>
+
+        <div className="w-full max-w-5xl rounded-3xl border border-white/20 bg-white/10 px-6 py-3 text-sm shadow-lg">
+          {pages.length ? (
+            <span className="font-semibold tracking-wide text-white">
+              Página {currentPageIndex + 1} de {pages.length}
+            </span>
+          ) : (
+            <span className="text-white/60">Cargando contenido…</span>
+          )}
+        </div>
+
+        {error && (
+          <div className="rounded-3xl border border-rose-400/40 bg-rose-500/10 px-5 py-3">
+            <p className="text-sm font-semibold text-rose-100">No se pudo cargar el PDF</p>
+            <p className="text-xs text-rose-200">{error}</p>
+          </div>
+        )}
+
+        {!loading && !error && pages.length > 0 && (
+          <div className="w-full max-w-6xl px-3">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute inset-0 -z-10 rounded-[36px] bg-gradient-to-br from-[#771919] via-[#6F0E15] to-[#4a090c]" />
+              <HTMLFlipBook
+                width={isMobile ? 300 : Math.min(bookWidth, 1100)}
+                height={isMobile ? 400 : bookHeight}
+                size="stretch"
+                minWidth={280}
+                maxWidth={1200}
+                minHeight={380}
+                maxHeight={1100}
+                maxShadowOpacity={0.6}
+                showCover={true}
+                className="relative mx-auto rounded-[30px] border border-white/10 bg-white shadow-[0_35px_120px_rgba(0,0,0,0.65)]"
+                ref={flipBookRef}
+                onFlip={onFlip}
+                drawShadow={true}
+                flippingTime={650}
+                useMouseEvents={!readMode}
+              >
+                {pages.map((p) => (
+                  <div
+                    key={p.num}
+                    className="page flex items-center justify-center overflow-hidden rounded-[28px] bg-white px-6 py-4 drop-shadow-lg"
+                  >
+                    <img src={p.dataUrl} alt="" className="max-h-full max-w-full object-contain" />
+                  </div>
+                ))}
+              </HTMLFlipBook>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex flex-col items-center gap-4 rounded-3xl border border-white/10 bg-white/10 px-6 py-6 shadow-xl">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/30 border-t-transparent" />
+            <p className="text-sm text-white/60">Procesando el documento…</p>
+          </div>
+        )}
+
+        {!loading && pages.length === 0 && !error && (
+          <div className="text-white/70">No hay páginas disponibles.</div>
+        )}
+
+        {!loading && pages.length > 0 && (
+          <div className="flex w-full max-w-5xl items-center justify-between gap-4 px-6">
+            <button
+              onClick={() => flipBookRef.current?.pageFlip()?.flipPrev()}
+              disabled={currentPageIndex === 0}
+              className="flex items-center justify-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <ChevronLeft size={16} /> Anterior
+            </button>
+            <button
+              onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
+              disabled={currentPageIndex >= pages.length - 1}
+              className="flex items-center justify-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-2 text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Siguiente <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
-
-      {loading && (
-        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-900/80 px-6">
-          <div className="relative w-24 h-24 mb-4">
-            <div className="absolute inset-0 border-4 border-white/10 rounded-full animate-spin" />
-            <div className="absolute inset-4 border-2 border-brand-500 rounded-full animate-pulse" />
-          </div>
-          <p className="text-white/80 tracking-wider">Procesando documento…</p>
-        </div>
-      )}
-
-      {error && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/80 p-6">
-          <div className="bg-rose-500/10 border border-rose-400/40 rounded-2xl px-6 py-4 text-center">
-            <p className="text-rose-200 font-semibold text-lg mb-2">No se pudo cargar el PDF</p>
-            <p className="text-white/70 text-sm">{error}</p>
-          </div>
-        </div>
-      )}
 
       {readMode && <ReadModeOverlay />}
       {gridView && <GridViewOverlay />}
-
-      {!loading && !error && pages.length > 0 && (
-        <div className="relative flex items-center justify-center w-full h-full px-4 py-10">
-          <div className="max-w-6xl w-full">
-            <HTMLFlipBook
-              width={isMobile ? 320 : Math.min(bookWidth, 1100)}
-              height={isMobile ? 420 : bookHeight}
-              size="stretch"
-              minWidth={320}
-              maxWidth={1200}
-              minHeight={440}
-              maxHeight={1200}
-              maxShadowOpacity={0.4}
-              showCover={false}
-              className="mx-auto rounded-2xl shadow-[0_35px_80px_rgba(0,0,0,0.6)]"
-              ref={flipBookRef}
-              onFlip={onFlip}
-              drawShadow={true}
-              flippingTime={600}
-              useMouseEvents={!readMode}
-            >
-              {pages.map((p) => (
-                <div
-                  key={p.num}
-                  className="page bg-white rounded-2xl overflow-hidden border border-white/10 shadow-[0_25px_60px_rgba(0,0,0,0.45)]"
-                >
-                  <div className="w-full h-full flex items-center justify-center bg-white">
-                    <img src={p.dataUrl} alt="" className="max-w-full max-h-full object-contain" />
-                  </div>
-                </div>
-              ))}
-            </HTMLFlipBook>
-          </div>
-        </div>
-      )}
-
-      {!loading && !error && pages.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center text-white/60">
-          No hay páginas disponibles.
-        </div>
-      )}
     </div>
   )
 }

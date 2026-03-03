@@ -106,101 +106,104 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
     return (
         <div
             ref={containerRef}
-            className={`relative w-full overflow-hidden transition-all duration-500 ease-in-out bg-gradient-to-br from-slate-950 via-slate-900 to-black ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'min-h-[640px] rounded-[28px] shadow-[0_40px_90px_rgba(0,0,0,0.65)] border border-white/10'}`}
+            className={`relative w-full overflow-hidden ${isFullscreen ? 'h-screen fixed inset-0 z-50' : 'min-h-[600px]'} rounded-[30px] bg-gradient-to-br from-[#771919] via-[#6F0E15] to-[#3f080d] border border-white/15 shadow-[0_40px_110px_rgba(0,0,0,0.7)]`}
         >
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.06),_transparent_55%)]" />
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_bottom,_rgba(255,255,255,0.04),_transparent_50%)]" />
-
-            <div className="absolute top-4 left-4 z-30 space-y-1 text-white text-xs uppercase tracking-[0.4em]">
-                <p className="text-white/50">Visor</p>
-                <p className="text-white/90 text-base font-semibold">Espressivo PDF</p>
-            </div>
-
-            <div className="absolute top-4 right-4 z-30 flex gap-2">
-                <button
-                    onClick={toggleFullscreen}
-                    className="w-11 h-11 rounded-xl bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all shadow-lg"
-                    title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
-                >
-                    {isFullscreen ? <IconMinimize className="w-5 h-5" /> : <IconMaximize className="w-5 h-5" />}
-                </button>
-            </div>
-
-            <div className="absolute inset-x-0 top-16 px-6 z-20">
-                <div className="max-w-4xl mx-auto rounded-full border border-white/20 bg-slate-900/60 backdrop-blur px-5 py-2 text-center text-xs text-slate-200 shadow-lg">
-                    {numPages ? `${pageLabel} · ${numPages} páginas` : 'Cargando contenido...'}
+            <div className="absolute inset-0 bg-gradient-to-br from-[#771919] via-[#6F0E15] to-[#2c0509]" />
+            <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center gap-6 px-4 py-10 text-center text-white">
+                <div className="space-y-1">
+                    <p className="text-xs uppercase tracking-[0.5em] text-white/60">Visor</p>
+                    <p className="text-2xl font-semibold tracking-[0.4em]">Espressivo PDF</p>
                 </div>
-            </div>
 
-            {loading && (
-                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-white/80">
-                    <div className="animate-pulse rounded-full w-16 h-16 border-4 border-white/30 border-t-transparent mb-4"></div>
-                    <p>Preparando la edición digital</p>
+                <div className="flex items-center justify-between w-full gap-4">
+                    <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs uppercase tracking-[0.4em] text-white/70 shadow-lg">
+                        {numPages ? pageLabel : 'Cargando contenido...'}
+                    </div>
+                    <button
+                        onClick={toggleFullscreen}
+                        className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                        title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+                    >
+                        {isFullscreen ? <IconMinimize className="w-5 h-5" /> : <IconMaximize className="w-5 h-5" />}
+                    </button>
                 </div>
-            )}
 
-            <div className="relative w-full h-full flex items-center justify-center px-4 py-16">
-                <Document
-                    file={src}
-                    onLoadSuccess={onDocumentLoadSuccess}
-                    onLoadError={onDocumentLoadError}
-                    className="flex justify-center w-full h-full"
-                    loading={null}
-                >
-                    {!loading && numPages > 0 && dimensions.width > 100 && (
-                        <div className="w-full flex justify-center">
-                            {/* @ts-ignore */}
-                            <HTMLFlipBook
-                                width={dimensions.width}
-                                height={dimensions.height}
-                                size="stretch"
-                                minWidth={200}
-                                maxWidth={2000}
-                                minHeight={400}
-                                maxHeight={2500}
-                                maxShadowOpacity={0.65}
-                                showCover={true}
-                                className="relative shadow-[0_40px_120px_rgba(0,0,0,0.55)] rounded-[28px]"
-                                ref={bookRef}
-                                onFlip={(e: any) => setPage(e.data)}
-                                useMouseEvents={true}
-                                swipeDistance={30}
-                                flippingTime={900}
-                            >
-                                {Array.from(new Array(numPages), (el, index) => (
-                                    <PageContent
-                                        key={`page_${index + 1}`}
-                                        pageNumber={index + 1}
+                {loading && (
+                    <div className="flex flex-col items-center gap-3 rounded-3xl border border-white/15 bg-white/10 px-6 py-6 shadow-xl">
+                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/30 border-t-transparent" />
+                        <p className="text-sm text-white/70">Preparando la edición digital</p>
+                    </div>
+                )}
+
+                {!loading && (
+                    <div className="w-full px-6">
+                        <Document
+                            file={src}
+                            onLoadSuccess={onDocumentLoadSuccess}
+                            onLoadError={onDocumentLoadError}
+                            className="flex justify-center"
+                            loading={null}
+                        >
+                            {numPages > 0 && dimensions.width > 100 && (
+                                <div className="w-full flex justify-center">
+                                    {/* @ts-ignore */}
+                                    <HTMLFlipBook
                                         width={dimensions.width}
                                         height={dimensions.height}
-                                    />
-                                ))}
-                            </HTMLFlipBook>
-                        </div>
-                    )}
-                </Document>
-            </div>
+                                        size="stretch"
+                                        minWidth={280}
+                                        maxWidth={1200}
+                                        minHeight={380}
+                                        maxHeight={2000}
+                                        maxShadowOpacity={0.6}
+                                        showCover={true}
+                                        className="relative rounded-[30px] border border-white/10 bg-white shadow-[0_40px_120px_rgba(0,0,0,0.55)]"
+                                        ref={bookRef}
+                                        onFlip={(e: any) => setPage(e.data)}
+                                        useMouseEvents={true}
+                                        swipeDistance={30}
+                                        flippingTime={850}
+                                    >
+                                        {Array.from(new Array(numPages), (el, index) => (
+                                            <PageContent
+                                                key={`page_${index + 1}`}
+                                                pageNumber={index + 1}
+                                                width={dimensions.width}
+                                                height={dimensions.height}
+                                            />
+                                        ))}
+                                    </HTMLFlipBook>
+                                </div>
+                            )}
+                        </Document>
+                    </div>
+                )}
 
-            {!loading && numPages > 0 && (
-                <>
-                    <button
-                        onClick={prevButtonClick}
-                        disabled={page === 0}
-                        className="absolute left-8 bottom-6 z-30 flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-xl transition hover:scale-[1.02]"
-                    >
-                        <IconChevronLeft className="w-4 h-4" />
-                        Anterior
-                    </button>
-                    <button
-                        onClick={nextButtonClick}
-                        disabled={page >= numPages - 1}
-                        className="absolute right-8 bottom-6 z-30 flex items-center gap-2 px-4 py-2 rounded-full bg-black/60 border border-white/10 text-white disabled:opacity-40 disabled:cursor-not-allowed shadow-xl transition hover:scale-[1.02]"
-                    >
-                        Siguiente
-                        <IconChevronRight className="w-4 h-4" />
-                    </button>
-                </>
-            )}
+                {!loading && numPages === 0 && (
+                    <div className="text-sm text-white/60">No hay páginas disponibles.</div>
+                )}
+
+                {!loading && numPages > 0 && (
+                    <div className="flex w-full items-center justify-between gap-4 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-white shadow-lg">
+                        <button
+                            onClick={prevButtonClick}
+                            disabled={page === 0}
+                            className="flex items-center gap-2 rounded-full bg-transparent px-3 py-2 text-sm uppercase tracking-[0.3em] text-white transition hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            <IconChevronLeft className="w-4 h-4" />
+                            Anterior
+                        </button>
+                        <button
+                            onClick={nextButtonClick}
+                            disabled={page >= numPages - 1}
+                            className="flex items-center gap-2 rounded-full bg-transparent px-3 py-2 text-sm uppercase tracking-[0.3em] text-white transition hover:bg-white/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Siguiente
+                            <IconChevronRight className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
