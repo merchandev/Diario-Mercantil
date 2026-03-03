@@ -26,6 +26,7 @@ export default function FlipbookViewer({ src, minHeight = 420, height }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [containerWidth, setContainerWidth] = useState(520)
   const [pdfBuffer, setPdfBuffer] = useState<ArrayBuffer | null>(null)
+  const [creditVisible, setCreditVisible] = useState(true)
 
   // Controls
   const [currentPageIndex, setCurrentPageIndex] = useState(0)
@@ -117,6 +118,12 @@ export default function FlipbookViewer({ src, minHeight = 420, height }: Props) 
     if (!pdfBuffer) return
     renderPages(pdfBuffer)
   }, [pdfBuffer, renderPages])
+
+  useEffect(() => {
+    if (!creditVisible) return
+    const timer = setTimeout(() => setCreditVisible(false), 5000)
+    return () => clearTimeout(timer)
+  }, [creditVisible])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -241,6 +248,16 @@ export default function FlipbookViewer({ src, minHeight = 420, height }: Props) 
       className="relative w-full overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-[#771919] via-[#6F0E15] to-[#4a090c] shadow-[0_40px_120px_rgba(0,0,0,0.65)]"
     >
       <div className="absolute inset-0 bg-gradient-to-br from-[#771919] to-[#6F0E15] opacity-90" />
+
+      <div
+        className={`absolute top-4 right-4 z-20 transform transition-all duration-700 ${
+          creditVisible ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="rounded-full border border-white/30 bg-white/10 px-4 py-2 text-[0.55rem] uppercase tracking-[0.4em] text-white shadow-lg backdrop-blur">
+          Visor · Espressivo
+        </div>
+      </div>
 
       <div className="relative z-10 flex min-h-[620px] w-full flex-col items-center justify-center gap-6 px-4 py-10 text-center text-white">
         <div className="flex flex-col items-center gap-2 text-xs uppercase tracking-[0.35em] text-white/70">
