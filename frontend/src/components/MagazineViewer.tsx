@@ -50,12 +50,12 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
             // Calculate aspect ratio for A4 portrait
             const targetRatio = 1 / 1.414;
 
-            // Give more breathing room (padding)
-            let w = (clientWidth / 2) - 40;
+            // Reduce padding to make the book much larger
+            let w = (clientWidth / 2) - 10;
             let h = w / targetRatio;
 
-            if (h > clientHeight - 80) {
-                h = clientHeight - 80;
+            if (h > clientHeight - 20) {
+                h = clientHeight - 20;
                 w = h * targetRatio;
             }
 
@@ -96,7 +96,8 @@ export default function MagazineViewer({ src }: MagazineViewerProps) {
     return (
         <div
             ref={containerRef}
-            className={`relative w-full bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[85vh] min-h-[600px] rounded-2xl shadow-2xl border border-slate-700/50'}`}
+            style={{ backgroundColor: '#8F1920' }}
+            className={`relative w-full flex flex-col items-center justify-center overflow-hidden transition-all duration-500 ease-in-out ${isFullscreen ? 'h-screen fixed inset-0 z-50 rounded-none' : 'h-[85vh] min-h-[650px] rounded-2xl shadow-2xl border border-white/10'}`}
         >
             {/* Controls */}
             <div className="absolute top-4 right-4 z-10 flex gap-2">

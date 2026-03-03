@@ -168,9 +168,9 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
   // Calculate flipbook dimensions
   // We want a two-page spread if width allows, or single page if mobile
   // But react-pageflip is tricky. For now, let's stick to valid dimensions.
-  const isMobile = containerWidth < 600
-  const bookWidth = isMobile ? containerWidth : Math.min(containerWidth, 1000)
-  const bookHeight = Math.min(viewerHeight, 700)
+  const isMobile = containerWidth < 800
+  const bookWidth = isMobile ? containerWidth : Math.min(containerWidth, 1200)
+  const bookHeight = Math.min(viewerHeight, 900)
 
   // Read Mode Component
   const ReadModeOverlay = () => {
@@ -257,8 +257,8 @@ export default function FlipbookViewer({ src, minHeight = 380, height }: Props) 
   return (
     <div
       ref={containerRef}
-      className="relative w-full bg-slate-900 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] rounded-2xl shadow-2xl overflow-hidden border border-slate-700/50 transition-all duration-500"
-      style={{ height: height ? height : 'auto', minHeight: '600px' }}
+      style={{ backgroundColor: '#8F1920', height: height ? height : 'auto', minHeight: '600px' }}
+      className="relative w-full rounded-2xl shadow-2xl overflow-hidden border border-white/10 transition-all duration-500"
     >
       {/* Floating Controls */}
       <div className="absolute top-16 right-4 z-10 flex flex-col gap-2">
