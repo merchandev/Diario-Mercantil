@@ -313,22 +313,22 @@ function GridOverlay({ pages, currentIdx, onSelect, onClose }: { pages: FlipPage
 
 
 // ─── NavButton ────────────────────────────────────────────────────────────────
-function NavBtn({ dir, disabled, onClick }: { dir: 'prev' | 'next'; disabled: boolean; onClick: () => void }) {
+function NavBtn({ dir, disabled, onClick, isMobile }: { dir: 'prev' | 'next'; disabled: boolean; onClick: () => void; isMobile?: boolean }) {
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      display: 'flex', alignItems: 'center', gap: 7,
-      padding: '10px 24px', borderRadius: 40,
+      display: 'flex', alignItems: 'center', gap: isMobile ? 0 : 7,
+      padding: isMobile ? '10px 14px' : '10px 24px', borderRadius: 40,
       border: `1.5px solid ${disabled ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.28)'}`,
       background: disabled ? 'rgba(255,255,255,0.03)' : 'linear-gradient(135deg,rgba(255,255,255,0.15),rgba(255,255,255,0.06))',
       color: disabled ? 'rgba(255,255,255,0.22)' : '#fff',
-      fontSize: 14, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
+      fontSize: isMobile ? 0 : 14, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
       backdropFilter: 'blur(12px)', boxShadow: disabled ? 'none' : '0 4px 20px rgba(0,0,0,0.3)',
-      transition: 'all 0.18s', userSelect: 'none', minWidth: 130, justifyContent: 'center',
+      transition: 'all 0.18s', userSelect: 'none', minWidth: isMobile ? 44 : 130, justifyContent: 'center',
       position: 'relative', zIndex: 50,
     }}>
-      {dir === 'prev' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>}
-      {dir === 'prev' ? 'Anterior' : 'Siguiente'}
-      {dir === 'next' && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>}
+      {dir === 'prev' && <svg width={isMobile ? "20" : "15"} height={isMobile ? "20" : "15"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>}
+      {!isMobile && (dir === 'prev' ? 'Anterior' : 'Siguiente')}
+      {dir === 'next' && <svg width={isMobile ? "20" : "15"} height={isMobile ? "20" : "15"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>}
     </button>
   )
 }
@@ -553,7 +553,7 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
     <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
       {/* Book */}
-      <div style={{ marginTop: isMobile ? 12 : 50, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ marginTop: 50, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div
           ref={bookRef}
           onPointerDown={handlePointerDown}
@@ -672,25 +672,25 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
 
       {/* ── Controls bar ── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', maxWidth: pageW * 2 + 60,
-        padding: '12px 18px', borderRadius: 50,
+        display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12,
+        width: '100%', maxWidth: isMobile ? pageW + 30 : pageW * 2 + 60,
+        padding: isMobile ? '12px 14px' : '12px 18px', borderRadius: 50,
         background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.1)',
         backdropFilter: 'blur(20px)', justifyContent: 'space-between',
         boxSizing: 'border-box', position: 'relative', zIndex: 50,
       }}>
-        <NavBtn dir="prev" disabled={spread <= 0 || isFlipping} onClick={() => doFlip('prev')} />
+        <NavBtn isMobile={isMobile} dir="prev" disabled={spread <= 0 || isFlipping} onClick={() => doFlip('prev')} />
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em' }}>
-            Pág.&nbsp;{curPageNum}{cur.left && cur.right ? `–${curPageNum + 1}` : ''}&nbsp;de&nbsp;{totalPages}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: isMobile ? 11 : 12, fontWeight: 700, letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+            Pág.&nbsp;{curPageNum}{(!isMobile && cur.left && cur.right) ? `–${curPageNum + 1}` : ''}&nbsp;de&nbsp;{totalPages}
           </span>
           <div style={{ width: '100%', maxWidth: 160, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#e63d3d,#ff6b6b)', borderRadius: 4, transition: 'width 0.4s ease' }} />
           </div>
         </div>
 
-        <NavBtn dir="next" disabled={spread >= maxS || isFlipping} onClick={() => doFlip('next')} />
+        <NavBtn isMobile={isMobile} dir="next" disabled={spread >= maxS || isFlipping} onClick={() => doFlip('next')} />
       </div>
     </div>
   )
