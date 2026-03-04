@@ -281,7 +281,9 @@ function PageCursor({ side, visible }: { side: 'left' | 'right'; visible: boolea
 }
 
 // ─── FlipEngine ───────────────────────────────────────────────────────────────
-function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?: (idx: number) => void }) {
+function FlipEngine({ pages, onPageChange, jumpTo }: {
+  pages: FlipPage[]; onPageChange?: (idx: number) => void; jumpTo?: number
+}) {
   const [spread, setSpread] = useState(0)
   // trans: active page-turn (drag or auto-anim)
   const [trans, setTrans] = useState<Trans | null>(null)
@@ -309,11 +311,25 @@ function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?:
   const nxt = spreadPages(pages, spread + 1)
   const prv = spreadPages(pages, spread - 1)
 
+  // Cancel any running RAF
+  const cancelRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null } }
+
+  // Jump to spread when instructed from outside (grid selection)
+  useEffect(() => {
+    if (jumpTo !== undefined && jumpTo !== spread) {
+      cancelRaf()
+      setTrans(null)
+      transRef.current = null
+      setSpread(jumpTo)
+      onPageChange?.(spreadToPageIdx(jumpTo))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpTo])
+
   // Keep transRef in sync
   useEffect(() => { transRef.current = trans }, [trans])
 
-  // Cancel any running RAF
-  const cancelRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null } }
+  // (cancelRaf already declared above)
 
   // Auto-animate from `fromAngle` to `toAngle`, then settle
   const animateTo = useCallback((dir: 'next' | 'prev', fromAngle: number, toAngle: number) => {
@@ -575,6 +591,7 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
   const [showGrid, setShowGrid] = useState(false)
   const [currentIdx, setCurrentIdx] = useState(0)
   const [isFs, setIsFs] = useState(false)
+  const [jumpToSpread, setJumpToSpread] = useState<number | null>(null)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const [rootW, setRootW] = useState(900)
@@ -728,13 +745,29 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
         {/* Viewer */}
         {!loading && pages.length > 0 && (
           <div style={{ width: '100%' }}>
-            <FlipEngine pages={pages} onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }} />
+            <FlipEngine
+              pages={pages}
+              jumpTo={jumpToSpread ?? undefined}
+              onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }}
+            />
           </div>
         )}
       </div>
 
       {showRead && <ReadOverlay pages={pages} startIdx={currentIdx} onClose={() => setShowRead(false)} />}
-      {showGrid && <GridOverlay pages={pages} currentIdx={currentIdx} onSelect={setCurrentIdx} onClose={() => setShowGrid(false)} />}
+      {showGrid && <GridOverlay
+        pages={pages}
+        currentIdx={currentIdx}
+        onSelect={(i) => {
+          // Convert page index → spread index, then jump
+          const targetSpread = i === 0 ? 0 : Math.ceil(i / 2)
+          setCurrentIdx(i)
+          setJumpToSpread(targetSpread)
+          // Reset after one render so the same value can be re-triggered
+          setTimeout(() => setJumpToSpread(null), 100)
+        }}
+        onClose={() => setShowGrid(false)}
+      />}
     </>
   )
 }
