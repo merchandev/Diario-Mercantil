@@ -108,14 +108,23 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
 
-  // sin() peaks at 90° for shadow and skew intensity
+  // Stable origin: prevents crazy CSS 3D scaling deformations
+  const origin = isR ? 'left center' : 'right center'
+
+  // sin() peaks at 90° for shadow and physics intensity
   const curve = Math.sin((angle / 180) * Math.PI)   // 0→1→0
 
+  // Corner peel physics: grabbing near top/bottom produces a slight twist
+  const skewDir = (dragY - 0.5) * 2    // -1 (top) to +1 (bottom)
 
-  // Transform origin shifts vertically to match where user grabbed the page.
-  // dragY=0 → top corner leads; dragY=1 → bottom corner leads; 0.5 = middle (uniform)
-  const originY = `${Math.round(dragY * 100)}%`
-  const transformOrigin = `${isR ? 'left' : 'right'} ${originY}`
+  // Small multi-axis tilt for organic peel without distortion
+  const maxTiltX = 8   // 8 degrees max twist
+  const maxSkewY = 4   // 4 degrees max skew
+
+  // X tilt pulls the grab-corner toward the user
+  const tiltX = curve * maxTiltX * skewDir
+  // Y skew adds a bit of curvature
+  const skewY = sign * curve * maxSkewY * skewDir
 
   const fSh = curve * 0.65
   const creaseBright = curve * 0.30
@@ -144,9 +153,11 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
 
       <div style={{
         position: 'absolute', inset: 0,
-        transformOrigin,
-        transform: `perspective(1200px) rotateY(${sign * angle}deg)`,
+        transformOrigin: origin,
+        // The rotation chain: Y for main flip, X for corner lifting, skewY for slight bending
+        transform: `rotateY(${sign * angle}deg) rotateX(${tiltX}deg) skewY(${skewY}deg)`,
         transformStyle: 'preserve-3d',
+        willChange: 'transform',
       }}>
         {/* Front face */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#fff', overflow: 'hidden' }}>
