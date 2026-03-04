@@ -377,7 +377,7 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
   const isMobile = containerW < 620
   const pageW = isMobile ? Math.min(containerW - 16, 380) : Math.floor((containerW - 60) / 2)
   const pageH = Math.round(pageW / 0.707)
-  const maxS = maxSpreadFor(pages)
+  const maxS = isMobile ? pages.length - 1 : maxSpreadFor(pages)
   const isCover = spread === 0
 
   const cur = spreadPages(pages, spread)
@@ -424,7 +424,8 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
         if (toAngle >= 170) {
           setSpread(s => {
             const ns = dir === 'next' ? s + 1 : s - 1
-            onPageChange?.(spreadToPageIdx(ns))
+            const realPageIdx = isMobile ? ns : spreadToPageIdx(ns)
+            onPageChange?.(realPageIdx)
             return ns
           })
         }
@@ -581,7 +582,11 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
 
               if (isFlipping) {
                 const bgM = flipDir === 'next' ? nxtPage : prvPage
-                return <PageFace page={bgM} w={pageW} h={pageH} />
+                return (
+                  <div style={{ position: 'relative' }}>
+                    <PageFace page={bgM} w={pageW} h={pageH} />
+                  </div>
+                )
               }
               return (
                 <div style={{ position: 'relative' }}>
