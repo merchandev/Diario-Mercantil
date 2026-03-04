@@ -46,53 +46,101 @@ function PageFace({ page, w, h, style = {} }: { page?: FlipPage; w: number; h: n
 }
 
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
-// KEY FIX: Back face does NOT use scaleX(-1).
-// The combined transform [parent rotateY(±180)] × [child rotateY(∓180)] = Identity
-// so the back-face content renders normally (not mirrored).
+/**
+ * FoldingPage — Two-segment curved fold
+ *
+ * Splits the page into spine-half (SegA) and outer-half (SegB, child of SegA).
+ * Each half rotates angle/2, so the junction creates a realistic bend.
+ *
+ * Image clipping: each segment shows only its half of the full-width image
+ * via overflow:hidden + absolute positioning with a -hw offset.
+ *
+ * Back-face correctness:
+ *   SegB at full flip: net rotation = -180° → back face at 0° → faces viewer ✓
+ *   SegA at full flip: net -90° → edge-on (back filled by bgLeft below)
+ */
 function FoldingPage({ front, back, angle, side, w, h }: {
   front?: FlipPage; back?: FlipPage
   angle: number; side: 'right' | 'left'; w: number; h: number
 }) {
-  const t = angle < 90 ? angle / 90 : (180 - angle) / 90
-  const sh = t * 0.5
-  const rotY = side === 'right' ? -angle : angle
-  const origin = side === 'right' ? 'left center' : 'right center'
+  const hw = w / 2
+  const seg = angle / 2              // each half does 0→90 as angle does 0→180
+  const isR = side === 'right'
+  const t = angle < 90 ? angle / 90 : (180 - angle) / 90   // 0→1→0, peaks at 90°
+  const sh = t * 0.55
 
-  // Slight skew to simulate page curvature (peaks at 90°)
-  const curveDeg = t * (side === 'right' ? 4 : -4)
+  // Directional shadows — progressively darker at the fold edge
+  const fGrad = isR
+    ? `linear-gradient(to left, rgba(0,0,0,${sh}) 0%, rgba(0,0,0,${sh * 0.35}) 40%, transparent 72%)`
+    : `linear-gradient(to right, rgba(0,0,0,${sh}) 0%, rgba(0,0,0,${sh * 0.35}) 40%, transparent 72%)`
+  const bGrad = isR
+    ? `linear-gradient(to right, rgba(0,0,0,${sh}) 0%, rgba(0,0,0,${sh * 0.35}) 40%, transparent 72%)`
+    : `linear-gradient(to left, rgba(0,0,0,${sh}) 0%, rgba(0,0,0,${sh * 0.35}) 40%, transparent 72%)`
+  // Spine crease: light gleam at the fold line
+  const creaseX = isR ? '0%' : '100%'
+  const crease = `radial-gradient(ellipse 10px 100% at ${creaseX} 50%, rgba(255,255,255,${t * 0.22}), transparent 70%)`
 
-  const frontShadow = side === 'right'
-    ? `linear-gradient(to left, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
-    : `linear-gradient(to right, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
-  const backShadow = side === 'right'
-    ? `linear-gradient(to right, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
-    : `linear-gradient(to left, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
-  // Mid-crease highlight (simulates paper light reflection at bend)
-  const creasePos = side === 'right' ? '2%' : '98%'
-  const creaseShadow = `radial-gradient(ellipse 6px 100% at ${creasePos} 50%, rgba(255,255,255,${t * 0.18}), transparent)`
+  // Rotation per segment
+  const rotA = `rotateY(${isR ? -seg : seg}deg)`
+  const rotB = `rotateY(${isR ? -seg : seg}deg)`  // additional, applied from SegB's origin
+  const origin = isR ? 'left center' : 'right center'
+
+  // Image offsets (inside overflow:hidden, width:hw containers)
+  // Each container clips to its own half; we offset the full-width image to align correctly.
+  //
+  //  segA front : spine half  → isR: left  half (offset 0)   ; !isR: right half (offset -hw)
+  //  segB front : outer half  → isR: right half (offset -hw)  ; !isR: left  half (offset 0)
+  //  segA back  : spine side of back page
+  //               → isR: right half of nxt.left (offset -hw)  ; !isR: left half of prv.right (offset 0)
+  //  segB back  : outer side of back page
+  //               → isR: left  half of nxt.left (offset 0)    ; !isR: right half of prv.right (offset -hw)
+  const imgS = (dx: number): React.CSSProperties => ({
+    position: 'absolute', top: 0, left: dx,
+    width: w, height: h, objectFit: 'contain', display: 'block',
+    userSelect: 'none', pointerEvents: 'none',
+  })
+  const aFi = isR ? 0 : -hw, bFi = isR ? -hw : 0
+  const aBi = isR ? -hw : 0, bBi = isR ? 0 : -hw
+
+  // SegA positionning within FoldingPage container
+  const segALeft = isR ? 0 : hw
+  // SegB positioned at SegA's outer edge (within SegA's local space)
+  const segBLeft = isR ? hw : -hw   // relative to SegA
+
+  const face = (imgX: number, src?: FlipPage, grad?: string, back?: boolean) => (
+    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden', ...(back ? { transform: 'rotateY(180deg)' } : {}) }}>
+      {src && <img src={src.dataUrl} alt="" draggable={false} style={imgS(imgX)} />}
+      {grad && <div style={{ position: 'absolute', inset: 0, background: grad, pointerEvents: 'none' }} />}
+      {!back && <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />}
+    </div>
+  )
 
   return (
     <div style={{
-      position: 'absolute', top: 0, [side === 'right' ? 'right' : 'left']: 0,
-      width: w, height: h, transformOrigin: origin,
-      transform: `rotateY(${rotY}deg) skewY(${curveDeg}deg)`,
-      transformStyle: 'preserve-3d', zIndex: 8,
+      position: 'absolute', top: 0, [isR ? 'right' : 'left']: 0,
+      width: w, height: h, zIndex: 8, transformStyle: 'preserve-3d', pointerEvents: 'none',
     }}>
-      {/* Front face */}
-      <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden' }}>
-        <PageFace page={front} w={w} h={h} />
-        <div style={{ position: 'absolute', inset: 0, background: frontShadow, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, background: creaseShadow, pointerEvents: 'none' }} />
-      </div>
-      {/* Back face */}
-      <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', overflow: 'hidden' }}>
-        <PageFace page={back} w={w} h={h} />
-        <div style={{ position: 'absolute', inset: 0, background: backShadow, pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', inset: 0, background: creaseShadow, pointerEvents: 'none' }} />
+      {/* ── Segment A: spine half ── */}
+      <div style={{
+        position: 'absolute', top: 0, left: segALeft, width: hw, height: h,
+        transformOrigin: origin, transform: rotA, transformStyle: 'preserve-3d',
+      }}>
+        {face(aFi, front, fGrad)}
+        {face(aBi, back, bGrad, true)}
+
+        {/* ── Segment B: outer half (child of SegA, rotates additionally) ── */}
+        <div style={{
+          position: 'absolute', top: 0, left: segBLeft, width: hw, height: h,
+          transformOrigin: origin, transform: rotB, transformStyle: 'preserve-3d',
+        }}>
+          {face(bFi, front, fGrad)}
+          {face(bBi, back, bGrad, true)}
+        </div>
       </div>
     </div>
   )
 }
+
 
 // ─── Overlays ─────────────────────────────────────────────────────────────────
 function ReadOverlay({ pages, startIdx, onClose }: { pages: FlipPage[]; startIdx: number; onClose: () => void }) {
