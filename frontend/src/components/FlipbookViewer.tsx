@@ -47,128 +47,78 @@ function PageFace({ page, w, h, style = {} }: { page?: FlipPage; w: number; h: n
 
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
 /**
- * FoldingPage — 3-segment cascading curved fold
+ * FoldingPage — single-segment with inline perspective for strong book-curl look.
  *
- * The page is split into 3 equal vertical strips (sw = w/3):
- *   SegA (spine-side, 1st third)  → rotates segAngle = angle/3
- *   SegB (middle, 2nd third)      → child of SegA, rotates additional segAngle → total 2*angle/3
- *   SegC (outer, 3rd third)       → child of SegB, rotates additional segAngle → total angle
+ * Using `perspective(700px)` directly in the transform (not inherited from parent)
+ * gives a much more dramatic perspective distortion: the page visibly narrows at
+ * 90° like real paper being held at the edge. Combined with a sin()-based
+ * shadow gradient and a subtle skewY, this creates a convincing book-page curl
+ * without any multi-segment clipping complexity.
  *
- * Result: a genuine C-curve bend. SegA barely moves (spine holds paper),
- * SegC moves the full angle (outer edge peels away fast).
- *
- * Transparency fix: every face div has background:#fff so even at 90° (edge-on)
- * the segment is white, never showing the red background through.
- *
- * Back-face visibility:
- *   SegC back: visible when angle > 90° (outer edge reveals destination page)
- *   SegB back: visible when angle > 135°
- *   SegA back: never visible during the animation (total angle/3 never > 90°)
- *   → Destination page content is shown progressively from outer edge inward ✓
+ * Key: background:#fff on both faces — never transparent regardless of angle.
  */
 function FoldingPage({ front, back, angle, side, w, h }: {
   front?: FlipPage; back?: FlipPage
   angle: number; side: 'right' | 'left'; w: number; h: number
 }) {
-  const sw = Math.floor(w / 3)      // strip width (one third)
-  const sw2 = w - sw * 2            // last strip takes any rounding remainder
   const isR = side === 'right'
   const origin = isR ? 'left center' : 'right center'
-  const segAngle = angle / 3        // each strip rotates this much additionally
   const sign = isR ? -1 : 1
 
-  // curve: 0→1→0, peaks at 90° for shadows / highlights
-  const curve = Math.sin((angle / 180) * Math.PI)
+  // sin() peaks at 90° — matches real paper curvature arc
+  const curve = Math.sin((angle / 180) * Math.PI)   // 0→1→0
 
-  // Shadow intensity increases from spine (SegA) to outer (SegC)
-  // Inner is lighter because it bends less; outer is darker because it bends most.
-  const shA = curve * 0.15
-  const shB = curve * 0.32
-  const shC = curve * 0.55
+  // Slight skewY simulates the paper bending (concave on one side)
+  // Peaks at 90° (max bend), reverses sign after 90° as page flips over
+  const skew = sign * curve * 3.5   // max ±3.5° at 90°
 
-  const makeShadow = (sh: number, isFront: boolean): string => {
-    if (isR) return isFront
-      ? `linear-gradient(to right, transparent 0%, rgba(0,0,0,${sh}) 100%)`
-      : `linear-gradient(to left,  transparent 0%, rgba(0,0,0,${sh}) 100%)`
-    return isFront
-      ? `linear-gradient(to left,  transparent 0%, rgba(0,0,0,${sh}) 100%)`
-      : `linear-gradient(to right, transparent 0%, rgba(0,0,0,${sh}) 100%)`
-  }
+  const fSh = curve * 0.65
+  const creaseBright = curve * 0.30
 
-  // Crease highlight at each segment junction (simulates paper catching light at bend)
-  const crease = `radial-gradient(ellipse 8px 100% at 50% 50%, rgba(255,255,255,${curve * 0.2}), transparent 70%)`
+  const frontGrad = isR
+    ? `linear-gradient(to left,  rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
+    : `linear-gradient(to right, rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
+  const backGrad = isR
+    ? `linear-gradient(to right, rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
+    : `linear-gradient(to left,  rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
+
+  const creaseX = isR ? '2%' : '98%'
+  const crease = `radial-gradient(ellipse 16px 100% at ${creaseX} 50%, rgba(255,255,255,${creaseBright}), transparent 60%)`
 
   // Cast shadow on the adjacent stationary page
-  const castW = Math.round(curve * 40)
-  const castBg = `rgba(0,0,0,${curve * 0.28})`
+  const castW = Math.round(curve * 44)
+  const castBg = `rgba(0,0,0,${curve * 0.35})`
   const castStyle = isR
     ? { right: w, width: castW, background: `linear-gradient(to left, ${castBg}, transparent)` }
     : { left: w, width: castW, background: `linear-gradient(to right, ${castBg}, transparent)` }
-
-  // Image offset helper: inside a strip of width `sw`, clip to show the correct
-  // portion of the full-width (w) page image.
-  const imgStyle = (offsetX: number, stripW: number): React.CSSProperties => ({
-    position: 'absolute', top: 0, left: offsetX,
-    width: w, height: h, display: 'block',
-    objectFit: 'fill', userSelect: 'none', pointerEvents: 'none',
-  })
-
-  // Front image offsets (current page, split into thirds):
-  const frontA = isR ? 0 : -(w - sw2)        // SegA: spine third
-  const frontB = isR ? -sw : -(w - sw2 - sw) // SegB: middle third
-  const frontC = isR ? -sw * 2 : 0           // SegC: outer third
-
-  // Back image offsets (destination page, outer revealed first):
-  //   isR: SegC (outer, leftmost) shows LEFT portion of destination left page
-  //   !isR: SegC (outer, rightmost) shows RIGHT portion of destination right page
-  const backC = isR ? 0 : -(w - sw2)         // SegC back: outer portion of dest
-  const backB = isR ? -sw : -(w - sw2 - sw)  // SegB back: middle portion
-  const backA = isR ? -sw * 2 : 0            // SegA back: spine portion (never shown)
-
-  type FaceProps = { imgX: number; stripW: number; page?: FlipPage; sh: number; isBack?: boolean }
-  const Face = ({ imgX, stripW, page, sh, isBack }: FaceProps) => (
-    <div style={{
-      position: 'absolute', inset: 0,
-      background: '#fff',          // ← KEY: always opaque, never transparent
-      overflow: 'hidden', backfaceVisibility: 'hidden',
-      ...(isBack ? { transform: 'rotateY(180deg)' } : {}),
-    }}>
-      {page && <img src={page.dataUrl} alt="" draggable={false} style={imgStyle(imgX, stripW)} />}
-      <div style={{ position: 'absolute', inset: 0, background: makeShadow(sh, !isBack), pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
-    </div>
-  )
-
-  const segStyle = (pos: number, width: number): React.CSSProperties => ({
-    position: 'absolute', top: 0, left: pos, width, height: h,
-    transformOrigin: origin,
-    transform: `rotateY(${sign * segAngle}deg)`,
-    transformStyle: 'preserve-3d',
-  })
 
   return (
     <div style={{
       position: 'absolute', top: 0, [isR ? 'right' : 'left']: 0,
       width: w, height: h, zIndex: 8, pointerEvents: 'none', transformStyle: 'preserve-3d',
     }}>
-      {/* Cast shadow onto the adjacent stationary page */}
+      {/* Cast shadow onto adjacent stationary page */}
       <div style={{ position: 'absolute', top: 0, height: '100%', ...castStyle, pointerEvents: 'none', zIndex: -1 }} />
 
-      {/* ── SegA: spine strip (rotates segAngle) ── */}
-      <div style={segStyle(isR ? 0 : w - sw, sw)}>
-        <Face imgX={frontA} stripW={sw} page={front} sh={shA} />
-        <Face imgX={backA} stripW={sw} page={back} sh={shA} isBack />
+      {/* The folding panel — perspective(700px) gives strong local 3D distortion */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        transformOrigin: origin,
+        transform: `perspective(700px) rotateY(${sign * angle}deg) skewY(${skew}deg)`,
+        transformStyle: 'preserve-3d',
+      }}>
+        {/* Front face – white bg prevents any transparency */}
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#fff', overflow: 'hidden' }}>
+          <PageFace page={front} w={w} h={h} />
+          <div style={{ position: 'absolute', inset: 0, background: frontGrad, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
+        </div>
 
-        {/* ── SegB: middle strip (child of SegA, adds segAngle) ── */}
-        <div style={segStyle(isR ? sw : -sw, sw)}>
-          <Face imgX={frontB} stripW={sw} page={front} sh={shB} />
-          <Face imgX={backB} stripW={sw} page={back} sh={shB} isBack />
-
-          {/* ── SegC: outer strip (child of SegB, adds segAngle → total = angle) ── */}
-          <div style={segStyle(isR ? sw : -sw, sw2)}>
-            <Face imgX={frontC} stripW={sw2} page={front} sh={shC} />
-            <Face imgX={backC} stripW={sw2} page={back} sh={shC} isBack />
-          </div>
+        {/* Back face – white bg prevents any transparency */}
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', overflow: 'hidden' }}>
+          <PageFace page={back} w={w} h={h} />
+          <div style={{ position: 'absolute', inset: 0, background: backGrad, pointerEvents: 'none' }} />
+          <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
         </div>
       </div>
     </div>
