@@ -111,12 +111,9 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   // sin() peaks at 90° for shadow and skew intensity
   const curve = Math.sin((angle / 180) * Math.PI)   // 0→1→0
 
-  // dragY-aware skew: grabbing near top → negative skewDir → top curls first
-  const skewDir = (dragY - 0.5) * 2    // -1 (top) to +1 (bottom)
-  const maxSkew = 7
-  const skew = sign * curve * maxSkew * skewDir
 
-  // Transform origin moves vertically to match where user grabbed
+  // Transform origin shifts vertically to match where user grabbed the page.
+  // dragY=0 → top corner leads; dragY=1 → bottom corner leads; 0.5 = middle (uniform)
   const originY = `${Math.round(dragY * 100)}%`
   const transformOrigin = `${isR ? 'left' : 'right'} ${originY}`
 
@@ -148,7 +145,7 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
       <div style={{
         position: 'absolute', inset: 0,
         transformOrigin,
-        transform: `perspective(600px) rotateY(${sign * angle}deg) skewY(${skew}deg)`,
+        transform: `perspective(1200px) rotateY(${sign * angle}deg)`,
         transformStyle: 'preserve-3d',
       }}>
         {/* Front face */}
