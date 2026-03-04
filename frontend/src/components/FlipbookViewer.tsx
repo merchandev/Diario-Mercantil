@@ -122,23 +122,72 @@ function ReadOverlay({ pages, startIdx, onClose }: { pages: FlipPage[]; startIdx
 
 function GridOverlay({ pages, currentIdx, onSelect, onClose }: { pages: FlipPage[]; currentIdx: number; onSelect: (i: number) => void; onClose: () => void }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.95)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <span style={{ color: '#fff', fontWeight: 700 }}>Todas las páginas</span>
-        <button onClick={onClose} style={{ color: '#fff', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 8, padding: '4px 12px', cursor: 'pointer' }}>✕</button>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: '#090910', display: 'flex', flexDirection: 'column', fontFamily: 'system-ui,sans-serif' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 4, height: 20, borderRadius: 2, background: '#e63d3d' }} />
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 16, letterSpacing: '0.01em' }}>Todas las páginas</span>
+          <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13, fontWeight: 500 }}>({pages.length} páginas)</span>
+        </div>
+        <button onClick={onClose} style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.14)',
+          color: '#fff', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>✕</button>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(100px,1fr))', gap: 8 }}>
-        {pages.map((p, i) => (
-          <button key={p.num} onClick={() => { onSelect(i); onClose() }}
-            style={{ border: i === currentIdx ? '2px solid #e63d3d' : '2px solid rgba(255,255,255,0.1)', borderRadius: 6, overflow: 'hidden', padding: 0, background: 'none', cursor: 'pointer' }}>
-            <img src={p.dataUrl} alt="" style={{ width: '100%', display: 'block' }} />
-            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 10, padding: '2px 0', background: 'rgba(0,0,0,0.5)' }}>{p.num}</div>
-          </button>
-        ))}
+
+      {/* Grid — 4 fixed columns */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 20, alignContent: 'start' }}>
+        {pages.map((p, i) => {
+          const isActive = i === currentIdx
+          return (
+            <button
+              key={p.num}
+              onClick={() => { onSelect(i); onClose() }}
+              style={{
+                border: isActive ? '2.5px solid #e63d3d' : '2px solid rgba(255,255,255,0.08)',
+                borderRadius: 12,
+                overflow: 'hidden',
+                padding: 0,
+                background: isActive ? 'rgba(230,61,61,0.08)' : 'rgba(255,255,255,0.03)',
+                cursor: 'pointer',
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease',
+                boxShadow: isActive ? '0 0 0 1px #e63d3d, 0 8px 32px rgba(230,61,61,0.25)' : '0 4px 16px rgba(0,0,0,0.4)',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.03)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.6)' }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = isActive ? '0 0 0 1px #e63d3d, 0 8px 32px rgba(230,61,61,0.25)' : '0 4px 16px rgba(0,0,0,0.4)' }}
+            >
+              {/* Thumbnail */}
+              <div style={{ width: '100%', background: '#fff', position: 'relative', overflow: 'hidden' }}>
+                <img src={p.dataUrl} alt={`Pág. ${p.num}`} style={{ width: '100%', display: 'block', objectFit: 'cover' }} />
+                {isActive && (
+                  <div style={{ position: 'absolute', top: 8, right: 8, background: '#e63d3d', borderRadius: 6, padding: '2px 7px', fontSize: 10, color: '#fff', fontWeight: 700 }}>
+                    Actual
+                  </div>
+                )}
+              </div>
+              {/* Page number label */}
+              <div style={{
+                textAlign: 'center',
+                color: isActive ? '#ff8080' : 'rgba(255,255,255,0.55)',
+                fontSize: 12, fontWeight: isActive ? 700 : 500,
+                padding: '8px 0',
+                background: isActive ? 'rgba(230,61,61,0.12)' : 'transparent',
+                letterSpacing: '0.04em',
+              }}>
+                Pág. {p.num}
+              </div>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
 }
+
 
 // ─── NavButton ────────────────────────────────────────────────────────────────
 function NavBtn({ dir, disabled, onClick }: { dir: 'prev' | 'next'; disabled: boolean; onClick: () => void }) {
