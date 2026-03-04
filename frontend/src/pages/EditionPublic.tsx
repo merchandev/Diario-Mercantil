@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
-import MagazineViewer from '../components/MagazineViewer'
+import FlipbookViewer from '../components/FlipbookViewer'
 import { listEditions } from '../lib/api'
 
 type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null }
@@ -133,7 +133,7 @@ export default function EditionPublic() {
         {/* 2. Revista PDF Central */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
           {edition.file_id ? (
-            <MagazineViewer src={pdfUrl} />
+            <FlipbookViewer src={pdfUrl} />
           ) : (
             <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
               <IconSearch className="w-12 h-12 mx-auto text-slate-300 mb-3" />
