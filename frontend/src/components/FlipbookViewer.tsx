@@ -354,8 +354,8 @@ function PageCursor({ side, visible }: { side: 'left' | 'right'; visible: boolea
 }
 
 // ─── FlipEngine ───────────────────────────────────────────────────────────────
-function FlipEngine({ pages, onPageChange, jumpTo }: {
-  pages: FlipPage[]; onPageChange?: (idx: number) => void; jumpTo?: number
+function FlipEngine({ pages, onPageChange, jumpTo, wrapperHeight }: {
+  pages: FlipPage[]; onPageChange?: (idx: number) => void; jumpTo?: number; wrapperHeight?: number
 }) {
   const [spread, setSpread] = useState(0)
   // trans: active page-turn (drag or auto-anim)
@@ -375,8 +375,18 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
   }, [])
 
   const isMobile = containerW < 620
-  const pageW = isMobile ? Math.min(containerW - 16, 380) : Math.floor((containerW - 60) / 2)
-  const pageH = Math.round(pageW / 0.707)
+  let pageW = isMobile ? Math.min(containerW - 16, 380) : Math.floor((containerW - 60) / 2)
+  let pageH = Math.round(pageW / 0.707)
+
+  // Sub-constraint: If it exceeds the explicitly forced wrapper maxHeight, scale it down.
+  // 170 accounts for container padding (50) and pagination controls (90) spacing
+  if (wrapperHeight) {
+    const maxH = Math.max(100, wrapperHeight - 170)
+    if (pageH > maxH) {
+      pageH = maxH
+      pageW = Math.round(pageH * 0.707)
+    }
+  }
   const maxS = isMobile ? pages.length - 1 : maxSpreadFor(pages)
   const isCover = spread === 0
 
@@ -866,6 +876,7 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
           <div style={{ width: '100%' }}>
             <FlipEngine
               pages={pages}
+              wrapperHeight={height}
               jumpTo={jumpToSpread ?? undefined}
               onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }}
             />
