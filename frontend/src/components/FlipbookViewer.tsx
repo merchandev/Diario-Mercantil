@@ -4,305 +4,647 @@ import {
   useRef,
   useState,
 } from 'react'
-import HTMLFlipBook from 'react-pageflip'
 import { fetchAuth } from '../lib/api'
 import * as pdfjs from 'pdfjs-dist'
-
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-type FlipPage = {
-  num: number
-  dataUrl: string
-  width: number
-  height: number
-}
+type FlipPage = { num: number; dataUrl: string }
 
 type Props = {
-  /** URL (absolute or relative) of the PDF to display */
   src: string
-  /** Minimum height in pixels (defaults to 480) */
   minHeight?: number
-  /** Fixed height in pixels — overrides auto height calculation */
   height?: number
-  /** Extra CSS class names to apply to the root wrapper */
   className?: string
-  /** Callback fired when the visible page changes */
   onPageChange?: (pageIndex: number) => void
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const RENDER_SCALE = 2.2       // supersampled for sharpness
-const FLIP_TIME = 780       // ms for page-flip animation
-const SHADOW_OP = 0.55      // max shadow opacity on flip
+const RENDER_SCALE = 2.2
+const ease = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
 
-// ─── Helper ──────────────────────────────────────────────────────────────────
+// ─── Custom 3-D Flip Engine ──────────────────────────────────────────────────
 
-function clamp(v: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, v))
-}
-
-// ─── Single-page overlay for READ mode ───────────────────────────────────────
-
-function ReadModeOverlay({
+function FlipEngine({
   pages,
-  pageIndex,
-  onClose,
+  onPageChange,
 }: {
   pages: FlipPage[]
-  pageIndex: number
-  onClose: () => void
+  onPageChange?: (idx: number) => void
 }) {
-  const [idx, setIdx] = useState(pageIndex)
-  const page = pages[idx]
-  if (!page) return null
+  // Spread = pair of pages; spread 0 → pages 0+1, spread 1 → pages 2+3 …
+  const [spread, setSpread] = useState(0)
+  const [flipping, setFlipping] = useState<'next' | 'prev' | null>(null)
+  const [flipAngle, setFlipAngle] = useState(0)   // 0 → 180
+  const [mouseAngle, setMouseAngle] = useState(0)  // subtle hover tilt
+  const [peelSide, setPeelSide] = useState<'right' | 'left' | null>(null)
+  const [peelAmt, setPeelAmt] = useState(0)
+  const [fs, setFs] = useState(false)
 
+  const raf = useRef<number | null>(null)
+  const bookRef = useRef<HTMLDivElement>(null)
+  const [w, setW] = useState(880)
+
+  // Watch container width
+  useEffect(() => {
+    if (!bookRef.current) return
+    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width))
+    ro.observe(bookRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  const isMobile = w < 640
+  const pageW = isMobile ? Math.min(w - 24, 400) : Math.floor((w - 80) / 2)
+  const pageH = Math.round(pageW / 0.707)
+  const maxSpread = Math.ceil(pages.length / 2) - 1
+
+  const L = (s: number) => pages[s * 2]
+  const R = (s: number) => pages[s * 2 + 1]
+  const nL = (s: number) => pages[(s + 1) * 2]
+  const nR = (s: number) => pages[(s + 1) * 2 + 1]
+  const pR = (s: number) => pages[(s - 1) * 2 + 1]
+
+  const flip = (dir: 'next' | 'prev') => {
+    if (flipping) return
+    if (dir === 'next' && spread >= maxSpread) return
+    if (dir === 'prev' && spread <= 0) return
+    setPeelSide(null)
+    setPeelAmt(0)
+    setFlipping(dir)
+    const start = performance.now()
+    const step = (now: number) => {
+      const p = Math.min((now - start) / 680, 1)
+      setFlipAngle(ease(p) * 180)
+      if (p < 1) {
+        raf.current = requestAnimationFrame(step)
+      } else {
+        setFlipAngle(0)
+        setFlipping(null)
+        if (dir === 'next') setSpread(s => { const nxt = s + 1; onPageChange?.(nxt * 2); return nxt })
+        else setSpread(s => { const prv = s - 1; onPageChange?.(prv * 2); return prv })
+      }
+    }
+    raf.current = requestAnimationFrame(step)
+  }
+
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current) }, [])
+
+  // Keyboard navigation
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') flip('next')
+      if (e.key === 'ArrowLeft') flip('prev')
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [spread, flipping])
+
+  // Mouse hover → subtle tilt + corner peel
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (flipping || isMobile) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const cx = (e.clientX - rect.left) / rect.width   // 0–1 left→right
+    setMouseAngle((cx - 0.5) * 8)  // ±4 deg tilt
+    // Corner peel detection
+    const cy = (e.clientY - rect.top) / rect.height
+    const rightEdge = cx > 0.72 && cy > 0.65
+    const leftEdge = cx < 0.28 && cy > 0.65
+    if (rightEdge && spread < maxSpread) {
+      setPeelSide('right')
+      setPeelAmt(Math.min(1, (cx - 0.72) / 0.28) * Math.min(1, (cy - 0.65) / 0.35))
+    } else if (leftEdge && spread > 0) {
+      setPeelSide('left')
+      setPeelAmt(Math.min(1, (0.28 - cx) / 0.28) * Math.min(1, (cy - 0.65) / 0.35))
+    } else {
+      setPeelSide(null); setPeelAmt(0)
+    }
+  }
+  const onMouseLeave = () => { setMouseAngle(0); setPeelSide(null); setPeelAmt(0) }
+
+  // Fullscreen
+  const toggleFs = () => {
+    if (!document.fullscreenElement) bookRef.current?.parentElement?.requestFullscreen().catch(() => { })
+    else document.exitFullscreen()
+  }
+  useEffect(() => {
+    const h = () => setFs(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', h)
+    return () => document.removeEventListener('fullscreenchange', h)
+  }, [])
+
+  // Total progress
+  const totalPages = pages.length
+  const curPage = spread * 2
+  const pct = totalPages > 0 ? Math.round(((curPage + (isMobile ? 1 : 2)) / totalPages) * 100) : 0
+
+  // Shadow intensity helper
+  const foldShadow = (angle: number) => {
+    const t = angle / 90
+    return t <= 1 ? t : 2 - t  // peaks at 90°
+  }
+
+  // Page component
+  const PageFace = ({ page, style = {} }: { page?: FlipPage; style?: React.CSSProperties }) => (
+    <div
+      style={{
+        width: pageW, height: pageH,
+        background: '#fff',
+        overflow: 'hidden',
+        flexShrink: 0,
+        boxShadow: '0 2px 24px rgba(0,0,0,0.35)',
+        ...style,
+      }}
+    >
+      {page
+        ? <img src={page.dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', userSelect: 'none', pointerEvents: 'none' }} draggable={false} />
+        : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #f0f0f0, #e8e8e8)' }} />
+      }
+    </div>
+  )
+
+  // Folding page during flip-next : right page folds left (rotateY 0→-180)
+  const FoldNextRight = () => {
+    const angle = flipAngle
+    const shadow = foldShadow(angle)
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          right: 0, top: 0,
+          width: pageW, height: pageH,
+          transformOrigin: 'left center',
+          transform: `rotateY(${-angle}deg)`,
+          transformStyle: 'preserve-3d',
+          zIndex: 10,
+        }}
+      >
+        {/* Front face: current right page */}
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden' }}>
+          <PageFace page={R(spread)} style={{ boxShadow: 'none' }} />
+          {/* Shadow that darkens toward the fold edge */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: `linear-gradient(to left, rgba(0,0,0,${shadow * 0.45}), transparent 60%)`,
+          }} />
+        </div>
+        {/* Back face: next-left page (mirrored) */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          overflow: 'hidden',
+        }}>
+          <PageFace page={nL(spread)} style={{ boxShadow: 'none', transform: 'scaleX(-1)' }} />
+          {/* Shadow on back face */}
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: `linear-gradient(to right, rgba(0,0,0,${shadow * 0.45}), transparent 60%)`,
+            transform: 'scaleX(-1)',
+          }} />
+        </div>
+      </div>
+    )
+  }
+
+  // Folding page during flip-prev: left page folds right (rotateY 0→+180)
+  const FoldPrevLeft = () => {
+    const angle = flipAngle
+    const shadow = foldShadow(angle)
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          left: 0, top: 0,
+          width: pageW, height: pageH,
+          transformOrigin: 'right center',
+          transform: `rotateY(${angle}deg)`,
+          transformStyle: 'preserve-3d',
+          zIndex: 10,
+        }}
+      >
+        {/* Front: current left page */}
+        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden' }}>
+          <PageFace page={L(spread)} style={{ boxShadow: 'none' }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: `linear-gradient(to right, rgba(0,0,0,${shadow * 0.45}), transparent 60%)`,
+          }} />
+        </div>
+        {/* Back: prev-right page (mirrored) */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          backfaceVisibility: 'hidden',
+          transform: 'rotateY(180deg)',
+          overflow: 'hidden',
+        }}>
+          <PageFace page={pR(spread)} style={{ boxShadow: 'none', transform: 'scaleX(-1)' }} />
+          <div style={{
+            position: 'absolute', inset: 0, pointerEvents: 'none',
+            background: `linear-gradient(to left, rgba(0,0,0,${shadow * 0.45}), transparent 60%)`,
+            transform: 'scaleX(-1)',
+          }} />
+        </div>
+      </div>
+    )
+  }
+
+  // Corner peel element
+  const CornerPeel = ({ side }: { side: 'right' | 'left' }) => {
+    const size = 60 + peelAmt * 40
+    return (
+      <div
+        onClick={() => flip(side === 'right' ? 'next' : 'prev')}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          [side]: 0,
+          width: size, height: size,
+          cursor: 'pointer',
+          zIndex: 20,
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          [side]: 0,
+          width: 0, height: 0,
+          borderStyle: 'solid',
+          borderWidth: side === 'right'
+            ? `${size}px 0 0 ${size}px`
+            : `${size}px ${size}px 0 0`,
+          borderColor: side === 'right'
+            ? `transparent transparent transparent rgba(0,0,0,${0.08 + peelAmt * 0.15})`
+            : `transparent transparent transparent transparent`,
+          filter: 'drop-shadow(-2px -2px 4px rgba(0,0,0,0.3))',
+        }} />
+        <div style={{
+          position: 'absolute',
+          bottom: 4, [side]: 4,
+          color: 'rgba(0,0,0,0.25)',
+          fontSize: 10,
+          fontWeight: 700,
+          userSelect: 'none',
+        }}>
+          {side === 'right' ? '›' : '‹'}
+        </div>
+      </div>
+    )
+  }
+
+  // ── MOBILE: Single-page swipe view ─────────────────────────────────────────
+  if (isMobile) {
+    const curMobilePage = pages[spread * 2] ?? pages[spread * 2 + 1]
+    return (
+      <div ref={bookRef} style={{ width: '100%' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: pageW, height: pageH,
+            boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
+            borderRadius: 4,
+            overflow: 'hidden',
+          }}>
+            <PageFace page={curMobilePage} style={{ boxShadow: 'none' }} />
+          </div>
+          {/* Mobile controls */}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <button
+              onClick={() => flip('prev')}
+              disabled={spread <= 0}
+              style={btnStyle(spread <= 0)}
+            >‹ Anterior</button>
+            <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>
+              {spread * 2 + 1} / {pages.length}
+            </span>
+            <button
+              onClick={() => flip('next')}
+              disabled={spread >= maxSpread}
+              style={btnStyle(spread >= maxSpread)}
+            >Siguiente ›</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── DESKTOP: Double-page spread ────────────────────────────────────────────
   return (
     <div
-      className="fixed inset-0 z-[200] flex flex-col bg-black/95 backdrop-blur-sm animate-fadein"
-      style={{ animation: 'flipbook-fadein 0.2s ease' }}
+      ref={bookRef}
+      style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}
     >
-      {/* header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
-        <span className="text-white/80 text-sm font-semibold tracking-wide">
-          Página {page.num} <span className="text-white/40">/ {pages.length}</span>
-        </span>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition"
-          aria-label="Cerrar vista de lectura"
+      {/* Book wrapper with perspective */}
+      <div
+        style={{
+          perspective: '1800px',
+          perspectiveOrigin: '50% 40%',
+          display: 'flex',
+          justifyContent: 'center',
+          width: '100%',
+        }}
+        onMouseMove={onMouseMove}
+        onMouseLeave={onMouseLeave}
+      >
+        {/* Book block — tilts subtly with mouse */}
+        <div
+          style={{
+            display: 'flex',
+            transform: !flipping ? `rotateY(${mouseAngle}deg) rotateX(-1.5deg)` : undefined,
+            transition: flipping ? 'none' : 'transform 0.25s ease-out',
+            transformStyle: 'preserve-3d',
+            position: 'relative',
+            boxShadow: '0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04)',
+          }}
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
+          {/* ── Background spread (visible during flip) ── */}
+          {flipping === 'next' && (
+            <>
+              <PageFace page={L(spread)} />
+              <div style={{ width: 2, background: 'rgba(0,0,0,0.15)', flexShrink: 0 }} />
+              <PageFace page={nL(spread)} />
+            </>
+          )}
+          {flipping === 'prev' && (
+            <>
+              <PageFace page={pR(spread)} />
+              <div style={{ width: 2, background: 'rgba(0,0,0,0.15)', flexShrink: 0 }} />
+              <PageFace page={R(spread)} />
+            </>
+          )}
 
-      {/* page image */}
-      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-        <img
-          src={page.dataUrl}
-          alt={`Página ${page.num}`}
-          className="max-h-full max-w-full object-contain rounded-lg shadow-2xl"
-          style={{ userSelect: 'none' }}
-        />
-      </div>
+          {/* ── Idle spread ── */}
+          {!flipping && (
+            <>
+              <div style={{ position: 'relative' }}>
+                <PageFace page={L(spread)} />
+                {peelSide === 'left' && <CornerPeel side="left" />}
+                {/* Left edge shadow (spine) */}
+                <div style={{
+                  position: 'absolute', top: 0, right: 0, width: 24, height: '100%', pointerEvents: 'none',
+                  background: 'linear-gradient(to left, rgba(0,0,0,0.18), transparent)',
+                }} />
+              </div>
+              <div style={{ width: 2, background: 'rgba(0,0,0,0.18)', flexShrink: 0 }} />
+              <div style={{ position: 'relative' }}>
+                <PageFace page={R(spread)} />
+                {peelSide === 'right' && <CornerPeel side="right" />}
+                {/* Right inner shadow (spine) */}
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, width: 24, height: '100%', pointerEvents: 'none',
+                  background: 'linear-gradient(to right, rgba(0,0,0,0.18), transparent)',
+                }} />
+              </div>
+            </>
+          )}
 
-      {/* navigation */}
-      <div className="flex items-center justify-center gap-3 py-4 border-t border-white/10 shrink-0">
-        <button
-          onClick={() => setIdx(i => Math.max(0, i - 1))}
-          disabled={idx === 0}
-          className="flex items-center gap-2 px-5 py-2 rounded-full border border-white/20 bg-white/10 text-white text-sm disabled:opacity-30 hover:bg-white/20 transition"
-        >
-          ← Anterior
-        </button>
-        {/* page dots (max 9 visible) */}
-        <div className="flex gap-1">
-          {pages.slice(Math.max(0, idx - 4), Math.min(pages.length, idx + 5)).map((p, i) => (
-            <button
-              key={p.num}
-              onClick={() => setIdx(Math.max(0, idx - 4) + i)}
-              className={`w-2 h-2 rounded-full transition ${Math.max(0, idx - 4) + i === idx ? 'bg-white scale-125' : 'bg-white/30'
-                }`}
-            />
-          ))}
+          {/* ── Folding page on top ── */}
+          {flipping === 'next' && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', pointerEvents: 'none' }}>
+              <FoldNextRight />
+            </div>
+          )}
+          {flipping === 'prev' && (
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', pointerEvents: 'none' }}>
+              <FoldPrevLeft />
+            </div>
+          )}
+
+          {/* Spine line */}
+          <div style={{
+            position: 'absolute',
+            top: 0, bottom: 0,
+            left: '50%',
+            width: 3,
+            background: 'linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,0.08), transparent)',
+            transform: 'translateX(-50%)',
+            pointerEvents: 'none',
+            zIndex: 5,
+          }} />
         </div>
-        <button
-          onClick={() => setIdx(i => Math.min(pages.length - 1, i + 1))}
-          disabled={idx >= pages.length - 1}
-          className="flex items-center gap-2 px-5 py-2 rounded-full border border-white/20 bg-white/10 text-white text-sm disabled:opacity-30 hover:bg-white/20 transition"
-        >
-          Siguiente →
+      </div>
+
+      {/* ── Controls bar ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 8, width: '100%', maxWidth: pageW * 2 + 40,
+        padding: '10px 16px',
+        borderRadius: 20,
+        background: 'rgba(0,0,0,0.40)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(16px)',
+      }}>
+        <button onClick={() => flip('prev')} disabled={spread <= 0} style={btnStyle(spread <= 0)}>
+          ‹ Anterior
+        </button>
+
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 12, fontWeight: 600, letterSpacing: '0.08em' }}>
+            Pág. {curPage + 1}{R(spread) ? `–${curPage + 2}` : ''} de {totalPages}
+          </span>
+          <div style={{ width: '100%', maxWidth: 200, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg, #e63d3d, #ff8080)', transition: 'width 0.4s ease', borderRadius: 2 }} />
+          </div>
+        </div>
+
+        {/* Action icons */}
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button title="Pantalla completa" onClick={toggleFs} style={iconBtnStyle}>
+            {fs
+              ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
+              : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+            }
+          </button>
+        </div>
+
+        <button onClick={() => flip('next')} disabled={spread >= maxSpread} style={btnStyle(spread >= maxSpread)}>
+          Siguiente ›
         </button>
       </div>
     </div>
   )
 }
 
-// ─── Grid-thumbnail overlay ───────────────────────────────────────────────────
+// Shared button styles
+const btnStyle = (disabled: boolean): React.CSSProperties => ({
+  padding: '6px 16px',
+  borderRadius: 30,
+  border: '1px solid rgba(255,255,255,0.2)',
+  background: 'rgba(255,255,255,0.08)',
+  color: disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.85)',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: disabled ? 'not-allowed' : 'pointer',
+  transition: 'all 0.18s ease',
+  letterSpacing: '0.04em',
+})
 
-function GridOverlay({
-  pages,
-  currentIdx,
-  onSelect,
-  onClose,
-}: {
-  pages: FlipPage[]
-  currentIdx: number
-  onSelect: (idx: number) => void
-  onClose: () => void
-}) {
+const iconBtnStyle: React.CSSProperties = {
+  width: 34, height: 34,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.15)',
+  background: 'rgba(255,255,255,0.07)',
+  color: 'rgba(255,255,255,0.65)',
+  cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  transition: 'background 0.15s',
+}
+
+// ─── Read-mode overlay ────────────────────────────────────────────────────────
+
+function ReadOverlay({ pages, startIdx, onClose }: { pages: FlipPage[]; startIdx: number; onClose: () => void }) {
+  const [idx, setIdx] = useState(startIdx)
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-black/96 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-white/10 shrink-0">
-        <h3 className="text-white font-semibold tracking-wide">Todas las páginas</h3>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition"
-          aria-label="Cerrar galería"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 300,
+      background: 'rgba(0,0,0,0.97)',
+      display: 'flex', flexDirection: 'column',
+      animation: 'flipbook-fadein 0.2s ease',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>Página {idx + 1} / {pages.length}</span>
+        <button onClick={onClose} style={{ ...iconBtnStyle, color: '#fff' }}>✕</button>
       </div>
-      <div
-        className="flex-1 overflow-y-auto p-4"
-        style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.2) transparent' }}
-      >
-        <div
-          className="grid gap-3"
-          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))' }}
-        >
-          {pages.map((p, idx) => (
-            <button
-              key={p.num}
-              onClick={() => onSelect(idx)}
-              className={`group relative rounded-xl overflow-hidden border-2 transition-all duration-200 ${currentIdx === idx
-                ? 'border-[#e63d3d] scale-[1.03] shadow-[0_0_0_3px_rgba(230,61,61,0.35)]'
-                : 'border-white/10 hover:border-white/40 hover:scale-[1.02]'
-                }`}
-              aria-label={`Ir a página ${p.num}`}
-            >
-              <img
-                src={p.dataUrl}
-                alt={`Pág. ${p.num}`}
-                className="w-full h-auto object-cover"
-                loading="lazy"
-              />
-              <span className="absolute bottom-0 inset-x-0 py-1 text-center text-[10px] text-white/80 bg-gradient-to-t from-black/80 to-transparent font-medium">
-                {p.num}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, overflow: 'hidden' }}>
+        {pages[idx] && <img src={pages[idx].dataUrl} alt="" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', boxShadow: '0 20px 60px rgba(0,0,0,0.8)' }} />}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12, padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+        <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0} style={btnStyle(idx === 0)}>‹ Anterior</button>
+        <button onClick={() => setIdx(i => Math.min(pages.length - 1, i + 1))} disabled={idx >= pages.length - 1} style={btnStyle(idx >= pages.length - 1)}>Siguiente ›</button>
       </div>
     </div>
+  )
+}
+
+// ─── Grid overlay ─────────────────────────────────────────────────────────────
+
+function GridOverlay({ pages, currentIdx, onSelect, onClose }: { pages: FlipPage[]; currentIdx: number; onSelect: (i: number) => void; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.97)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <span style={{ color: '#fff', fontWeight: 600 }}>Todas las páginas</span>
+        <button onClick={onClose} style={{ ...iconBtnStyle, color: '#fff' }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+        {pages.map((p, i) => (
+          <button
+            key={p.num}
+            onClick={() => { onSelect(i); onClose() }}
+            style={{
+              border: i === currentIdx ? '2px solid #e63d3d' : '2px solid transparent',
+              borderRadius: 8, overflow: 'hidden', padding: 0, background: 'none', cursor: 'pointer',
+              boxShadow: i === currentIdx ? '0 0 0 3px rgba(230,61,61,0.3)' : 'none',
+            }}
+          >
+            <img src={p.dataUrl} alt="" style={{ width: '100%', display: 'block' }} />
+            <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: 10, padding: '2px 0', background: 'rgba(0,0,0,0.6)' }}>{p.num}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+function BrandBadge() {
+  return (
+    <>
+      <style>{`
+        @keyframes badge-enter {
+          0%   { opacity:0; transform: translate(10px,-6px) scale(0.88); }
+          12%  { opacity:1; transform: translate(0,0) scale(1); }
+          72%  { opacity:1; transform: translate(0,0) scale(1); }
+          100% { opacity:0; transform: translate(4px,-3px) scale(0.96); }
+        }
+        .fb-badge { animation: badge-enter 6.5s cubic-bezier(.4,0,.2,1) forwards; pointer-events: none; }
+        @keyframes flipbook-fadein { from{opacity:0} to{opacity:1} }
+        @keyframes flipbook-spin { to{transform:rotate(360deg)} }
+      `}</style>
+      <div className="fb-badge" style={{ position: 'absolute', top: 14, right: 16, zIndex: 30 }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '7px 14px', borderRadius: 30,
+          background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(255,255,255,0.15)',
+        }}>
+          <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e63d3d', boxShadow: '0 0 6px #e63d3d' }} />
+          <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.42em', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>
+            Visor · Espressivo PDF
+          </span>
+        </div>
+      </div>
+    </>
   )
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function FlipbookViewer({
-  src,
-  minHeight = 480,
-  height,
-  className = '',
-  onPageChange,
-}: Props) {
+export default function FlipbookViewer({ src, minHeight = 500, height, className = '', onPageChange }: Props) {
   const [pages, setPages] = useState<FlipPage[]>([])
   const [loading, setLoading] = useState(false)
-  const [loadProgress, setLoadProgress] = useState(0)
+  const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const [pageIndex, setPageIndex] = useState(0)
-  const [showGrid, setShowGrid] = useState(false)
   const [showRead, setShowRead] = useState(false)
+  const [showGrid, setShowGrid] = useState(false)
+  const [currentIdx, setCurrentIdx] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const flipBookRef = useRef<any>(null)
-  const [containerW, setContainerW] = useState(800)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerW, setContainerW] = useState(900)
 
-  // ── Track container width with ResizeObserver ──────────────────────────────
   useEffect(() => {
     if (!containerRef.current) return
-    const ro = new ResizeObserver(([entry]) => {
-      setContainerW(entry.contentRect.width)
-    })
+    const ro = new ResizeObserver(([e]) => setContainerW(e.contentRect.width))
     ro.observe(containerRef.current)
     return () => ro.disconnect()
   }, [])
 
-  // ── Fullscreen sync ────────────────────────────────────────────────────────
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onFsChange)
-    return () => document.removeEventListener('fullscreenchange', onFsChange)
+    const h = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', h)
+    return () => document.removeEventListener('fullscreenchange', h)
   }, [])
 
-  // ── Keyboard navigation ────────────────────────────────────────────────────
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (showGrid || showRead) return
-      if (e.key === 'ArrowRight') flipBookRef.current?.pageFlip()?.flipNext()
-      if (e.key === 'ArrowLeft') flipBookRef.current?.pageFlip()?.flipPrev()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [showGrid, showRead])
-
-  // ── Load PDF buffer ────────────────────────────────────────────────────────
   const loadAndRender = useCallback(async () => {
     if (!src) return
-    setLoading(true)
-    setError(null)
-    setPages([])
-    setPageIndex(0)
-    setLoadProgress(0)
-
+    setLoading(true); setError(null); setPages([]); setProgress(0)
     try {
-      const isSameOrigin =
-        !src.startsWith('http') ||
-        src.startsWith(window.location.origin)
-
+      const isSameOrigin = !src.startsWith('http') || src.startsWith(window.location.origin)
       let buffer: ArrayBuffer
-
       if (isSameOrigin) {
-        // Same-origin API path → use fetchAuth (sends JWT if present)
-        const absoluteUrl = src.startsWith('http')
-          ? src
-          : new URL(src, window.location.origin).toString()
-        const res = await fetchAuth(absoluteUrl, undefined, true)
-        if (!res.ok) throw new Error(`Error al descargar el PDF (${res.status})`)
+        const res = await fetchAuth(src.startsWith('http') ? src : new URL(src, window.location.origin).toString(), undefined, true)
+        if (!res.ok) throw new Error(`Error ${res.status}`)
         buffer = await res.arrayBuffer()
       } else {
-        // External URL (CDN, S3, etc.) → plain fetch, no auth headers
         const res = await fetch(src)
-        if (!res.ok) throw new Error(`Error al descargar el PDF (${res.status})`)
+        if (!res.ok) throw new Error(`Error ${res.status}`)
         buffer = await res.arrayBuffer()
       }
-
-      // Clone to avoid detached-buffer issues with pdfjs
       const copy = new ArrayBuffer(buffer.byteLength)
       new Uint8Array(copy).set(new Uint8Array(buffer))
-
       const pdf = await pdfjs.getDocument({ data: copy }).promise
-      const totalPages = pdf.numPages
-      const rendered: FlipPage[] = []
-
-      for (let i = 1; i <= totalPages; i++) {
+      const total = pdf.numPages
+      const out: FlipPage[] = []
+      for (let i = 1; i <= total; i++) {
         const page = await pdf.getPage(i)
         const dpr = Math.min(window.devicePixelRatio || 1, 2)
         const viewport = page.getViewport({ scale: RENDER_SCALE * dpr })
-
         const canvas = document.createElement('canvas')
         canvas.width = viewport.width
         canvas.height = viewport.height
-
         const ctx = canvas.getContext('2d')
         if (!ctx) continue
-
         await page.render({ canvasContext: ctx, viewport } as any).promise
-
-        rendered.push({
-          num: i,
-          dataUrl: canvas.toDataURL('image/jpeg', 0.92),
-          width: viewport.width / dpr,
-          height: viewport.height / dpr,
-        })
-
-        setLoadProgress(Math.round((i / totalPages) * 100))
+        out.push({ num: i, dataUrl: canvas.toDataURL('image/jpeg', 0.92) })
+        setProgress(Math.round((i / total) * 100))
       }
-
-      setPages(rendered)
-    } catch (err: any) {
-      setError(err?.message || 'No se pudo cargar el PDF')
-      console.error('[FlipbookViewer] error:', err)
+      setPages(out)
+    } catch (e: any) {
+      setError(e?.message ?? 'Error al cargar el PDF')
     } finally {
       setLoading(false)
     }
@@ -310,331 +652,98 @@ export default function FlipbookViewer({
 
   useEffect(() => { loadAndRender() }, [loadAndRender])
 
-  // ── Derived dimensions ─────────────────────────────────────────────────────
-  const isMobile = containerW < 700
-  const isTablet = containerW >= 700 && containerW < 1100
+  const isMobile = containerW < 640
+  const pageW = isMobile ? Math.min(containerW - 24, 400) : Math.floor((containerW - 80) / 2)
+  const pageH = Math.round(pageW / 0.707)
+  const viewerH = height ?? Math.max(minHeight, pageH + 130)
 
-  // Single-page width (mobile) or double-page spread (desktop)
-  // We aim for max viewport usage while keeping A4 ratio (1:√2 ≈ 0.707)
-  const PAGE_RATIO = 1 / 1.414  // width / height for a single A4 page
-
-  let bookPageW: number
-  let bookPageH: number
-
-  if (isMobile) {
-    bookPageW = clamp(containerW - 32, 280, 480)
-    bookPageH = Math.round(bookPageW / PAGE_RATIO)
-  } else if (isTablet) {
-    // double page, half container each
-    bookPageW = clamp((containerW - 80) / 2, 300, 560)
-    bookPageH = Math.round(bookPageW / PAGE_RATIO)
-  } else {
-    bookPageW = clamp((containerW - 120) / 2, 340, 680)
-    bookPageH = Math.round(bookPageW / PAGE_RATIO)
-  }
-
-  const viewerH = height ?? Math.max(minHeight, bookPageH + 120)
-
-  // ── Flip event ─────────────────────────────────────────────────────────────
-  const onFlip = useCallback((e: any) => {
-    const idx = e.data as number
-    setPageIndex(idx)
-    onPageChange?.(idx)
-  }, [onPageChange])
-
-  const goToPage = (idx: number) => {
-    flipBookRef.current?.pageFlip()?.flip(idx)
-    setPageIndex(idx)
-    setShowGrid(false)
-  }
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(console.warn)
-    } else {
-      document.exitFullscreen()
-    }
-  }
-
-  const totalPages = pages.length
-  const progressPct = totalPages ? Math.round(((pageIndex + (isMobile ? 1 : 2)) / totalPages) * 100) : 0
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Keyframe injection */}
-      <style>{`
-        @keyframes flipbook-fadein  { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes flipbook-spin    { to { transform: rotate(360deg) } }
-        @keyframes badge-enter {
-          0%   { opacity: 0; transform: translate(12px, -8px) scale(0.9); }
-          15%  { opacity: 1; transform: translate(0, 0) scale(1); }
-          75%  { opacity: 1; transform: translate(0, 0) scale(1); }
-          100% { opacity: 0; transform: translate(6px, -4px) scale(0.95); }
-        }
-        .flipbook-badge {
-          animation: badge-enter 6s cubic-bezier(0.4,0,0.2,1) forwards;
-          pointer-events: none;
-        }
-        .flipbook-page {
-          background: #fff;
-          overflow: hidden;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        .flipbook-page img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          display: block;
-          pointer-events: none;
-          user-select: none;
-          -webkit-user-drag: none;
-        }
-      `}</style>
-
       <div
         ref={containerRef}
         className={`relative w-full overflow-hidden select-none ${className}`}
         style={{
-          minHeight: isFullscreen ? '100vh' : `${viewerH}px`,
+          minHeight: isFullscreen ? '100vh' : viewerH,
           height: isFullscreen ? '100vh' : undefined,
-          background: 'linear-gradient(145deg, #6b1111 0%, #7a1515 40%, #4a0a0a 100%)',
+          background: 'linear-gradient(150deg, #6b1111 0%, #7d1616 35%, #3e0808 100%)',
           borderRadius: isFullscreen ? 0 : 28,
-          boxShadow: isFullscreen ? 'none' : '0 40px 120px rgba(0,0,0,0.6)',
+          boxShadow: isFullscreen ? 'none' : '0 40px 120px rgba(0,0,0,0.65)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          padding: '20px 12px 16px',
+          gap: 0,
         }}
       >
-        {/* Subtle texture overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at 20% 0%, rgba(255,120,120,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(0,0,0,0.3) 0%, transparent 60%)',
-          }}
-        />
+        {/* Ambient glow */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse at 18% 0%, rgba(255,130,130,0.07) 0%, transparent 55%), radial-gradient(ellipse at 82% 100%, rgba(0,0,0,0.35) 0%, transparent 55%)',
+        }} />
 
-        {/* ── LOADING STATE ── */}
-        {loading && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 px-6">
-            {/* Animated spinner */}
-            <div className="relative">
-              <div
-                className="w-16 h-16 rounded-full border-4 border-white/10"
-                style={{ borderTopColor: 'rgba(255,255,255,0.7)', animation: 'flipbook-spin 0.9s linear infinite' }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center text-white/70 text-xs font-bold">
-                {loadProgress}%
-              </div>
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-white/90 text-sm font-semibold tracking-wide">Preparando edición digital…</p>
-              <p className="text-white/40 text-xs">Procesando páginas del documento</p>
-            </div>
-            {/* Progress bar */}
-            <div className="w-48 h-1.5 rounded-full bg-white/10 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${loadProgress}%`, background: 'linear-gradient(90deg, #e63d3d, #ff8080)' }}
-              />
-            </div>
-          </div>
-        )}
+        {/* Brand badge */}
+        {!loading && pages.length > 0 && <BrandBadge />}
 
-        {/* ── ERROR STATE ── */}
-        {!loading && error && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center px-6">
-            <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-8 py-6 text-center max-w-sm">
-              <div className="text-3xl mb-3">📄</div>
-              <p className="text-rose-100 font-semibold text-sm mb-1">No se pudo cargar el PDF</p>
-              <p className="text-rose-200/70 text-xs">{error}</p>
-              <button
-                onClick={loadAndRender}
-                className="mt-4 px-5 py-2 rounded-full bg-white/10 border border-white/20 text-white text-xs hover:bg-white/20 transition"
-              >
-                Reintentar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── EMPTY STATE ── */}
-        {!loading && !error && pages.length === 0 && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <p className="text-white/40 text-sm">No hay páginas disponibles.</p>
-          </div>
-        )}
-
-        {/* ── FLIPBOOK ── */}
+        {/* Grid + Read buttons */}
         {!loading && pages.length > 0 && (
-          <div className="relative z-10 flex flex-col items-center w-full h-full py-8 px-2 gap-4">
-
-            {/* Brand badge — top-right corner, appears then fades after 6s */}
-            <div
-              className="flipbook-badge absolute top-4 right-5 z-30"
-            >
-              <div
-                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 border border-white/20"
-                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}
-              >
-                <span className="text-[9px] uppercase tracking-[0.45em] text-white/60 font-semibold">Visor · Espressivo PDF</span>
-              </div>
-            </div>
-
-            {/* ── Book area ── */}
-            <div
-              className="relative flex items-center justify-center flex-1 w-full"
-              style={{ minHeight: bookPageH + 20 }}
-            >
-              {/* Shadow under book */}
-              <div
-                className="absolute bottom-0 left-1/2 -translate-x-1/2 pointer-events-none"
-                style={{
-                  width: isMobile ? bookPageW * 0.8 : bookPageW * 1.6,
-                  height: 30,
-                  background: 'radial-gradient(ellipse, rgba(0,0,0,0.55) 0%, transparent 70%)',
-                  filter: 'blur(8px)',
-                }}
-              />
-
-              {/* react-pageflip */}
-              {/* @ts-ignore – extended props valid at runtime */}
-              <HTMLFlipBook
-                width={bookPageW}
-                height={bookPageH}
-                size="stretch"
-                minWidth={isMobile ? 240 : 280}
-                maxWidth={isMobile ? 520 : 760}
-                minHeight={isMobile ? 340 : 400}
-                maxHeight={1400}
-                maxShadowOpacity={0.7}
-                showCover={true}
-                className="flipbook-root"
-                ref={flipBookRef}
-                onFlip={onFlip}
-                drawShadow={true}
-                flippingTime={1050}
-                useMouseEvents={true}
-                startPage={0}
-                style={{}}
-              >
-                {pages.map((p) => (
-                  <div key={p.num} className="flipbook-page">
-                    <img
-                      src={p.dataUrl}
-                      alt={`Página ${p.num}`}
-                      draggable={false}
-                    />
-                  </div>
-                ))}
-              </HTMLFlipBook>
-            </div>
-
-            {/* ── Controls bar ── */}
-            <div
-              className="flex items-center justify-between gap-2 w-full max-w-2xl px-4 py-2.5 rounded-2xl"
-              style={{
-                background: 'rgba(0,0,0,0.35)',
-                border: '1px solid rgba(255,255,255,0.10)',
-                backdropFilter: 'blur(12px)',
-              }}
-            >
-              {/* Prev */}
-              <button
-                onClick={() => flipBookRef.current?.pageFlip()?.flipPrev()}
-                disabled={pageIndex === 0}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white/80 text-sm hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                aria-label="Página anterior"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-                {!isMobile && <span>Anterior</span>}
-              </button>
-
-              {/* Center: page info + progress bar + actions */}
-              <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-                <span className="text-white/70 text-xs font-medium tracking-wide">
-                  {isMobile
-                    ? `${pageIndex + 1} / ${totalPages}`
-                    : `Pág. ${pageIndex + 1}${pageIndex + 1 < totalPages ? `–${pageIndex + 2}` : ''} de ${totalPages}`
-                  }
-                </span>
-                {/* Progress bar */}
-                <div className="w-full max-w-xs h-1 rounded-full bg-white/10 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${progressPct}%`, background: 'linear-gradient(90deg, #e63d3d, #ff9090)' }}
-                  />
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-1">
-                {/* Read mode */}
-                <button
-                  onClick={() => setShowRead(true)}
-                  title="Leer esta página"
-                  className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition"
-                  aria-label="Ver página completa"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>
-                </button>
-
-                {/* Grid */}
-                <button
-                  onClick={() => setShowGrid(true)}
-                  title="Ver todas las páginas"
-                  className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition"
-                  aria-label="Galería de páginas"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
-                </button>
-
-                {/* Fullscreen */}
-                <button
-                  onClick={toggleFullscreen}
-                  title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-                  className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition"
-                  aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-                >
-                  {isFullscreen ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
-                  )}
-                </button>
-              </div>
-
-              {/* Next */}
-              <button
-                onClick={() => flipBookRef.current?.pageFlip()?.flipNext()}
-                disabled={pageIndex >= totalPages - (isMobile ? 1 : 2)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-white/80 text-sm hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition"
-                aria-label="Siguiente página"
-              >
-                {!isMobile && <span>Siguiente</span>}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            </div>
-
+          <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 30, display: 'flex', gap: 6 }}>
+            <button title="Ver todas las páginas" onClick={() => setShowGrid(true)} style={iconBtnStyle}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
+            </button>
+            <button title="Leer página" onClick={() => setShowRead(true)} style={iconBtnStyle}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>
+            </button>
           </div>
+        )}
+
+        {/* LOADING */}
+        {loading && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+            <div style={{ position: 'relative', width: 64, height: 64 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                border: '4px solid rgba(255,255,255,0.1)',
+                borderTopColor: 'rgba(255,255,255,0.75)',
+                animation: 'flipbook-spin 0.85s linear infinite',
+              }} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: 700 }}>
+                {progress}%
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600, margin: 0 }}>Preparando edición digital…</p>
+              <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, margin: '4px 0 0' }}>Procesando páginas del documento</p>
+            </div>
+            <div style={{ width: 180, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress}%`, background: 'linear-gradient(90deg,#e63d3d,#ff8080)', transition: 'width 0.3s', borderRadius: 2 }} />
+            </div>
+          </div>
+        )}
+
+        {/* ERROR */}
+        {!loading && error && (
+          <div style={{ textAlign: 'center', padding: 32 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
+            <p style={{ color: '#fca5a5', fontWeight: 600, margin: 0 }}>No se pudo cargar el PDF</p>
+            <p style={{ color: 'rgba(252,165,165,0.7)', fontSize: 12, margin: '4px 0 16px' }}>{error}</p>
+            <button onClick={loadAndRender} style={btnStyle(false)}>Reintentar</button>
+          </div>
+        )}
+
+        {/* EMPTY */}
+        {!loading && !error && pages.length === 0 && (
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>No hay páginas disponibles.</p>
+        )}
+
+        {/* FLIPBOOK ENGINE */}
+        {!loading && pages.length > 0 && (
+          <FlipEngine
+            pages={pages}
+            onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }}
+          />
         )}
       </div>
 
-      {/* ── Overlays (rendered outside container to cover screen) ── */}
-      {showRead && (
-        <ReadModeOverlay
-          pages={pages}
-          pageIndex={pageIndex}
-          onClose={() => setShowRead(false)}
-        />
-      )}
-      {showGrid && (
-        <GridOverlay
-          pages={pages}
-          currentIdx={pageIndex}
-          onSelect={goToPage}
-          onClose={() => setShowGrid(false)}
-        />
-      )}
+      {showRead && <ReadOverlay pages={pages} startIdx={currentIdx} onClose={() => setShowRead(false)} />}
+      {showGrid && <GridOverlay pages={pages} currentIdx={currentIdx} onSelect={setCurrentIdx} onClose={() => setShowGrid(false)} />}
     </>
   )
 }
