@@ -38,9 +38,9 @@ function ease(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t }
 // ─── PageFace ─────────────────────────────────────────────────────────────────
 function PageFace({ page, w, h, style = {} }: { page?: FlipPage; w: number; h: number; style?: React.CSSProperties }) {
   return (
-    <div style={{ width: w, height: h, background: page ? '#fff' : 'transparent', overflow: 'hidden', userSelect: 'none', flexShrink: 0, ...style }}>
+    <div style={{ width: w, height: h, background: page ? '#fff' : 'transparent', overflow: 'hidden', userSelect: 'none', flexShrink: 0, position: 'relative', ...style }}>
       {page && <img src={page.dataUrl} alt={`p${page.num}`} draggable={false}
-        style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />}
+        style={{ position: 'absolute', top: 0, left: 0, width: w, height: h, objectFit: 'contain', display: 'block', pointerEvents: 'none' }} />}
     </div>
   )
 }
@@ -101,7 +101,7 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const sliceW = w / N
 
   // overlap to brutally eliminate pixel gaps between DOM slabs
-  const overlap = 1.0
+  const overlap = 1.5
 
   // sin() peaks at 90 deg 
   const curve = Math.sin((angle / 180) * Math.PI)
@@ -173,7 +173,6 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
         {/* Front Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
-          background: '#fff',
           transform: 'translateZ(0.1px)' // Prevents Z-fighting gaps
         }}>
           {/* Shift image back by exactly the mathematical coordinate, NOT the rendered width */}
@@ -186,7 +185,6 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
         {/* Back Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
-          background: '#fff',
           transform: 'rotateY(180deg) translateZ(0.1px)' // Prevents Z-fighting
         }}>
           {/* Flip X-axis mapping entirely */}
