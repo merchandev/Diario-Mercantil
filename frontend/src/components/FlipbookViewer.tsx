@@ -364,14 +364,39 @@ export default function FlipbookViewer({
     <>
       {/* Keyframe injection */}
       <style>{`
-        @keyframes flipbook-fadein { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes flipbook-spin   { to { transform: rotate(360deg) } }
+        @keyframes flipbook-fadein  { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes flipbook-spin    { to { transform: rotate(360deg) } }
+        @keyframes badge-enter {
+          0%   { opacity: 0; transform: translate(12px, -8px) scale(0.9); }
+          15%  { opacity: 1; transform: translate(0, 0) scale(1); }
+          75%  { opacity: 1; transform: translate(0, 0) scale(1); }
+          100% { opacity: 0; transform: translate(6px, -4px) scale(0.95); }
+        }
+        .flipbook-badge {
+          animation: badge-enter 6s cubic-bezier(0.4,0,0.2,1) forwards;
+          pointer-events: none;
+        }
         .flipbook-page {
           background: #fff;
           overflow: hidden;
           display: flex;
           align-items: center;
           justify-content: center;
+          /* Subtle gradient on inner edge simulates page curvature */
+          position: relative;
+        }
+        .flipbook-page::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            to right,
+            rgba(0,0,0,0.06) 0%,
+            transparent 8%,
+            transparent 92%,
+            rgba(0,0,0,0.04) 100%
+          );
         }
         .flipbook-page img {
           width: 100%;
@@ -458,9 +483,16 @@ export default function FlipbookViewer({
         {!loading && pages.length > 0 && (
           <div className="relative z-10 flex flex-col items-center w-full h-full py-8 px-2 gap-4">
 
-            {/* Brand badge */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.4em] text-white/40 font-semibold">Visor · Espressivo PDF</span>
+            {/* Brand badge — top-right corner, appears then fades after 6s */}
+            <div
+              className="flipbook-badge absolute top-4 right-5 z-30"
+            >
+              <div
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 border border-white/20"
+                style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(8px)' }}
+              >
+                <span className="text-[9px] uppercase tracking-[0.45em] text-white/60 font-semibold">Visor · Espressivo PDF</span>
+              </div>
             </div>
 
             {/* ── Book area ── */}
@@ -480,7 +512,7 @@ export default function FlipbookViewer({
               />
 
               {/* react-pageflip */}
-              {/* @ts-ignore – swipeDistance is valid at runtime even if not in typedefs */}
+              {/* @ts-ignore – extended props valid at runtime */}
               <HTMLFlipBook
                 width={bookPageW}
                 height={bookPageH}
@@ -489,16 +521,16 @@ export default function FlipbookViewer({
                 maxWidth={isMobile ? 520 : 760}
                 minHeight={isMobile ? 340 : 400}
                 maxHeight={1400}
-                maxShadowOpacity={SHADOW_OP}
+                maxShadowOpacity={0.7}
                 showCover={true}
                 className="flipbook-root"
                 ref={flipBookRef}
                 onFlip={onFlip}
                 drawShadow={true}
-                flippingTime={FLIP_TIME}
+                flippingTime={1050}
                 useMouseEvents={true}
                 startPage={0}
-                style={{}}
+                style={{ perspective: '2000px' }}
               >
                 {pages.map((p) => (
                   <div key={p.num} className="flipbook-page">
