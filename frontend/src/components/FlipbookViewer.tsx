@@ -3,10 +3,9 @@
  *
  * • Portada (página 1) sola al inicio
  * • Spreads dobles (2 páginas) en adelante
- * • Animación CSS 3D propia (rotateY + backface-visibility)
- * • Sombra dinámica que simula doblado del papel
- * • Corner-peel interactivo con el ratón
- * • Tilt suave siguiendo el cursor
+ * • Animación CSS 3D (rotateY + backface-visibility)
+ * • Botones Anterior/Siguiente siempre accesibles (fuera del overflow)
+ * • Teclas ← → del teclado
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fetchAuth } from '../lib/api'
@@ -28,11 +27,6 @@ type Props = {
 }
 
 // ─── Spread helpers ───────────────────────────────────────────────────────────
-//
-//  Spread 0 → cover: left=undefined, right=pages[0]
-//  Spread 1 → pages[1] (left)  + pages[2] (right)
-//  Spread N → pages[2N-1] (left) + pages[2N] (right)
-//
 
 function spreadPages(pages: FlipPage[], s: number) {
   if (s === 0) return { left: undefined, right: pages[0] }
@@ -42,7 +36,6 @@ function spreadPages(pages: FlipPage[], s: number) {
 
 function maxSpreadFor(pages: FlipPage[]) {
   if (pages.length === 0) return 0
-  // spread 0 = 1 page, then each spread = 2 more
   return Math.ceil((pages.length - 1) / 2)
 }
 
@@ -50,38 +43,8 @@ function spreadToPageIdx(s: number) {
   return s === 0 ? 0 : 2 * s - 1
 }
 
-// ─── Easing ───────────────────────────────────────────────────────────────────
-
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
-}
-
-// ─── Shared styles ────────────────────────────────────────────────────────────
-
-const btnStyle = (disabled: boolean): React.CSSProperties => ({
-  padding: '6px 18px',
-  borderRadius: 30,
-  border: '1px solid rgba(255,255,255,0.2)',
-  background: disabled ? 'transparent' : 'rgba(255,255,255,0.09)',
-  color: disabled ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.88)',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  transition: 'all 0.18s',
-  letterSpacing: '0.04em',
-  whiteSpace: 'nowrap',
-})
-
-const iconBtn: React.CSSProperties = {
-  width: 34, height: 34,
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.14)',
-  background: 'rgba(255,255,255,0.07)',
-  color: 'rgba(255,255,255,0.65)',
-  cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  transition: 'background 0.15s',
-  flexShrink: 0,
 }
 
 // ─── Single page face ─────────────────────────────────────────────────────────
@@ -108,19 +71,18 @@ const PageFace = ({
   </div>
 )
 
-// ─── Folding page (module-level so React keeps stable identity) ───────────────
+// ─── Folding page ─────────────────────────────────────────────────────────────
 
 interface FoldProps {
   frontPage?: FlipPage
   backPage?: FlipPage
-  flipAngle: number           // 0 → 180
-  side: 'right' | 'left'     // which side of book folds
+  flipAngle: number
+  side: 'right' | 'left'
   pageW: number
   pageH: number
 }
 
 function FoldingPage({ frontPage, backPage, flipAngle, side, pageW, pageH }: FoldProps) {
-  // Shadow peaks at 90° (edge-on)
   const shadowT = flipAngle < 90 ? flipAngle / 90 : (180 - flipAngle) / 90
   const shadowA = shadowT * 0.45
   const rotateY = side === 'right' ? -flipAngle : flipAngle
@@ -144,42 +106,14 @@ function FoldingPage({ frontPage, backPage, flipAngle, side, pageW, pageH }: Fol
       transformStyle: 'preserve-3d',
       zIndex: 8,
     }}>
-      {/* Front face */}
       <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden' }}>
         <PageFace page={frontPage} w={pageW} h={pageH} />
         <div style={{ position: 'absolute', inset: 0, background: shadowFront, pointerEvents: 'none' }} />
       </div>
-      {/* Back face (mirror of destination page) */}
       <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', overflow: 'hidden' }}>
         <PageFace page={backPage} w={pageW} h={pageH} style={{ transform: 'scaleX(-1)' }} />
         <div style={{ position: 'absolute', inset: 0, background: shadowBack, transform: 'scaleX(-1)', pointerEvents: 'none' }} />
       </div>
-    </div>
-  )
-}
-
-// ─── Corner peel ornament ────────────────────────────────────────────────────
-
-function CornerPeel({ side, amount, onClick }: { side: 'right' | 'left'; amount: number; onClick: () => void }) {
-  const size = 48 + amount * 52
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        position: 'absolute', bottom: 0,
-        [side]: 0,
-        width: size, height: size,
-        zIndex: 20, cursor: 'pointer', overflow: 'hidden',
-      }}
-    >
-      <div style={{
-        position: 'absolute', bottom: 0, [side]: 0,
-        width: 0, height: 0,
-        borderStyle: 'solid',
-        borderWidth: side === 'right' ? `${size}px 0 0 ${size}px` : `${size}px ${size}px 0 0`,
-        borderColor: `transparent transparent transparent rgba(0,0,0,${0.07 + amount * 0.14})`,
-        filter: 'drop-shadow(-2px -2px 6px rgba(0,0,0,0.25))',
-      }} />
     </div>
   )
 }
@@ -192,14 +126,14 @@ function ReadOverlay({ pages, startIdx, onClose }: { pages: FlipPage[]; startIdx
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.96)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>Página {idx + 1} / {pages.length}</span>
-        <button onClick={onClose} style={{ ...iconBtn, color: '#fff', fontSize: 16 }}>✕</button>
+        <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: '#fff', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
       </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, overflow: 'hidden' }}>
         {pages[idx] && <img src={pages[idx].dataUrl} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', boxShadow: '0 24px 64px rgba(0,0,0,0.8)' }} />}
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 10, padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <button disabled={idx === 0} onClick={() => setIdx(i => i - 1)} style={btnStyle(idx === 0)}>‹ Anterior</button>
-        <button disabled={idx >= pages.length - 1} onClick={() => setIdx(i => i + 1)} style={btnStyle(idx >= pages.length - 1)}>Siguiente ›</button>
+        <button disabled={idx === 0} onClick={() => setIdx(i => i - 1)} style={{ padding: '6px 18px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)', background: idx === 0 ? 'transparent' : 'rgba(255,255,255,0.09)', color: idx === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: 600, cursor: idx === 0 ? 'not-allowed' : 'pointer' }}>‹ Anterior</button>
+        <button disabled={idx >= pages.length - 1} onClick={() => setIdx(i => i + 1)} style={{ padding: '6px 18px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)', background: idx >= pages.length - 1 ? 'transparent' : 'rgba(255,255,255,0.09)', color: idx >= pages.length - 1 ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: 600, cursor: idx >= pages.length - 1 ? 'not-allowed' : 'pointer' }}>Siguiente ›</button>
       </div>
     </div>
   )
@@ -210,7 +144,7 @@ function GridOverlay({ pages, currentIdx, onSelect, onClose }: { pages: FlipPage
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.96)', display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <span style={{ color: '#fff', fontWeight: 700 }}>Todas las páginas</span>
-        <button onClick={onClose} style={{ ...iconBtn, color: '#fff', fontSize: 16 }}>✕</button>
+        <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.07)', color: '#fff', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(100px,1fr))', gap: 8 }}>
         {pages.map((p, i) => (
@@ -228,15 +162,64 @@ function GridOverlay({ pages, currentIdx, onSelect, onClose }: { pages: FlipPage
   )
 }
 
+// ─── NAV BUTTON (grande, accesible, siempre clickeable) ───────────────────────
+
+function NavBtn({
+  dir, disabled, onClick,
+}: { dir: 'prev' | 'next'; disabled: boolean; onClick: () => void }) {
+  const isPrev = dir === 'prev'
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '10px 22px',
+        borderRadius: 36,
+        border: disabled ? '1.5px solid rgba(255,255,255,0.1)' : '1.5px solid rgba(255,255,255,0.3)',
+        background: disabled
+          ? 'rgba(255,255,255,0.04)'
+          : 'linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.07) 100%)',
+        color: disabled ? 'rgba(255,255,255,0.25)' : '#fff',
+        fontSize: 14,
+        fontWeight: 700,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        letterSpacing: '0.03em',
+        backdropFilter: 'blur(12px)',
+        boxShadow: disabled ? 'none' : '0 4px 20px rgba(0,0,0,0.3)',
+        transition: 'all 0.18s ease',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        flexShrink: 0,
+        minWidth: 120,
+        justifyContent: 'center',
+        position: 'relative',
+        zIndex: 50,
+      }}
+    >
+      {isPrev && (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
+      )}
+      <span>{isPrev ? 'Anterior' : 'Siguiente'}</span>
+      {!isPrev && (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
 // ─── FlipEngine ───────────────────────────────────────────────────────────────
 
 function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?: (idx: number) => void }) {
   const [spread, setSpread] = useState(0)
   const [flipping, setFlipping] = useState<'next' | 'prev' | null>(null)
   const [flipAngle, setFlipAngle] = useState(0)
-  const [mouseTilt, setMouseTilt] = useState(0)
-  const [peelSide, setPeelSide] = useState<'right' | 'left' | null>(null)
-  const [peelAmt, setPeelAmt] = useState(0)
 
   const raf = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -258,12 +241,11 @@ function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?:
   const nxt = spreadPages(pages, spread + 1)
   const prv = spreadPages(pages, spread - 1)
 
-  // ── animate flip ────────────────────────────────────────────────────────────
+  // ── animate flip ──────────────────────────────────────────────────────────────
   const doFlip = useCallback((dir: 'next' | 'prev') => {
     if (flipping) return
     if (dir === 'next' && spread >= maxS) return
     if (dir === 'prev' && spread <= 0) return
-    setPeelSide(null)
     setFlipping(dir)
     const t0 = performance.now()
     const tick = (now: number) => {
@@ -296,129 +278,82 @@ function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?:
     return () => window.removeEventListener('keydown', h)
   }, [doFlip])
 
-  // Mouse tilt + corner peel
-  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (flipping || isMobile) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    const cx = (e.clientX - rect.left) / rect.width
-    const cy = (e.clientY - rect.top) / rect.height
-    setMouseTilt((cx - 0.5) * 6)
-    const nearRight = cx > 0.70 && cy > 0.60 && spread < maxS
-    const nearLeft = cx < 0.30 && cy > 0.60 && spread > 0
-    if (nearRight) {
-      setPeelSide('right')
-      setPeelAmt(Math.min(1, ((cx - 0.70) / 0.30) * ((cy - 0.60) / 0.40)))
-    } else if (nearLeft) {
-      setPeelSide('left')
-      setPeelAmt(Math.min(1, ((0.30 - cx) / 0.30) * ((cy - 0.60) / 0.40)))
-    } else {
-      setPeelSide(null); setPeelAmt(0)
-    }
-  }
-  const onMouseLeave = () => { setMouseTilt(0); setPeelSide(null); setPeelAmt(0) }
-
   const totalPages = pages.length
   const curPageNum = spreadToPageIdx(spread) + 1
   const curMaxPage = cur.right ? curPageNum + (cur.left ? 1 : 0) : curPageNum
   const pct = Math.round((curMaxPage / totalPages) * 100)
 
-  // ── Background pages during flip ─────────────────────────────────────────
-  // When flipping NEXT: bg shows current-left + next-left (destination)
-  // When flipping PREV: bg shows prev-right + current-right (destination)
   const bgLeft = flipping === 'next' ? cur.left : flipping === 'prev' ? prv.left : cur.left
   const bgRight = flipping === 'next' ? nxt.left : flipping === 'prev' ? cur.right : cur.right
 
-  // What folds: NEXT → current right page folds to left (side='right')
-  //             PREV → current left page folds to right (side='left')
   const foldFront = flipping === 'next' ? cur.right : cur.left
   const foldBack = flipping === 'next' ? nxt.left : prv.right
 
-  // ── Render ───────────────────────────────────────────────────────────────
-
-  // Mobile: single page view
+  // ── Mobile: single page ───────────────────────────────────────────────────────
   if (isMobile) {
     const visiblePage = cur.left ?? cur.right
     return (
-      <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        {/* Book */}
         <div style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.6)', borderRadius: 4, overflow: 'hidden' }}>
           <PageFace page={visiblePage} w={pageW} h={pageH} />
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button disabled={spread <= 0} onClick={() => doFlip('prev')} style={btnStyle(spread <= 0)}>‹ Anterior</button>
-          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12 }}>{curPageNum}/{totalPages}</span>
-          <button disabled={spread >= maxS} onClick={() => doFlip('next')} style={btnStyle(spread >= maxS)}>Siguiente ›</button>
+        {/* Controls */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <NavBtn dir="prev" disabled={spread <= 0} onClick={() => doFlip('prev')} />
+          <span style={{ color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 600 }}>{curPageNum}/{totalPages}</span>
+          <NavBtn dir="next" disabled={spread >= maxS} onClick={() => doFlip('next')} />
         </div>
       </div>
     )
   }
 
-  // Desktop spread
-  const isCover = spread === 0  // cover spread: only right page, left is empty
+  // ── Desktop spread ────────────────────────────────────────────────────────────
+  const isCover = spread === 0
 
   return (
-    <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-      {/* Perspective wrapper + mouse tracking */}
-      <div
-        style={{ perspective: '1800px', perspectiveOrigin: '50% 40%', width: '100%', display: 'flex', justifyContent: 'center' }}
-        onMouseMove={onMouseMove}
-        onMouseLeave={onMouseLeave}
-      >
-        {/* Book block */}
+    <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
+
+      {/* Book viewport */}
+      <div style={{ perspective: '1800px', perspectiveOrigin: '50% 40%', width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div style={{
           display: 'flex',
-          transform: !flipping ? `rotateY(${mouseTilt}deg) rotateX(-1deg)` : 'none',
-          transition: flipping ? 'none' : 'transform 0.22s ease-out',
           transformStyle: 'preserve-3d',
           position: 'relative',
           boxShadow: '0 44px 110px rgba(0,0,0,0.75)',
         }}>
-          {/* ── Background pages (shown behind the fold) ── */}
+          {/* Background pages */}
           {flipping ? (
             <>
-              {/* Left bg */}
               <PageFace page={bgLeft} w={pageW} h={pageH} />
-              {/* Spine */}
               <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.22),rgba(0,0,0,0.08),transparent)', flexShrink: 0 }} />
-              {/* Right bg */}
               <PageFace page={bgRight} w={pageW} h={pageH} />
             </>
           ) : (
             <>
-              {/* Normal idle spread */}
-              {isCover
-                ? (
-                  /* Cover: empty left half + right (cover page) */
-                  <>
-                    <div style={{ width: pageW, height: pageH, background: 'rgba(0,0,0,0.18)', flexShrink: 0 }} />
-                    <div style={{ width: 3, background: 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
-                    <div style={{ position: 'relative' }}>
-                      <PageFace page={cur.right} w={pageW} h={pageH} />
-                      {peelSide === 'right' && <CornerPeel side="right" amount={peelAmt} onClick={() => doFlip('next')} />}
-                    </div>
-                  </>
-                )
-                : (
-                  <>
-                    <div style={{ position: 'relative' }}>
-                      <PageFace page={cur.left} w={pageW} h={pageH} />
-                      {/* Spine shadow on right edge of left page */}
-                      <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.16),transparent)', pointerEvents: 'none' }} />
-                      {peelSide === 'left' && <CornerPeel side="left" amount={peelAmt} onClick={() => doFlip('prev')} />}
-                    </div>
-                    <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.22),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
-                    <div style={{ position: 'relative' }}>
-                      <PageFace page={cur.right} w={pageW} h={pageH} />
-                      {/* Spine shadow on left edge of right page */}
-                      <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.16),transparent)', pointerEvents: 'none' }} />
-                      {peelSide === 'right' && <CornerPeel side="right" amount={peelAmt} onClick={() => doFlip('next')} />}
-                    </div>
-                  </>
-                )
-              }
+              {isCover ? (
+                <>
+                  <div style={{ width: pageW, height: pageH, background: 'rgba(0,0,0,0.18)', flexShrink: 0 }} />
+                  <div style={{ width: 3, background: 'rgba(0,0,0,0.2)', flexShrink: 0 }} />
+                  <PageFace page={cur.right} w={pageW} h={pageH} />
+                </>
+              ) : (
+                <>
+                  <div style={{ position: 'relative' }}>
+                    <PageFace page={cur.left} w={pageW} h={pageH} />
+                    <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.16),transparent)', pointerEvents: 'none' }} />
+                  </div>
+                  <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.22),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
+                  <div style={{ position: 'relative' }}>
+                    <PageFace page={cur.right} w={pageW} h={pageH} />
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.16),transparent)', pointerEvents: 'none' }} />
+                  </div>
+                </>
+              )}
             </>
           )}
 
-          {/* ── Folding page overlay ── */}
+          {/* Folding overlay */}
           {flipping && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', pointerEvents: 'none' }}>
               <FoldingPage
@@ -434,35 +369,53 @@ function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?:
         </div>
       </div>
 
-      {/* ── Controls bar ── */}
+      {/* ── Controls bar — OUTSIDE the book, no overflow clipping ── */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        width: '100%', maxWidth: pageW * 2 + 60,
-        padding: '9px 16px',
-        borderRadius: 22,
-        background: 'rgba(0,0,0,0.42)',
-        border: '1px solid rgba(255,255,255,0.09)',
-        backdropFilter: 'blur(18px)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        width: '100%',
+        maxWidth: pageW * 2 + 60,
+        padding: '12px 16px',
+        borderRadius: 50,
+        background: 'rgba(0,0,0,0.55)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        backdropFilter: 'blur(20px)',
         justifyContent: 'space-between',
+        boxSizing: 'border-box',
+        zIndex: 50,
+        position: 'relative',
       }}>
-        <button disabled={spread <= 0} onClick={() => doFlip('prev')} style={btnStyle(spread <= 0)}>‹ Anterior</button>
+        <NavBtn dir="prev" disabled={spread <= 0 || !!flipping} onClick={() => doFlip('prev')} />
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-          <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: 700, letterSpacing: '0.06em' }}>
             Pág.&nbsp;{curPageNum}{cur.left && cur.right ? `–${curPageNum + 1}` : ''}&nbsp;de&nbsp;{totalPages}
           </span>
-          <div style={{ width: '100%', maxWidth: 180, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.1)' }}>
-            <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#e63d3d,#ff8080)', borderRadius: 2, transition: 'width 0.4s ease' }} />
+          <div style={{ width: '100%', maxWidth: 160, height: 4, borderRadius: 4, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${pct}%`, background: 'linear-gradient(90deg,#e63d3d,#ff6b6b)', borderRadius: 4, transition: 'width 0.4s ease' }} />
           </div>
         </div>
 
-        <button disabled={spread >= maxS} onClick={() => doFlip('next')} style={btnStyle(spread >= maxS)}>Siguiente ›</button>
+        <NavBtn dir="next" disabled={spread >= maxS || !!flipping} onClick={() => doFlip('next')} />
       </div>
     </div>
   )
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
+
+const iconBtnStyle: React.CSSProperties = {
+  width: 36, height: 36,
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.15)',
+  background: 'rgba(255,255,255,0.08)',
+  color: 'rgba(255,255,255,0.7)',
+  cursor: 'pointer',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  transition: 'background 0.15s',
+  flexShrink: 0,
+}
 
 export default function FlipbookViewer({ src, minHeight = 480, height, className = '', onPageChange }: Props) {
   const [pages, setPages] = useState<FlipPage[]>([])
@@ -537,7 +490,7 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
   const isMobile = rootW < 620
   const pageW = isMobile ? Math.min(rootW - 16, 380) : Math.floor((rootW - 60) / 2)
   const pageH = Math.round(pageW / 0.707)
-  const viewerH = height ?? Math.max(minHeight, pageH + 130)
+  const viewerH = height ?? Math.max(minHeight, pageH + 160)
 
   const toggleFs = () => {
     if (!document.fullscreenElement) rootRef.current?.requestFullscreen().catch(() => { })
@@ -546,7 +499,6 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
 
   return (
     <>
-      {/* Global keyframes */}
       <style>{`
         @keyframes fb-spin { to { transform: rotate(360deg) } }
         @keyframes fb-fade { from { opacity:0 } to { opacity:1 } }
@@ -557,23 +509,30 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
           100%{ opacity:0; transform:translate(4px,-3px) scale(.96) }
         }
         .fb-badge { animation: fb-badge 6.5s cubic-bezier(.4,0,.2,1) forwards; pointer-events:none }
+        .fb-navbtn:not(:disabled):hover { background: rgba(255,255,255,0.22) !important; transform: scale(1.04); }
       `}</style>
 
+      {/* Outer wrapper — NO overflow:hidden so controls are always visible */}
       <div
         ref={rootRef}
-        className={`relative w-full select-none overflow-hidden ${className}`}
+        className={`relative w-full select-none ${className}`}
         style={{
           minHeight: isFs ? '100vh' : viewerH,
           height: isFs ? '100vh' : undefined,
-          background: 'linear-gradient(150deg,#6a1010 0%,#7c1515 38%,#3d0808 100%)',
-          borderRadius: isFs ? 0 : 26,
+          background: 'linear-gradient(150deg,#5a0c0c 0%,#7c1515 38%,#3d0808 100%)',
+          borderRadius: isFs ? 0 : 24,
           boxShadow: isFs ? 'none' : '0 40px 120px rgba(0,0,0,0.65)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          padding: '20px 14px 16px', gap: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px 16px 20px',
+          gap: 0,
+          // KEY: no overflow:hidden here — lets controls always be clickable
         }}
       >
         {/* Ambient glow */}
-        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 18% 5%, rgba(255,130,130,0.07) 0%, transparent 55%)' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(ellipse at 18% 5%, rgba(255,130,130,0.07) 0%, transparent 55%)', borderRadius: 'inherit' }} />
 
         {/* Top-right action buttons */}
         {!loading && pages.length > 0 && (
@@ -582,21 +541,21 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
             <div className="fb-badge" style={{ position: 'absolute', top: 14, right: 14, zIndex: 30 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 13px', borderRadius: 30, background: 'rgba(0,0,0,0.46)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.14)' }}>
                 <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e63d3d', boxShadow: '0 0 6px #e63d3d' }} />
-                <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.42em', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>Visor · Espressivo PDF</span>
+                <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.42em', color: 'rgba(255,255,255,0.65)', fontWeight: 700 }}>Diario Mercantil · PDF</span>
               </div>
             </div>
 
-            {/* Fullscreen + grid + read */}
+            {/* Icon buttons */}
             <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 30, display: 'flex', gap: 6 }}>
-              <button title="Ver en cuadrícula" onClick={() => setShowGrid(true)} style={iconBtn}>
+              <button title="Ver en cuadrícula" onClick={() => setShowGrid(true)} style={iconBtnStyle}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
               </button>
-              <button title="Modo lectura" onClick={() => setShowRead(true)} style={iconBtn}>
+              <button title="Modo lectura" onClick={() => setShowRead(true)} style={iconBtnStyle}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>
               </button>
-              <button title={isFs ? 'Salir pantalla completa' : 'Pantalla completa'} onClick={toggleFs} style={iconBtn}>
+              <button title={isFs ? 'Salir pantalla completa' : 'Pantalla completa'} onClick={toggleFs} style={iconBtnStyle}>
                 {isFs
-                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 1 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
+                  ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v3a2 2 0 0 1-2 2H3" /><path d="M21 8h-3a2 2 0 0 1-2-2V3" /><path d="M3 16h3a2 2 0 0 0 2 2v3" /><path d="M16 21v-3a2 2 0 0 1 2-2h3" /></svg>
                   : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
                 }
               </button>
@@ -627,7 +586,7 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
             <div style={{ fontSize: 32, marginBottom: 12 }}>📄</div>
             <p style={{ color: '#fca5a5', fontWeight: 600, margin: 0 }}>No se pudo cargar el PDF</p>
             <p style={{ color: 'rgba(252,165,165,0.7)', fontSize: 12, margin: '4px 0 16px' }}>{error}</p>
-            <button onClick={loadPdf} style={btnStyle(false)}>Reintentar</button>
+            <button onClick={loadPdf} style={{ padding: '6px 18px', borderRadius: 30, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.09)', color: 'rgba(255,255,255,0.88)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Reintentar</button>
           </div>
         )}
 
@@ -638,10 +597,12 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
 
         {/* FLIPBOOK */}
         {!loading && pages.length > 0 && (
-          <FlipEngine
-            pages={pages}
-            onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }}
-          />
+          <div style={{ width: '100%' }}>
+            <FlipEngine
+              pages={pages}
+              onPageChange={(idx) => { setCurrentIdx(idx); onPageChange?.(idx) }}
+            />
+          </div>
         )}
       </div>
 
