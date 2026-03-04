@@ -21,7 +21,7 @@ type Props = {
   className?: string
   onPageChange?: (pageIndex: number) => void
 }
-type Trans = { dir: 'next' | 'prev'; angle: number; dragging: boolean }
+type Trans = { dir: 'next' | 'prev'; angle: number; dragging: boolean; dragY?: number }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function spreadPages(pages: FlipPage[], s: number) {
@@ -45,32 +45,80 @@ function PageFace({ page, w, h, style = {} }: { page?: FlipPage; w: number; h: n
   )
 }
 
+// ─── Corner curl indicator ───────────────────────────────────────────────────
+function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner: 'top' | 'bottom'; visible: boolean }) {
+  const isR = side === 'right'
+  const isBot = corner === 'bottom'
+  return (
+    <div style={{
+      position: 'absolute',
+      [isBot ? 'bottom' : 'top']: 0,
+      [isR ? 'right' : 'left']: 0,
+      width: 44, height: 44,
+      pointerEvents: 'none', zIndex: 20, overflow: 'hidden',
+      opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease',
+    }}>
+      {/* Shadow line */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: isR && isBot
+          ? 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
+          : isR
+            ? 'linear-gradient(225deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
+            : isBot
+              ? 'linear-gradient(45deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
+              : 'linear-gradient(315deg, transparent 50%, rgba(0,0,0,0.25) 50%)',
+      }} />
+      {/* Folded flap */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: isR && isBot
+          ? 'linear-gradient(135deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
+          : isR
+            ? 'linear-gradient(225deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
+            : isBot
+              ? 'linear-gradient(45deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
+              : 'linear-gradient(315deg, rgba(235,235,235,0.95) 50%, transparent 50%)',
+        boxShadow: 'inset 0 0 6px rgba(0,0,0,0.12)',
+      }} />
+    </div>
+  )
+}
+
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
 /**
- * FoldingPage — single-segment with inline perspective for strong book-curl look.
+ * FoldingPage — corner-peel aware 3D fold.
  *
- * Using `perspective(700px)` directly in the transform (not inherited from parent)
- * gives a much more dramatic perspective distortion: the page visibly narrows at
- * 90° like real paper being held at the edge. Combined with a sin()-based
- * shadow gradient and a subtle skewY, this creates a convincing book-page curl
- * without any multi-segment clipping complexity.
+ * dragY (0=top, 1=bottom, default 0.5=middle):
+ *   • Moves the transform-origin vertically so the fold radiates from where
+ *     the user grabbed the page corner.
+ *   • Applies a skewY that bends the page top/bottom depending on grab point:
+ *     dragY=0 → top corner leads (bottom of page trails behind)
+ *     dragY=1 → bottom corner leads (top of page trails behind)
+ *     dragY=0.5 → uniform fold (no skew)
  *
- * Key: background:#fff on both faces — never transparent regardless of angle.
+ * perspective(600px) inline gives strong local 3D distortion.
+ * background:#fff on both faces prevents transparency.
  */
-function FoldingPage({ front, back, angle, side, w, h }: {
+function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   front?: FlipPage; back?: FlipPage
   angle: number; side: 'right' | 'left'; w: number; h: number
+  dragY?: number
 }) {
   const isR = side === 'right'
-  const origin = isR ? 'left center' : 'right center'
   const sign = isR ? -1 : 1
 
-  // sin() peaks at 90° — matches real paper curvature arc
+  // sin() peaks at 90° for shadow and skew intensity
   const curve = Math.sin((angle / 180) * Math.PI)   // 0→1→0
 
-  // Slight skewY simulates the paper bending (concave on one side)
-  // Peaks at 90° (max bend), reverses sign after 90° as page flips over
-  const skew = sign * curve * 3.5   // max ±3.5° at 90°
+  // dragY-aware skew: grabbing near top → negative skewDir → top curls first
+  const skewDir = (dragY - 0.5) * 2    // -1 (top) to +1 (bottom)
+  const maxSkew = 7
+  const skew = sign * curve * maxSkew * skewDir
+
+  // Transform origin moves vertically to match where user grabbed
+  const originY = `${Math.round(dragY * 100)}%`
+  const transformOrigin = `${isR ? 'left' : 'right'} ${originY}`
 
   const fSh = curve * 0.65
   const creaseBright = curve * 0.30
@@ -85,36 +133,31 @@ function FoldingPage({ front, back, angle, side, w, h }: {
   const creaseX = isR ? '2%' : '98%'
   const crease = `radial-gradient(ellipse 16px 100% at ${creaseX} 50%, rgba(255,255,255,${creaseBright}), transparent 60%)`
 
-  // Cast shadow on the adjacent stationary page
   const castW = Math.round(curve * 44)
-  const castBg = `rgba(0,0,0,${curve * 0.35})`
   const castStyle = isR
-    ? { right: w, width: castW, background: `linear-gradient(to left, ${castBg}, transparent)` }
-    : { left: w, width: castW, background: `linear-gradient(to right, ${castBg}, transparent)` }
+    ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.35}), transparent)` }
+    : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.35}), transparent)` }
 
   return (
     <div style={{
       position: 'absolute', top: 0, [isR ? 'right' : 'left']: 0,
       width: w, height: h, zIndex: 8, pointerEvents: 'none', transformStyle: 'preserve-3d',
     }}>
-      {/* Cast shadow onto adjacent stationary page */}
       <div style={{ position: 'absolute', top: 0, height: '100%', ...castStyle, pointerEvents: 'none', zIndex: -1 }} />
 
-      {/* The folding panel — perspective(700px) gives strong local 3D distortion */}
       <div style={{
         position: 'absolute', inset: 0,
-        transformOrigin: origin,
-        transform: `perspective(700px) rotateY(${sign * angle}deg) skewY(${skew}deg)`,
+        transformOrigin,
+        transform: `perspective(600px) rotateY(${sign * angle}deg) skewY(${skew}deg)`,
         transformStyle: 'preserve-3d',
       }}>
-        {/* Front face – white bg prevents any transparency */}
+        {/* Front face */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#fff', overflow: 'hidden' }}>
           <PageFace page={front} w={w} h={h} />
           <div style={{ position: 'absolute', inset: 0, background: frontGrad, pointerEvents: 'none' }} />
           <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
         </div>
-
-        {/* Back face – white bg prevents any transparency */}
+        {/* Back face */}
         <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', overflow: 'hidden' }}>
           <PageFace page={back} w={w} h={h} />
           <div style={{ position: 'absolute', inset: 0, background: backGrad, pointerEvents: 'none' }} />
@@ -127,7 +170,8 @@ function FoldingPage({ front, back, angle, side, w, h }: {
 
 
 
-// ─── Overlays ─────────────────────────────────────────────────────────────────
+
+
 
 function ReadOverlay({ pages, startIdx, onClose }: { pages: FlipPage[]; startIdx: number; onClose: () => void }) {
   const [idx, setIdx] = useState(startIdx)
@@ -378,9 +422,11 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
     if (isCover && dir === 'prev') return
 
     const capturedPageW = pageW
-    const capturedRect = { left: rect.left, right: rect.right }
+    const capturedRect = { left: rect.left, right: rect.right, top: rect.top, height: rect.height }
+    // Capture initial Y position relative to the page (0=top, 1=bottom)
+    const initDragY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
 
-    const startTrans: Trans = { dir, angle: 0, dragging: true }
+    const startTrans: Trans = { dir, angle: 0, dragging: true, dragY: initDragY }
     setTrans(startTrans)
     transRef.current = startTrans
 
@@ -391,7 +437,9 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
       } else {
         angle = Math.min(175, Math.max(0, 180 * (ev.clientX - capturedRect.left) / capturedPageW))
       }
-      const updated: Trans = { dir, angle, dragging: true }
+      // Update dragY as user moves (allows mid-drag adjustment, clamped)
+      const dragY = Math.max(0, Math.min(1, (ev.clientY - capturedRect.top) / capturedRect.height))
+      const updated: Trans = { dir, angle, dragging: true, dragY }
       setTrans(updated)
       transRef.current = updated
     }
@@ -506,12 +554,16 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
                 <div style={{ position: 'relative' }}>
                   <PageFace page={cur.left} w={pageW} h={pageH} />
                   <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
+                  <CornerCurl side="left" corner="top" visible={hoverHalf === 'left' && spread > 0} />
+                  <CornerCurl side="left" corner="bottom" visible={hoverHalf === 'left' && spread > 0} />
                   <PageCursor side="left" visible={hoverHalf === 'left' && spread > 0} />
                 </div>
                 <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
                 <div style={{ position: 'relative' }}>
                   <PageFace page={cur.right} w={pageW} h={pageH} />
                   <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
+                  <CornerCurl side="right" corner="top" visible={hoverHalf === 'right' && spread < maxS} />
+                  <CornerCurl side="right" corner="bottom" visible={hoverHalf === 'right' && spread < maxS} />
                   <PageCursor side="right" visible={hoverHalf === 'right' && spread < maxS} />
                 </div>
               </>
@@ -528,6 +580,7 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
                 side={flipDir === 'next' ? 'right' : 'left'}
                 w={pageW}
                 h={pageH}
+                dragY={trans?.dragY ?? 0.5}
               />
             </div>
           )}
