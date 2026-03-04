@@ -382,21 +382,6 @@ export default function FlipbookViewer({
           display: flex;
           align-items: center;
           justify-content: center;
-          /* Subtle gradient on inner edge simulates page curvature */
-          position: relative;
-        }
-        .flipbook-page::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background: linear-gradient(
-            to right,
-            rgba(0,0,0,0.06) 0%,
-            transparent 8%,
-            transparent 92%,
-            rgba(0,0,0,0.04) 100%
-          );
         }
         .flipbook-page img {
           width: 100%;
@@ -530,7 +515,7 @@ export default function FlipbookViewer({
                 flippingTime={1050}
                 useMouseEvents={true}
                 startPage={0}
-                style={{ perspective: '2000px' }}
+                style={{}}
               >
                 {pages.map((p) => (
                   <div key={p.num} className="flipbook-page">
