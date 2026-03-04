@@ -49,37 +49,33 @@ function PageFace({ page, w, h, style = {} }: { page?: FlipPage; w: number; h: n
 function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner: 'top' | 'bottom'; visible: boolean }) {
   const isR = side === 'right'
   const isBot = corner === 'bottom'
+
+  // Realism: use a soft pseudo-curled paper triangle.
+  const gradientAngle = isR && isBot ? '135deg'
+    : isR ? '225deg'
+      : isBot ? '45deg' : '315deg'
+
   return (
     <div style={{
       position: 'absolute',
       [isBot ? 'bottom' : 'top']: 0,
       [isR ? 'right' : 'left']: 0,
-      width: 44, height: 44,
+      width: 50, height: 50,
       pointerEvents: 'none', zIndex: 20, overflow: 'hidden',
-      opacity: visible ? 1 : 0, transition: 'opacity 0.2s ease',
+      opacity: visible ? 1 : 0, transition: 'opacity 0.25s ease',
     }}>
-      {/* Shadow line */}
+      {/* Drop shadow of the fold onto the page */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: isR && isBot
-          ? 'linear-gradient(135deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
-          : isR
-            ? 'linear-gradient(225deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
-            : isBot
-              ? 'linear-gradient(45deg, transparent 50%, rgba(0,0,0,0.25) 50%)'
-              : 'linear-gradient(315deg, transparent 50%, rgba(0,0,0,0.25) 50%)',
+        background: `linear-gradient(${gradientAngle}, transparent 45%, rgba(0,0,0,0.15) 50%, transparent 60%)`,
       }} />
-      {/* Folded flap */}
+      {/* The actual folded paper piece */}
       <div style={{
         position: 'absolute', inset: 0,
-        background: isR && isBot
-          ? 'linear-gradient(135deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
-          : isR
-            ? 'linear-gradient(225deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
-            : isBot
-              ? 'linear-gradient(45deg, rgba(235,235,235,0.95) 50%, transparent 50%)'
-              : 'linear-gradient(315deg, rgba(235,235,235,0.95) 50%, transparent 50%)',
-        boxShadow: 'inset 0 0 6px rgba(0,0,0,0.12)',
+        background: `linear-gradient(${gradientAngle}, #fff 48%, #f0f0f0 50%, transparent 51%)`,
+        boxShadow: isR && isBot ? '-4px -4px 10px rgba(0,0,0,0.08)'
+          : isR ? '-4px 4px 10px rgba(0,0,0,0.08)'
+            : isBot ? '4px -4px 10px rgba(0,0,0,0.08)' : '4px 4px 10px rgba(0,0,0,0.08)',
       }} />
     </div>
   )
@@ -87,7 +83,7 @@ function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner:
 
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
 /**
- * FoldingPage — Multi-segment cylindrical curve fold.
+ * FoldingPage — Multi-segment cylindrical curve fold with Sweeping Optical Shading.
  * Slices the page into vertical strips. The first strip is strictly anchored 
  * to the spine (0 offset, pure rotateY), guaranteeing it never detaches.
  * Subsequent strips bend progressively.
@@ -100,7 +96,7 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
 
-  // Use 8 segments for higher fidelity paper curve
+  // Use 8 segments for high fidelity 3D cylinder
   const N = 8
   const sliceW = w / N
 
@@ -132,10 +128,21 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
     : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.45}), transparent)` }
 
   // CRITICAL: When flipping a container 180 degrees in CSS 3D space, its internal left/right 
-  // coordinate axis inverts. We MUST map the backface to the opposite property to 
-  // prevent the image strips from rendering completely backwards and "tearing" the text.
+  // coordinate axis inverts.
   const frontProp = isR ? 'left' : 'right'
   const backProp = isR ? 'right' : 'left'
+
+  // OPTICAL SHADING: Instead of rendering 8 individual strip shadows (which causes vertical banding),
+  // we render ONE SINGLE majestic highlight gradient covering the full width (w), representing
+  // the optical apex (highest curve point) where light hits the folding paper.
+  const apexPrc = isR ? 100 - (angle / 180) * 100 : (angle / 180) * 100
+  const globalShade = `linear-gradient(to right, 
+    rgba(0,0,0,${curve * 0.12}) 0%, 
+    rgba(0,0,0,${curve * 0.05}) max(0%, calc(${apexPrc}% - 20%)), 
+    rgba(255,255,255,${curve * 0.35}) ${apexPrc}%, 
+    rgba(0,0,0,${curve * 0.20}) min(100%, calc(${apexPrc}% + 15%)), 
+    rgba(0,0,0,${curve * 0.15}) 100%
+  )`
 
   // Recursively render slices for the cylindrical curve
   const renderSlice = (i: number): React.ReactNode => {
@@ -143,12 +150,6 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
 
     // First slice (spine) pivots by rootBound. Inner slices bend relative to their parent.
     const relAngle = i === 0 ? rootBound : a_inner
-
-    // Self-shadowing: the crease gets slightly darker where bent
-    const shadowAlpha = curve * 0.05
-    const sliceFrontGrad = isR
-      ? `linear-gradient(to left, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
-      : `linear-gradient(to right, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
 
     // Overlap logic: Render physical DOM node slightly wider, offset left/right slightly negative 
     // to bleed into the parent slice and seal the crack.
@@ -178,8 +179,8 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
           {/* Shift image back by exactly the mathematical coordinate, NOT the rendered width */}
           <div style={{ position: 'absolute', top: 0, [frontProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={front} w={w} h={h} />
+            <div style={{ position: 'absolute', inset: 0, background: globalShade, pointerEvents: 'none' }} />
           </div>
-          <div style={{ position: 'absolute', inset: 0, background: sliceFrontGrad, pointerEvents: 'none' }} />
         </div>
 
         {/* Back Face */}
@@ -191,6 +192,7 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
           {/* Flip X-axis mapping entirely */}
           <div style={{ position: 'absolute', top: 0, [backProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={back} w={w} h={h} />
+            <div style={{ position: 'absolute', inset: 0, background: globalShade, pointerEvents: 'none' }} />
           </div>
         </div>
 
