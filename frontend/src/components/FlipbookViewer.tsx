@@ -100,8 +100,8 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
 
-  // Use 6 segments
-  const N = 6
+  // Use 8 segments for higher fidelity paper curve
+  const N = 8
   const sliceW = w / N
 
   // overlap to brutally eliminate pixel gaps between DOM slabs
@@ -130,6 +130,12 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const castStyle = isR
     ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.45}), transparent)` }
     : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.45}), transparent)` }
+
+  // CRITICAL: When flipping a container 180 degrees in CSS 3D space, its internal left/right 
+  // coordinate axis inverts. We MUST map the backface to the opposite property to 
+  // prevent the image strips from rendering completely backwards and "tearing" the text.
+  const frontProp = isR ? 'left' : 'right'
+  const backProp = isR ? 'right' : 'left'
 
   // Recursively render slices for the cylindrical curve
   const renderSlice = (i: number): React.ReactNode => {
@@ -166,10 +172,11 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
         {/* Front Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
-          background: '#fff'
+          background: '#fff',
+          transform: 'translateZ(0.1px)' // Prevents Z-fighting gaps
         }}>
           {/* Shift image back by exactly the mathematical coordinate, NOT the rendered width */}
-          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
+          <div style={{ position: 'absolute', top: 0, [frontProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={front} w={w} h={h} />
           </div>
           <div style={{ position: 'absolute', inset: 0, background: sliceFrontGrad, pointerEvents: 'none' }} />
@@ -178,10 +185,11 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
         {/* Back Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
-          background: '#fff', transform: 'rotateY(180deg)'
+          background: '#fff',
+          transform: 'rotateY(180deg) translateZ(0.1px)' // Prevents Z-fighting
         }}>
-          {/* Flip X-axis mapping */}
-          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
+          {/* Flip X-axis mapping entirely */}
+          <div style={{ position: 'absolute', top: 0, [backProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={back} w={w} h={h} />
           </div>
         </div>
