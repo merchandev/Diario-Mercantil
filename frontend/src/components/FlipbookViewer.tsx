@@ -455,116 +455,151 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
     return () => window.removeEventListener('keydown', h)
   }, [doFlip])
 
-  // ── Mouse drag ──────────────────────────────────────────────────────────────
-  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  // ── Unified Pointer Drag (Mouse + Touch) ───────────────────────────────────
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (transRef.current) return
     if (!bookRef.current) return
+
+    // Attempt to capture the pointer so touching/swiping over the book doesn't scroll the page
+    try { e.currentTarget.setPointerCapture(e.pointerId) } catch (err) { }
+
     const rect = bookRef.current.getBoundingClientRect()
     const relX = e.clientX - rect.left
-    const dir: 'next' | 'prev' = relX > rect.width / 2 ? 'next' : 'prev'
+
+    // If mobile (single page), clicking right half = next, left half = prev
+    // If desktop (two pages), clicking right page = next, left page = prev
+    let dir: 'next' | 'prev' = 'next'
+    if (isMobile) {
+      dir = relX > rect.width / 2 ? 'next' : 'prev'
+    } else {
+      dir = relX > rect.width / 2 ? 'next' : 'prev'
+    }
+
     if (dir === 'next' && spread >= maxS) return
     if (dir === 'prev' && spread <= 0) return
-    if (isCover && dir === 'prev') return
+    if (!isMobile && isCover && dir === 'prev') return
 
     const capturedPageW = pageW
     const capturedRect = { left: rect.left, right: rect.right, top: rect.top, height: rect.height }
-    // Capture initial Y position relative to the page (0=top, 1=bottom)
     const initDragY = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height))
 
     const startTrans: Trans = { dir, angle: 0, dragging: true, dragY: initDragY }
     setTrans(startTrans)
     transRef.current = startTrans
 
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       let angle: number
-      if (dir === 'next') {
-        angle = Math.min(175, Math.max(0, 180 * (capturedRect.right - ev.clientX) / capturedPageW))
+      const cx = ev.clientX
+
+      if (isMobile) {
+        // En mobile, el bookRef mide 1 solo pageW y está centrado
+        if (dir === 'next') {
+          const traveled = capturedRect.right - cx
+          angle = Math.max(0, Math.min(180, (traveled / capturedPageW) * 180))
+        } else {
+          const traveled = cx - capturedRect.left
+          angle = Math.max(0, Math.min(180, (traveled / capturedPageW) * 180))
+        }
       } else {
-        angle = Math.min(175, Math.max(0, 180 * (ev.clientX - capturedRect.left) / capturedPageW))
+        if (dir === 'next') {
+          const traveled = capturedRect.right - cx
+          angle = Math.max(0, Math.min(180, (traveled / capturedPageW) * 180))
+        } else {
+          const traveled = cx - capturedRect.left
+          angle = Math.max(0, Math.min(180, (traveled / capturedPageW) * 180))
+        }
       }
-      // Update dragY as user moves (allows mid-drag adjustment, clamped)
+
       const dragY = Math.max(0, Math.min(1, (ev.clientY - capturedRect.top) / capturedRect.height))
       const updated: Trans = { dir, angle, dragging: true, dragY }
       setTrans(updated)
       transRef.current = updated
     }
 
-    const onUp = () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-      const cur = transRef.current
-      if (!cur) return
-      const target = cur.angle > 90 ? 180 : 0
-      animateTo(cur.dir, cur.angle, target)
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      try { bookRef.current?.releasePointerCapture(ev.pointerId) } catch (err) { }
+
+      const c = transRef.current
+      if (!c) return
+      const target = c.angle > 90 ? 180 : 0
+      animateTo(c.dir, c.angle, target)
     }
 
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [spread, maxS, isCover, pageW, animateTo])
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+  }, [spread, maxS, isCover, pageW, animateTo, isMobile])
 
   // ── What to show visually ───────────────────────────────────────────────────
   const isFlipping = trans !== null
   const flipDir = trans?.dir ?? null
   const flipAngle = trans?.angle ?? 0
 
-  // Background (stationary pages behind the fold)
-  const bgLeft = flipDir === 'next' ? cur.left : flipDir === 'prev' ? prv.left : cur.left
-  const bgRight = flipDir === 'next' ? nxt.right : flipDir === 'prev' ? cur.right : cur.right
-
-  // Fold: front = lifting page, back = destination page
-  const foldFront = flipDir === 'next' ? cur.right : cur.left
-  const foldBack = flipDir === 'next' ? nxt.left : prv.right
-
+  // Fold math logic varying based on Layout Type
   const totalPages = pages.length
-  const curPageNum = spreadToPageIdx(spread) + 1
-  const curMaxPage = cur.right ? curPageNum + (cur.left ? 1 : 0) : curPageNum
+  // Mobile index logic is different since it displays 1 sheet per spread tick
+  const mobileCurPageNum = spread + 1
+  const desktopCurPageNum = spreadToPageIdx(spread) + 1
+
+  const curPageNum = isMobile ? mobileCurPageNum : desktopCurPageNum
+  const curMaxPage = isMobile ? curPageNum : (cur.right ? curPageNum + (cur.left ? 1 : 0) : curPageNum)
   const pct = Math.round((curMaxPage / totalPages) * 100)
 
-  // ── Mobile ──────────────────────────────────────────────────────────────────
-  if (isMobile) {
-    const visiblePage = cur.left ?? cur.right
-    return (
-      <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-        <div style={{ boxShadow: '0 20px 60px rgba(0,0,0,0.6)', borderRadius: 4, overflow: 'hidden' }}>
-          <PageFace page={visiblePage} w={pageW} h={pageH} />
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <NavBtn dir="prev" disabled={spread <= 0 || isFlipping} onClick={() => doFlip('prev')} />
-          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, fontWeight: 600 }}>{curPageNum}/{totalPages}</span>
-          <NavBtn dir="next" disabled={spread >= maxS || isFlipping} onClick={() => doFlip('next')} />
-        </div>
-      </div>
-    )
-  }
-
-  // ── Desktop ─────────────────────────────────────────────────────────────────
+  // ── Unified Render Tree ─────────────────────────────────────────────────────
   return (
     <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
       {/* Book */}
-      <div style={{ marginTop: 50, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ marginTop: isMobile ? 12 : 50, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div
           ref={bookRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={(e) => {
+          onPointerDown={handlePointerDown}
+          onPointerMove={(e) => {
             if (trans) return
             const rect = e.currentTarget.getBoundingClientRect()
-            setHoverHalf(e.clientX - rect.left > rect.width / 2 ? 'right' : 'left')
+            setHoverHalf(e.clientX - rect.left > rect.width / (isMobile ? 1 : 2) ? 'right' : 'left')
           }}
-          onMouseLeave={() => setHoverHalf(null)}
+          onPointerLeave={() => setHoverHalf(null)}
           style={{
             display: 'flex', position: 'relative',
             transformStyle: 'preserve-3d',
             boxShadow: '0 48px 120px rgba(0,0,0,0.8)',
             cursor: isFlipping ? 'grabbing' : 'grab',
             userSelect: 'none',
+            touchAction: 'none' // CRITICAL: Stop mobile from firing pull-to-refresh down-swipes while dragging pages
           }}
         >
           {/* ── Background / idle spread ── */}
           {(() => {
-            // Detect single-page situations
-            const singleRight = !cur.left && !!cur.right   // cover (spread 0)
-            const singleLeft = !!cur.left && !cur.right   // last page on odd total
+            if (isMobile) {
+              // --- MOBILE RENDER (Single Page Face) ---
+              // Pages mapping for Mobile (1 sheet at a time)
+              const curPage = pages[spread]
+              const nxtPage = pages[spread + 1]
+              const prvPage = pages[spread - 1]
+
+              if (isFlipping) {
+                const bgM = flipDir === 'next' ? nxtPage : prvPage
+                return <PageFace page={bgM} w={pageW} h={pageH} />
+              }
+              return (
+                <div style={{ position: 'relative' }}>
+                  <PageFace page={curPage} w={pageW} h={pageH} />
+                  <CornerCurl side="right" corner="bottom" visible={spread < maxS} />
+                  <CornerCurl side="left" corner="bottom" visible={spread > 0} />
+                </div>
+              )
+            }
+
+            // --- DESKTOP RENDER (Two Page Spread) ---
+            const singleRight = !cur.left && !!cur.right   // cover
+            const singleLeft = !!cur.left && !cur.right   // back cover
+
+            const bgLeft = flipDir === 'next' ? cur.left : flipDir === 'prev' ? prv.left : cur.left
+            const bgRight = flipDir === 'next' ? nxt.right : flipDir === 'prev' ? cur.right : cur.right
 
             if (isFlipping) {
               return (
@@ -575,7 +610,6 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
               )
             }
 
-            // ── Single page — centered ──────────────────────────────────────
             if (singleRight || singleLeft) {
               const page = singleRight ? cur.right : cur.left
               const canNext = singleRight && spread < maxS
@@ -583,7 +617,6 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
               return (
                 <div style={{ position: 'relative', boxShadow: '0 28px 80px rgba(0,0,0,0.72)' }}>
                   <PageFace page={page} w={pageW} h={pageH} />
-                  {/* Subtle spine shadow on the correct side */}
                   {singleRight && <div style={{ position: 'absolute', top: 0, left: 0, width: 18, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.18),transparent)', pointerEvents: 'none' }} />}
                   {singleLeft && <div style={{ position: 'absolute', top: 0, right: 0, width: 18, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.18),transparent)', pointerEvents: 'none' }} />}
                   <PageCursor side="right" visible={canNext && hoverHalf === 'right'} />
@@ -592,7 +625,6 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
               )
             }
 
-            // ── Two-page spread ─────────────────────────────────────────────
             return (
               <>
                 <div style={{ position: 'relative' }}>
@@ -615,12 +647,20 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
 
           {/* ── Folding overlay ── */}
           {isFlipping && flipDir && (
-            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex' }}>
+            <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', justifyContent: isMobile ? 'center' : 'flex-start' }}>
               <FoldingPage
-                front={foldFront}
-                back={foldBack}
+                front={
+                  isMobile
+                    ? (flipDir === 'next' ? pages[spread] : pages[spread - 1])
+                    : (flipDir === 'next' ? cur.right : cur.left)
+                }
+                back={
+                  isMobile
+                    ? (flipDir === 'next' ? pages[spread + 1] : pages[spread])
+                    : (flipDir === 'next' ? nxt.left : prv.right)
+                }
                 angle={flipAngle}
-                side={flipDir === 'next' ? 'right' : 'left'}
+                side={isMobile ? (flipDir === 'next' ? 'right' : 'left') : (flipDir === 'next' ? 'right' : 'left')}
                 w={pageW}
                 h={pageH}
                 dragY={trans?.dragY ?? 0.5}
