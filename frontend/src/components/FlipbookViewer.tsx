@@ -87,18 +87,10 @@ function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner:
 
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
 /**
- * FoldingPage — corner-peel aware 3D fold.
- *
- * dragY (0=top, 1=bottom, default 0.5=middle):
- *   • Moves the transform-origin vertically so the fold radiates from where
- *     the user grabbed the page corner.
- *   • Applies a skewY that bends the page top/bottom depending on grab point:
- *     dragY=0 → top corner leads (bottom of page trails behind)
- *     dragY=1 → bottom corner leads (top of page trails behind)
- *     dragY=0.5 → uniform fold (no skew)
- *
- * perspective(600px) inline gives strong local 3D distortion.
- * background:#fff on both faces prevents transparency.
+ * FoldingPage — Multi-segment cylindrical curve fold.
+ * Slices the page into 5 vertical strips, nesting them so they curve gracefully
+ * around the Y axis during the flip. This perfectly anchors the spine and prevents
+ * all image distortion/shearing, delivering a premium "soft magazine" roll.
  */
 function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   front?: FlipPage; back?: FlipPage
@@ -108,41 +100,90 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
 
-  // Stable origin: prevents crazy CSS 3D scaling deformations
-  const origin = isR ? 'left center' : 'right center'
+  const N = 5
+  const sliceW = w / N
 
-  // sin() peaks at 90° for shadow and physics intensity
-  const curve = Math.sin((angle / 180) * Math.PI)   // 0→1→0
+  // Calculate realistic page curl
+  const curve = Math.sin((angle / 180) * Math.PI)
 
-  // Corner peel physics: grabbing near top/bottom produces a slight twist
-  const skewDir = (dragY - 0.5) * 2    // -1 (top) to +1 (bottom)
+  // Maximum bending degrees (spans across the 5 segments)
+  const maxSway = 65
+  const targetBend = curve * maxSway
 
-  // Small multi-axis tilt for organic peel without distortion
-  const maxTiltX = 8   // 8 degrees max twist
-  const maxSkewY = 4   // 4 degrees max skew
+  // The spine angle (a0Target) leads the turn, pulling the edge (which lags behind).
+  const a0Target = angle + targetBend
 
-  // X tilt pulls the grab-corner toward the user
-  const tiltX = curve * maxTiltX * skewDir
-  // Y skew adds a bit of curvature
-  const skewY = sign * curve * maxSkewY * skewDir
+  // Prevent clipping through physical constraints (0=right flat, 180=left flat)
+  const boundedA0 = Math.min(Math.max(a0Target, 0), 180)
+  const actualBend = boundedA0 - angle
 
-  const fSh = curve * 0.65
-  const creaseBright = curve * 0.30
+  // Distribute the remaining lag across the N-1 inner joints
+  const a_inner = N > 1 ? (-actualBend / (N - 1)) : 0
 
-  const frontGrad = isR
-    ? `linear-gradient(to left,  rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
-    : `linear-gradient(to right, rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
-  const backGrad = isR
-    ? `linear-gradient(to right, rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
-    : `linear-gradient(to left,  rgba(0,0,0,${fSh}) 0%, rgba(0,0,0,${fSh * 0.3}) 50%, transparent 90%)`
-
-  const creaseX = isR ? '2%' : '98%'
-  const crease = `radial-gradient(ellipse 16px 100% at ${creaseX} 50%, rgba(255,255,255,${creaseBright}), transparent 60%)`
-
-  const castW = Math.round(curve * 44)
+  // Shadow casting on the stationary pages below the page being turned
+  const castW = Math.round(curve * 60)
   const castStyle = isR
-    ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.35}), transparent)` }
-    : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.35}), transparent)` }
+    ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.4}), transparent)` }
+    : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.4}), transparent)` }
+
+  // Recursively render slices for the cylindrical curve
+  const renderSlice = (i: number): React.ReactNode => {
+    if (i === N) return null
+
+    // First slice (spine) pivots by a0. Inner slices bend relative to their parent.
+    const relAngle = i === 0 ? boundedA0 : a_inner
+
+    // Self-shadowing: the crease gets slightly darker where bent
+    const shadowAlpha = curve * 0.08
+    const sliceFrontGrad = isR
+      ? `linear-gradient(to left, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
+      : `linear-gradient(to right, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
+
+    // Overlap segments by 0.5px to hide subpixel CSS 3D hairline gaps
+    const isInner = i > 0
+    const sliceWidth = isInner ? sliceW + 0.5 : sliceW
+    const offsetPos = isInner ? sliceW - 0.5 : 0
+
+    return (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        [isR ? 'left' : 'right']: offsetPos,
+        width: sliceWidth,
+        height: h,
+        transformOrigin: isR ? 'left center' : 'right center',
+        transform: `rotateY(${sign * relAngle}deg)`,
+        transformStyle: 'preserve-3d',
+        zIndex: i === 0 ? 8 : 'auto',
+      }}>
+        {/* Front Face of this Slice */}
+        <div style={{
+          position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
+          background: '#fff'
+        }}>
+          {/* Offset the full page back so only this slice's content is visible */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+            <PageFace page={front} w={w} h={h} />
+          </div>
+          <div style={{ position: 'absolute', inset: 0, background: sliceFrontGrad, pointerEvents: 'none' }} />
+        </div>
+
+        {/* Back Face of this Slice */}
+        <div style={{
+          position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
+          background: '#fff', transform: 'rotateY(180deg)'
+        }}>
+          {/* Flipped X-axis means the offset miraculously maps to the mirrored back page correctly */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+            <PageFace page={back} w={w} h={h} />
+          </div>
+        </div>
+
+        {/* Render next slice nested inside this one */}
+        {renderSlice(i + 1)}
+      </div>
+    )
+  }
 
   return (
     <div style={{
@@ -151,27 +192,8 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
     }}>
       <div style={{ position: 'absolute', top: 0, height: '100%', ...castStyle, pointerEvents: 'none', zIndex: -1 }} />
 
-      <div style={{
-        position: 'absolute', inset: 0,
-        transformOrigin: origin,
-        // The rotation chain: Y for main flip, X for corner lifting, skewY for slight bending
-        transform: `rotateY(${sign * angle}deg) rotateX(${tiltX}deg) skewY(${skewY}deg)`,
-        transformStyle: 'preserve-3d',
-        willChange: 'transform',
-      }}>
-        {/* Front face */}
-        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#fff', overflow: 'hidden' }}>
-          <PageFace page={front} w={w} h={h} />
-          <div style={{ position: 'absolute', inset: 0, background: frontGrad, pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
-        </div>
-        {/* Back face */}
-        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', overflow: 'hidden' }}>
-          <PageFace page={back} w={w} h={h} />
-          <div style={{ position: 'absolute', inset: 0, background: backGrad, pointerEvents: 'none' }} />
-          <div style={{ position: 'absolute', inset: 0, background: crease, pointerEvents: 'none' }} />
-        </div>
-      </div>
+      {/* Start mathematical segment rendering */}
+      {renderSlice(0)}
     </div>
   )
 }
