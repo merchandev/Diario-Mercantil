@@ -542,7 +542,7 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
     <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
       {/* Book */}
-      <div style={{ perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ marginTop: 16, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div
           ref={bookRef}
           onMouseDown={handleMouseDown}
