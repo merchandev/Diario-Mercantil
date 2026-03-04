@@ -54,31 +54,41 @@ function FoldingPage({ front, back, angle, side, w, h }: {
   angle: number; side: 'right' | 'left'; w: number; h: number
 }) {
   const t = angle < 90 ? angle / 90 : (180 - angle) / 90
-  const sh = t * 0.45
+  const sh = t * 0.5
   const rotY = side === 'right' ? -angle : angle
   const origin = side === 'right' ? 'left center' : 'right center'
+
+  // Slight skew to simulate page curvature (peaks at 90°)
+  const curveDeg = t * (side === 'right' ? 4 : -4)
+
   const frontShadow = side === 'right'
-    ? `linear-gradient(to left,rgba(0,0,0,${sh}),transparent 60%)`
-    : `linear-gradient(to right,rgba(0,0,0,${sh}),transparent 60%)`
+    ? `linear-gradient(to left, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
+    : `linear-gradient(to right, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
   const backShadow = side === 'right'
-    ? `linear-gradient(to right,rgba(0,0,0,${sh}),transparent 60%)`
-    : `linear-gradient(to left,rgba(0,0,0,${sh}),transparent 60%)`
+    ? `linear-gradient(to right, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
+    : `linear-gradient(to left, rgba(0,0,0,${sh * 0.9}) 0%, rgba(0,0,0,${sh * 0.3}) 40%, transparent 75%)`
+  // Mid-crease highlight (simulates paper light reflection at bend)
+  const creasePos = side === 'right' ? '2%' : '98%'
+  const creaseShadow = `radial-gradient(ellipse 6px 100% at ${creasePos} 50%, rgba(255,255,255,${t * 0.18}), transparent)`
 
   return (
     <div style={{
       position: 'absolute', top: 0, [side === 'right' ? 'right' : 'left']: 0,
       width: w, height: h, transformOrigin: origin,
-      transform: `rotateY(${rotY}deg)`, transformStyle: 'preserve-3d', zIndex: 8,
+      transform: `rotateY(${rotY}deg) skewY(${curveDeg}deg)`,
+      transformStyle: 'preserve-3d', zIndex: 8,
     }}>
       {/* Front face */}
       <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', overflow: 'hidden' }}>
         <PageFace page={front} w={w} h={h} />
         <div style={{ position: 'absolute', inset: 0, background: frontShadow, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: creaseShadow, pointerEvents: 'none' }} />
       </div>
-      {/* Back face — no scaleX(-1) needed */}
+      {/* Back face */}
       <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', overflow: 'hidden' }}>
         <PageFace page={back} w={w} h={h} />
         <div style={{ position: 'absolute', inset: 0, background: backShadow, pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: creaseShadow, pointerEvents: 'none' }} />
       </div>
     </div>
   )
@@ -358,39 +368,56 @@ function FlipEngine({ pages, onPageChange }: { pages: FlipPage[]; onPageChange?:
             userSelect: 'none',
           }}
         >
-          {/* ── Background spread ── */}
-          {isFlipping ? (
-            <>
-              <PageFace page={bgLeft} w={pageW} h={pageH} />
-              <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.08),transparent)', flexShrink: 0 }} />
-              <PageFace page={bgRight} w={pageW} h={pageH} />
-            </>
-          ) : isCover ? (
-            <>
-              <div style={{ width: pageW, height: pageH, background: 'rgba(0,0,0,0.22)', flexShrink: 0, position: 'relative' }}>
-                <PageCursor side="left" visible={false} />
-              </div>
-              <div style={{ width: 3, background: 'rgba(0,0,0,0.25)', flexShrink: 0 }} />
-              <div style={{ position: 'relative' }}>
-                <PageFace page={cur.right} w={pageW} h={pageH} />
-                <PageCursor side="right" visible={hoverHalf === 'right' && spread < maxS} />
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ position: 'relative' }}>
-                <PageFace page={cur.left} w={pageW} h={pageH} />
-                <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
-                <PageCursor side="left" visible={hoverHalf === 'left' && spread > 0} />
-              </div>
-              <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
-              <div style={{ position: 'relative' }}>
-                <PageFace page={cur.right} w={pageW} h={pageH} />
-                <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
-                <PageCursor side="right" visible={hoverHalf === 'right' && spread < maxS} />
-              </div>
-            </>
-          )}
+          {/* ── Background / idle spread ── */}
+          {(() => {
+            // Detect single-page situations
+            const singleRight = !cur.left && !!cur.right   // cover (spread 0)
+            const singleLeft = !!cur.left && !cur.right   // last page on odd total
+
+            if (isFlipping) {
+              return (
+                <>
+                  <PageFace page={bgLeft} w={pageW} h={pageH} />
+                  <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.08),transparent)', flexShrink: 0 }} />
+                  <PageFace page={bgRight} w={pageW} h={pageH} />
+                </>
+              )
+            }
+
+            // ── Single page — centered ──────────────────────────────────────
+            if (singleRight || singleLeft) {
+              const page = singleRight ? cur.right : cur.left
+              const canNext = singleRight && spread < maxS
+              const canPrev = singleLeft && spread > 0
+              return (
+                <div style={{ position: 'relative', boxShadow: '0 28px 80px rgba(0,0,0,0.72)' }}>
+                  <PageFace page={page} w={pageW} h={pageH} />
+                  {/* Subtle spine shadow on the correct side */}
+                  {singleRight && <div style={{ position: 'absolute', top: 0, left: 0, width: 18, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.18),transparent)', pointerEvents: 'none' }} />}
+                  {singleLeft && <div style={{ position: 'absolute', top: 0, right: 0, width: 18, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.18),transparent)', pointerEvents: 'none' }} />}
+                  <PageCursor side="right" visible={canNext && hoverHalf === 'right'} />
+                  <PageCursor side="left" visible={canPrev && hoverHalf === 'left'} />
+                </div>
+              )
+            }
+
+            // ── Two-page spread ─────────────────────────────────────────────
+            return (
+              <>
+                <div style={{ position: 'relative' }}>
+                  <PageFace page={cur.left} w={pageW} h={pageH} />
+                  <div style={{ position: 'absolute', top: 0, right: 0, width: 22, height: '100%', background: 'linear-gradient(to left,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
+                  <PageCursor side="left" visible={hoverHalf === 'left' && spread > 0} />
+                </div>
+                <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
+                <div style={{ position: 'relative' }}>
+                  <PageFace page={cur.right} w={pageW} h={pageH} />
+                  <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
+                  <PageCursor side="right" visible={hoverHalf === 'right' && spread < maxS} />
+                </div>
+              </>
+            )
+          })()}
 
           {/* ── Folding overlay ── */}
           {isFlipping && flipDir && (
