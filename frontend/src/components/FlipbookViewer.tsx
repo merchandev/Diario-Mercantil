@@ -90,8 +90,7 @@ function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner:
  * FoldingPage — Multi-segment cylindrical curve fold.
  * Slices the page into vertical strips. The first strip is strictly anchored 
  * to the spine (0 offset, pure rotateY), guaranteeing it never detaches.
- * Subsequent strips bend progressively to create a deep, realistic 
- * paper curve (exaggerated fold).
+ * Subsequent strips bend progressively.
  */
 function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   front?: FlipPage; back?: FlipPage
@@ -101,37 +100,32 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
 
-  // Use 6 segments for a smoother exaggerated curve
+  // Use 6 segments
   const N = 6
-  // Ensure we cover the full width plus a tiny overlap to avoid subpixel gaps
   const sliceW = w / N
-  const overlap = 0.5 // overlap in px
 
-  // Calculate realistic page curl strength 
+  // overlap to brutally eliminate pixel gaps between DOM slabs
+  const overlap = 1.0
+
+  // sin() peaks at 90 deg 
   const curve = Math.sin((angle / 180) * Math.PI)
 
-  // EXAGGERATED BEND: Max 85 degrees curve spread across the segments
-  const maxSway = 85
+  // Max paper flexibility
+  const maxSway = 50 // reduced slightly to prevent self-intersection "breaking"
   const totalBend = curve * maxSway
 
-  // Spin the outer edge faster than the spine.
-  // The spine itself rotates exactly with `angle` or lags slightly behind the edge.
-  // We want the edge to lead the movement towards the user.
-  const a0 = angle + totalBend
-  const boundedA0 = Math.min(Math.max(a0, 0), 180)
+  // Absolute pivot of the spine against the table
+  const rootBound = Math.min(Math.max(angle + totalBend, 0), 180)
 
-  // The actual curvature achieved based on bounds
-  const actualBend = boundedA0 - angle
+  // Total angle delta that needs to be distributed across the remaining joints
+  // to ensure the outer edge physically ends up at `angle`
+  const flexLeft = rootBound - angle
+  const a_inner = N > 1 ? (-flexLeft / (N - 1)) : 0
 
-  // Distribute the reverse-bend across the inner joints so the outer edge
-  // ends up at exactly the physical `angle` position.
-  const a_inner = N > 1 ? (-actualBend / (N - 1)) : 0
-
-  // Optional: slight X-tilt based on dragY for corner peeling feel
+  // Optional: slight X-tilt based on dragY
   const tiltDir = (dragY - 0.5) * 2
-  const tiltX = curve * 4 * tiltDir
+  const tiltX = curve * 3 * tiltDir
 
-  // Cast shadow on the stationary pages 
   const castW = 20 + Math.round(curve * 60)
   const castStyle = isR
     ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.45}), transparent)` }
@@ -141,57 +135,58 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   const renderSlice = (i: number): React.ReactNode => {
     if (i === N) return null
 
-    // First slice (spine) pivots by a0. Inner slices bend relative to their parent.
-    const relAngle = i === 0 ? boundedA0 : a_inner
+    // First slice (spine) pivots by rootBound. Inner slices bend relative to their parent.
+    const relAngle = i === 0 ? rootBound : a_inner
 
     // Self-shadowing: the crease gets slightly darker where bent
-    const shadowAlpha = curve * 0.08
+    const shadowAlpha = curve * 0.05
     const sliceFrontGrad = isR
       ? `linear-gradient(to left, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
       : `linear-gradient(to right, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
 
-    // Overlap handling: Inner slices are positioned at sliceW, but we increase 
-    // their physical rendered width slightly to overlap the next seam.
+    // Overlap logic: Render physical DOM node slightly wider, offset left/right slightly negative 
+    // to bleed into the parent slice and seal the crack.
     const isInner = i > 0
-    const sliceWidth = i < N - 1 ? sliceW + overlap : sliceW
-    const offsetPos = isInner ? sliceW : 0
+    const wRender = i < N - 1 ? sliceW + overlap : sliceW
+    // Positioning relative to parent slice
+    const offsetPos = isInner ? sliceW - (overlap / 2) : 0
 
     return (
       <div style={{
         position: 'absolute',
         top: 0,
         [isR ? 'left' : 'right']: offsetPos,
-        width: sliceWidth, // Render slightly wider to cover gaps
+        width: wRender,
         height: h,
         transformOrigin: isR ? 'left center' : 'right center',
-        // Only apply tiltX to the root spine segment so the whole cylinder tilts together
+        // Tilt ONLY the root so the cylinder doesn't twist into a corkscrew (which breaks geometry)
         transform: `rotateY(${sign * relAngle}deg) ${i === 0 ? `rotateX(${tiltX}deg)` : ''}`,
         transformStyle: 'preserve-3d',
       }}>
-        {/* Front Face of this Slice */}
+        {/* Front Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
           background: '#fff'
         }}>
-          {/* Offset the full page back so only this slice's content is visible */}
-          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+          {/* Shift image back by exactly the mathematical coordinate, NOT the rendered width */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={front} w={w} h={h} />
           </div>
           <div style={{ position: 'absolute', inset: 0, background: sliceFrontGrad, pointerEvents: 'none' }} />
         </div>
 
-        {/* Back Face of this Slice */}
+        {/* Back Face */}
         <div style={{
           position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
           background: '#fff', transform: 'rotateY(180deg)'
         }}>
-          {/* Flipped X-axis mapping */}
-          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+          {/* Flip X-axis mapping */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW + (isInner ? -(overlap / 2) : 0)), width: w, height: h }}>
             <PageFace page={back} w={w} h={h} />
           </div>
         </div>
 
-        {/* Render next slice nested inside this one */}
+        {/* Render next slice */}
         {renderSlice(i + 1)}
       </div>
     )
@@ -203,7 +198,6 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
       width: w, height: h, zIndex: 8, pointerEvents: 'none', transformStyle: 'preserve-3d',
     }}>
       <div style={{ position: 'absolute', top: 0, height: '100%', ...castStyle, pointerEvents: 'none', zIndex: -1 }} />
-      {/* Start mathematical segment rendering */}
       {renderSlice(0)}
     </div>
   )
