@@ -542,7 +542,7 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
     <div ref={containerRef} style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
 
       {/* Book */}
-      <div style={{ marginTop: 16, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ marginTop: 50, perspective: '2000px', perspectiveOrigin: '50% 38%', width: '100%', display: 'flex', justifyContent: 'center' }}>
         <div
           ref={bookRef}
           onMouseDown={handleMouseDown}
@@ -570,7 +570,6 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
               return (
                 <>
                   <PageFace page={bgLeft} w={pageW} h={pageH} />
-                  <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.08),transparent)', flexShrink: 0 }} />
                   <PageFace page={bgRight} w={pageW} h={pageH} />
                 </>
               )
@@ -603,7 +602,6 @@ function FlipEngine({ pages, onPageChange, jumpTo }: {
                   <CornerCurl side="left" corner="bottom" visible={hoverHalf === 'left' && spread > 0} />
                   <PageCursor side="left" visible={hoverHalf === 'left' && spread > 0} />
                 </div>
-                <div style={{ width: 3, background: 'linear-gradient(to right,rgba(0,0,0,0.25),rgba(0,0,0,0.07),transparent)', flexShrink: 0 }} />
                 <div style={{ position: 'relative' }}>
                   <PageFace page={cur.right} w={pageW} h={pageH} />
                   <div style={{ position: 'absolute', top: 0, left: 0, width: 22, height: '100%', background: 'linear-gradient(to right,rgba(0,0,0,0.14),transparent)', pointerEvents: 'none' }} />
