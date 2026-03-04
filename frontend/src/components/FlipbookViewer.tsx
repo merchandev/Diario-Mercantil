@@ -87,10 +87,11 @@ function CornerCurl({ side, corner, visible }: { side: 'left' | 'right'; corner:
 
 // ─── FoldingPage ──────────────────────────────────────────────────────────────
 /**
- * FoldingPage — optical 3D curve fold.
- * Replaces geometric slicing (which causes visible rendering seams) 
- * with a flawless single rotating plane, simulating the curvature optically 
- * using a dynamic sweeping gradient (the "apex" of the bend travels across the page).
+ * FoldingPage — Multi-segment cylindrical curve fold.
+ * Slices the page into vertical strips. The first strip is strictly anchored 
+ * to the spine (0 offset, pure rotateY), guaranteeing it never detaches.
+ * Subsequent strips bend progressively to create a deep, realistic 
+ * paper curve (exaggerated fold).
  */
 function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
   front?: FlipPage; back?: FlipPage
@@ -99,73 +100,111 @@ function FoldingPage({ front, back, angle, side, w, h, dragY = 0.5 }: {
 }) {
   const isR = side === 'right'
   const sign = isR ? -1 : 1
-  const origin = isR ? 'left center' : 'right center'
 
-  // Progress 0 -> 1 -> 0
+  // Use 6 segments for a smoother exaggerated curve
+  const N = 6
+  // Ensure we cover the full width plus a tiny overlap to avoid subpixel gaps
+  const sliceW = w / N
+  const overlap = 0.5 // overlap in px
+
+  // Calculate realistic page curl strength 
   const curve = Math.sin((angle / 180) * Math.PI)
 
-  // Organic lift of the corner based on drag position
-  const tiltDir = (dragY - 0.5) * 2 // -1 (top) to +1 (bottom)
-  const tiltX = curve * 5 * tiltDir
+  // EXAGGERATED BEND: Max 85 degrees curve spread across the segments
+  const maxSway = 85
+  const totalBend = curve * maxSway
 
-  // The highlight (apex) travels across the page as it folds. 
-  // Right page turns left: apex moves from 100% (right edge) to 0% (spine)
-  const apexPrc = isR ? 100 - (angle / 180) * 100 : (angle / 180) * 100
+  // Spin the outer edge faster than the spine.
+  // The spine itself rotates exactly with `angle` or lags slightly behind the edge.
+  // We want the edge to lead the movement towards the user.
+  const a0 = angle + totalBend
+  const boundedA0 = Math.min(Math.max(a0, 0), 180)
 
-  // Optical illusion wrapper - the bright highlight gives a soft rounded edge,
-  // followed by a subtle darkening to create depth (the shadowed backside of the curve).
-  const shadowGlow = `linear-gradient(${isR ? 'to left' : 'to right'}, 
-    transparent 0%, 
-    rgba(0,0,0,${curve * 0.1}) max(0%, ${apexPrc - 15}%), 
-    rgba(255,255,255,${curve * 0.3}) ${apexPrc}%, 
-    rgba(0,0,0,${curve * 0.2}) min(100%, ${apexPrc + 10}%), 
-    transparent 100%
-  )`
+  // The actual curvature achieved based on bounds
+  const actualBend = boundedA0 - angle
 
-  // The back follows the same physics inverted
-  const backShadowGlow = `linear-gradient(${isR ? 'to right' : 'to left'}, 
-    transparent 0%, 
-    rgba(0,0,0,${curve * 0.1}) max(0%, ${apexPrc - 15}%), 
-    rgba(255,255,255,${curve * 0.3}) ${apexPrc}%, 
-    rgba(0,0,0,${curve * 0.2}) min(100%, ${apexPrc + 10}%), 
-    transparent 100%
-  )`
+  // Distribute the reverse-bend across the inner joints so the outer edge
+  // ends up at exactly the physical `angle` position.
+  const a_inner = N > 1 ? (-actualBend / (N - 1)) : 0
 
-  // Moving drop shadow cast onto the stationary pages below
-  const castW = 20 + (curve * 60)
-  const castShadow = isR
+  // Optional: slight X-tilt based on dragY for corner peeling feel
+  const tiltDir = (dragY - 0.5) * 2
+  const tiltX = curve * 4 * tiltDir
+
+  // Cast shadow on the stationary pages 
+  const castW = 20 + Math.round(curve * 60)
+  const castStyle = isR
     ? { right: w, width: castW, background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.45}), transparent)` }
     : { left: w, width: castW, background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.45}), transparent)` }
+
+  // Recursively render slices for the cylindrical curve
+  const renderSlice = (i: number): React.ReactNode => {
+    if (i === N) return null
+
+    // First slice (spine) pivots by a0. Inner slices bend relative to their parent.
+    const relAngle = i === 0 ? boundedA0 : a_inner
+
+    // Self-shadowing: the crease gets slightly darker where bent
+    const shadowAlpha = curve * 0.08
+    const sliceFrontGrad = isR
+      ? `linear-gradient(to left, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
+      : `linear-gradient(to right, rgba(0,0,0,${shadowAlpha}) 0%, transparent 100%)`
+
+    // Overlap handling: Inner slices are positioned at sliceW, but we increase 
+    // their physical rendered width slightly to overlap the next seam.
+    const isInner = i > 0
+    const sliceWidth = i < N - 1 ? sliceW + overlap : sliceW
+    const offsetPos = isInner ? sliceW : 0
+
+    return (
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        [isR ? 'left' : 'right']: offsetPos,
+        width: sliceWidth, // Render slightly wider to cover gaps
+        height: h,
+        transformOrigin: isR ? 'left center' : 'right center',
+        // Only apply tiltX to the root spine segment so the whole cylinder tilts together
+        transform: `rotateY(${sign * relAngle}deg) ${i === 0 ? `rotateX(${tiltX}deg)` : ''}`,
+        transformStyle: 'preserve-3d',
+      }}>
+        {/* Front Face of this Slice */}
+        <div style={{
+          position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
+          background: '#fff'
+        }}>
+          {/* Offset the full page back so only this slice's content is visible */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+            <PageFace page={front} w={w} h={h} />
+          </div>
+          <div style={{ position: 'absolute', inset: 0, background: sliceFrontGrad, pointerEvents: 'none' }} />
+        </div>
+
+        {/* Back Face of this Slice */}
+        <div style={{
+          position: 'absolute', inset: 0, overflow: 'hidden', backfaceVisibility: 'hidden',
+          background: '#fff', transform: 'rotateY(180deg)'
+        }}>
+          {/* Flipped X-axis mapping */}
+          <div style={{ position: 'absolute', top: 0, [isR ? 'left' : 'right']: -(i * sliceW), width: w, height: h }}>
+            <PageFace page={back} w={w} h={h} />
+          </div>
+        </div>
+
+        {/* Render next slice nested inside this one */}
+        {renderSlice(i + 1)}
+      </div>
+    )
+  }
 
   return (
     <div style={{
       position: 'absolute', top: 0, [isR ? 'right' : 'left']: 0,
       width: w, height: h, zIndex: 8, pointerEvents: 'none', transformStyle: 'preserve-3d',
     }}>
-      {/* Shadow cast on the floor pages */}
-      <div style={{ position: 'absolute', top: 0, height: '100%', ...castShadow, pointerEvents: 'none', zIndex: -1 }} />
-
-      {/* The unified turning plane */}
-      <div style={{
-        position: 'absolute', inset: 0,
-        transformOrigin: origin,
-        transform: `rotateY(${sign * angle}deg) rotateX(${tiltX}deg)`,
-        transformStyle: 'preserve-3d',
-        willChange: 'transform',
-      }}>
-        {/* Front face */}
-        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: '#fff', overflow: 'hidden' }}>
-          <PageFace page={front} w={w} h={h} />
-          {/* Sweeping optical highlight layer */}
-          <div style={{ position: 'absolute', inset: 0, background: shadowGlow, pointerEvents: 'none' }} />
-        </div>
-        {/* Back face */}
-        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: '#fff', overflow: 'hidden' }}>
-          <PageFace page={back} w={w} h={h} />
-          {/* Sweeping optical highlight layer */}
-          <div style={{ position: 'absolute', inset: 0, background: backShadowGlow, pointerEvents: 'none' }} />
-        </div>
-      </div>
+      <div style={{ position: 'absolute', top: 0, height: '100%', ...castStyle, pointerEvents: 'none', zIndex: -1 }} />
+      {/* Start mathematical segment rendering */}
+      {renderSlice(0)}
     </div>
   )
 }
