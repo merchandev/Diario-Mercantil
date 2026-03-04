@@ -248,6 +248,10 @@ class SystemController {
                 $pdo->exec("CREATE TABLE pages (id INT AUTO_INCREMENT PRIMARY KEY, slug VARCHAR(255) NOT NULL UNIQUE, title VARCHAR(255) NOT NULL, content TEXT, published TINYINT(1) DEFAULT 1, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)");
                 $log[] = "Tabla pages creada.";
             } else {
+                if (!in_array('content', $colsP)) {
+                    $pdo->exec("ALTER TABLE pages ADD COLUMN content TEXT");
+                    $log[] = "Columna pages.content agregada.";
+                }
                 if (!in_array('published', $colsP)) {
                     if (in_array('status', $colsP)) {
                         $pdo->exec("ALTER TABLE pages CHANGE status published TINYINT(1) DEFAULT 1");
