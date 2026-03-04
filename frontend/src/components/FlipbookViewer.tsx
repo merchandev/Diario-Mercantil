@@ -810,12 +810,6 @@ export default function FlipbookViewer({ src, minHeight = 480, height, className
         {/* Top buttons */}
         {!loading && pages.length > 0 && (
           <>
-            <div className="fb-badge" style={{ position: 'absolute', top: 14, right: 14, zIndex: 30 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 30, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e63d3d', boxShadow: '0 0 6px #e63d3d' }} />
-                <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.4em', color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>Diario Mercantil · PDF</span>
-              </div>
-            </div>
             <div style={{ position: 'absolute', top: 14, left: 14, zIndex: 30, display: 'flex', gap: 6 }}>
               <button title="Cuadrícula" onClick={() => setShowGrid(true)} style={iconBtn}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /></svg>
