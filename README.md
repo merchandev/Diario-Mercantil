@@ -95,6 +95,7 @@ El modelo correcto es:
 - Este proyecto solo publica labels Traefik en el `frontend`.
 - El `frontend` se conecta a la red externa `traefik-proxy`.
 - El `backend` no debe exponerse con un puerto publico; solo atiende a `frontend` por la red Docker.
+- Las labels Traefik del `frontend` deben mantenerse simples y usar nombres de router/service alfanumericos.
 
 ## DNS
 
