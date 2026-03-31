@@ -60,11 +60,15 @@ services:
       - "traefik.enable=true"
 
       # ── Router HTTPS (websecure) ──────────────────────────────────────────
-      # El redirect HTTP→HTTPS lo gestiona el entrypoint global de Traefik
-      - "traefik.http.routers.dm.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
+      # NOTA: www se quitó temporalmente porque www.diariomercantil.com no tiene
+      # registro DNS → Let's Encrypt rechaza el cert para AMBOS dominios.
+      # Para reactivar www: agrega CNAME www→diariomercantil.com en el panel DNS
+      # de Hostinger y luego vuelve a agregar || Host(`www.diariomercantil.com`)
+      - "traefik.http.routers.dm.rule=Host(`diariomercantil.com`)"
       - "traefik.http.routers.dm.entrypoints=websecure"
       - "traefik.http.routers.dm.tls=true"
       - "traefik.http.routers.dm.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dm.tls.domains[0].main=diariomercantil.com"
 
       # ── Servicio: puerto donde escucha ESTE contenedor (host port 8091) ──
       - "traefik.http.services.dm.loadbalancer.server.port=8091"
