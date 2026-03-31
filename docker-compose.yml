@@ -41,7 +41,7 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=app-network"
+      - "traefik.docker.network=diario-mercantil_app-network"
       - "traefik.http.routers.diariomercantil-final.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
       - "traefik.http.routers.diariomercantil-final.entrypoints=websecure"
       - "traefik.http.routers.diariomercantil-final.priority=100"
