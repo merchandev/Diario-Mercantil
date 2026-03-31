@@ -44,11 +44,13 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-proxy"
       - "traefik.http.routers.mercantilv.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
       - "traefik.http.routers.mercantilv.entrypoints=web,websecure"
       - "traefik.http.routers.mercantilv.tls=true"
       - "traefik.http.routers.mercantilv.tls.certresolver=letsencrypt"
-      - "traefik.http.services.mercantilv.loadbalancer.server.port=80"
+      - "traefik.http.routers.mercantilv.service=dm-service"
+      - "traefik.http.services.dm-service.loadbalancer.server.port=80"
     networks:
       - app-network
       - traefik-proxy
