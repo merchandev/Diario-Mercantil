@@ -912,8 +912,14 @@ export default function Documento() {
             </div>
           </div>
           <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Razón o denominación social *</span>
-            <input className="input w-full" placeholder="Razón social" value={meta.razon_social || ''} onChange={e => setMeta({ ...meta, razon_social: e.target.value })} required />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Razón o denominación social (nombre de la sociedad mercantil) *</span>
+            <input 
+              className="input w-full" 
+              placeholder="RAZÓN SOCIAL" 
+              value={meta.razon_social || ''} 
+              onChange={e => setMeta({ ...meta, razon_social: e.target.value.toUpperCase() })} 
+              required 
+            />
           </label>
           <div className="relative">
             <select className="input w-full" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value, oficina: '' })}>
@@ -942,57 +948,75 @@ export default function Documento() {
             </div>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Nombre del registrador(a) mercantil</span>
-            <input className="input w-full" placeholder="Nombre del registrador" value={meta.registrador || ''} onChange={e => setMeta({ ...meta, registrador: e.target.value })} />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Nombre del (de la) registrador(a) mercantil *</span>
+            <input className="input w-full" placeholder="NOMBRE DEL REGISTRADOR" value={meta.registrador || ''} onChange={e => setMeta({ ...meta, registrador: e.target.value.toUpperCase() })} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Tipo de registrador(a) mercantil</span>
-            <input className="input w-full" placeholder="Principal, Auxiliar, etc." value={meta.tipo_registrador || ''} onChange={e => setMeta({ ...meta, tipo_registrador: e.target.value })} />
+            <input className="input w-full" placeholder="PRINCIPAL, AUXILIAR, ETC." value={meta.tipo_registrador || ''} onChange={e => setMeta({ ...meta, tipo_registrador: e.target.value.toUpperCase() })} />
+            <p className="text-[10px] text-brand-600 mt-1">Opciones: Titular / Suplente / Auxiliar</p>
           </label>
           <div className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo / Letra</span>
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo **</span>
             <div className="flex gap-2">
-              <select
-                className="input w-24"
-                value={meta.tomo_letra || ''}
-                onChange={e => setMeta({ ...meta, tomo_letra: e.target.value })}
-              >
-                <option value="">-</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
-              </select>
               <input
                 className="input flex-1"
-                placeholder="Número"
+                placeholder="000"
+                maxLength={3}
                 value={meta.tomo || ''}
-                onChange={e => setMeta({ ...meta, tomo: e.target.value })}
+                onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })}
               />
+              <div className="w-24">
+                <span className="text-[10px] text-slate-500 mb-1 block">Letra</span>
+                <select
+                  className="input w-full"
+                  value={meta.letra || ''}
+                  onChange={e => setMeta({ ...meta, letra: e.target.value })}
+                >
+                  <option value="">-</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="E">E</option>
+                </select>
+              </div>
             </div>
+            <p className="text-[10px] text-brand-600 mt-1">** Debe permitir solo números. La nomenclatura máximo 3 dígitos</p>
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número</span>
-            <input className="input w-full" placeholder="Número" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value })} />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número **</span>
+            <input className="input w-full" placeholder="000" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '') })} />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Año</span>
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Año *</span>
             <YearPicker
               value={meta.anio}
               onChange={(y) => setMeta({ ...meta, anio: y })}
               className="w-full"
             />
+            <p className="text-[10px] text-brand-600 mt-1">Debe permitir la selección hasta el año en curso. Por ejemplo, actualmente hasta el 2026</p>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente</span>
-            <input className="input w-full" placeholder="Número de expediente" value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value })} />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente *</span>
+            <input className="input w-full" placeholder="391-456987" value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
+            <p className="text-[10px] text-brand-600 mt-1">Debe permitir solo números. La nomenclatura es 3 dígitos seguido de un guion y luego permitir hasta 8 dígitos</p>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha</span>
-            <input className="input w-full" type="date" value={meta.fecha || ''} onChange={e => setMeta({ ...meta, fecha: e.target.value })} />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha *</span>
+            <input 
+              className="input w-full" 
+              type="date" 
+              max={new Date().toISOString().split('T')[0]} 
+              value={meta.fecha || ''} 
+              onChange={e => setMeta({ ...meta, fecha: e.target.value })} 
+            />
+            <p className="text-[10px] text-brand-600 mt-1">* No debe admitir fechas futuras al día de la solicitud</p>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla</span>
-            <input className="input w-full" placeholder="Número de planilla" value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: e.target.value })} />
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla **</span>
+            <input className="input w-full" placeholder="391.2024.4.4388" value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: e.target.value.toUpperCase() })} />
+            <p className="text-[10px] text-brand-600 mt-1">** Debe admitir solo números. La nomenclatura es 3 dígitos seguido de un punto, 4 dígitos, punto, 1 dígito, punto y luego permitir hasta 6 dígitos</p>
           </label>
           <div className="md:col-span-2 flex gap-3 pt-4">
             <button type="submit" className="btn btn-primary flex-1" disabled={loading}>
@@ -1121,7 +1145,7 @@ export default function Documento() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
                   <div className="flex items-center gap-2 mb-2">
                     <svg className="w-5 h-5 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1144,16 +1168,7 @@ export default function Documento() {
                   <p className="text-xs text-slate-500 mt-1">${(pdfAnalysis.price_usd / pdfAnalysis.folios).toFixed(2)} × {pdfAnalysis.folios}</p>
                 </div>
 
-                <div className="bg-white rounded-xl p-4 shadow-sm border border-green-100">
-                  <div className="flex items-center gap-2 mb-2">
-                    <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-sm font-medium text-slate-600">Subtotal + IVA</p>
-                  </div>
-                  <p className="text-2xl font-bold text-amber-700">Bs. {pdfAnalysis.subtotal_bs.toFixed(2)}</p>
-                  <p className="text-xs text-slate-500 mt-1">+ Bs. {pdfAnalysis.iva_bs.toFixed(2)} IVA</p>
-                </div>
+
 
                 <div className="bg-gradient-to-br from-brand-600 to-brand-700 rounded-xl p-4 shadow-md text-white">
                   <div className="flex items-center gap-2 mb-2">
@@ -1281,18 +1296,32 @@ export default function Documento() {
 
                 {/* Totales */}
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-brand-800 mb-2 text-sm uppercase tracking-wide border-b pb-2">Detalle de Costos</h4>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="text-sm text-slate-600">Servicio de publicación - {meta.razon_social || 'Documento'}</span>
+                  <div className="p-4 bg-white rounded-lg border border-slate-200 text-slate-800 text-sm leading-relaxed mb-4">
+                    <p className="text-blue-700 font-medium text-[11px] uppercase mb-2">Servicio de publicación electrónica en el Diario Mercantil de Venezuela de un documento protocolizado que corresponde a la razón social:</p>
+                    <div className="font-bold border-b pb-2 mb-2 text-brand-900">[{meta.razon_social || 'REVISAR'}]</div>
+                    
+                    <div className="text-[12px] space-y-1 text-slate-600">
+                      <p>Datos de registro mercantil:</p>
+                      <p>Oficina de registro mercantil: <span className="font-medium">[{meta.oficina || 'REVISAR'}]</span></p>
+                      <p>Tomo: <span className="font-medium">[{meta.tomo || 'REVISAR'}]</span> Letra: <span className="font-medium">[{meta.letra || '-'}]</span></p>
+                      <p>Número: <span className="font-medium">[{meta.numero || 'REVISAR'}]</span></p>
+                      <p>Año: <span className="font-medium">[{meta.anio || 'REVISAR'}]</span></p>
+                      <p>Número de expediente: <span className="font-medium">[{meta.expediente || 'REVISAR'}]</span></p>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
+
+                  <div className="flex justify-between items-center py-2 px-1">
                     <span className="text-slate-600">Folios:</span>
                     <span className="font-semibold">{pdfAnalysis.folios}</span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center py-2 px-1">
                     <span className="text-slate-600">Precio por folio:</span>
-                    <span className="font-semibold">Bs. {pdfAnalysis.price_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <div className="text-right">
+                      <div className="font-semibold text-green-700">Bs. {(pdfAnalysis.total_bs / pdfAnalysis.folios).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-[10px] text-slate-400">Equivalente a $1.50 USD / folio</div>
+                    </div>
                   </div>
+                  {/* Detalles ocultos a petición del cliente:
                   <div className="flex justify-between items-center border-t border-slate-300 pt-2">
                     <span className="text-slate-600">Subtotal:</span>
                     <span className="font-semibold">Bs. {pdfAnalysis.subtotal_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1301,6 +1330,7 @@ export default function Documento() {
                     <span className="text-slate-600">IVA ({settings.iva_percent || 16}%):</span>
                     <span className="font-semibold">Bs. {pdfAnalysis.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
+                  */}
                   <div className="flex justify-between items-center border-t-2 border-brand-600 pt-3">
                     <span className="text-lg font-bold text-brand-900">TOTAL A PAGAR:</span>
                     <span className="text-2xl font-bold text-brand-600">Bs. {pdfAnalysis.total_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1362,16 +1392,41 @@ export default function Documento() {
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">N° de Referencia *</span>
-                  <input className="input w-full" placeholder="123456789" value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value })} />
+                  <input 
+                    className="input w-full" 
+                    placeholder="Últimos 4 dígitos" 
+                    maxLength={4}
+                    value={pay.ref} 
+                    onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} 
+                  />
+                  <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 4 dígitos numéricos</p>
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha del pago *</span>
                   <input className="input w-full" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+                   <p className="text-[10px] text-brand-600 mt-1">* No debe admitir fechas futuras al día de la solicitud</p>
                 </label>
                 {pay.type === 'pago_movil' && (
                   <label className="block md:col-span-2">
                     <span className="text-sm font-medium text-slate-700 mb-1 block">Teléfono desde donde realizó el pago móvil *</span>
-                    <input className="input w-full" placeholder="0424-1234567" value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value })} />
+                    <div className="flex gap-2">
+                      <select className="input w-32">
+                        <option>0412</option>
+                        <option>0414</option>
+                        <option>0416</option>
+                        <option>0422</option>
+                        <option>0424</option>
+                        <option>0426</option>
+                      </select>
+                      <input 
+                        className="input flex-1" 
+                        placeholder="1234567" 
+                        maxLength={7}
+                        value={pay.mobile_phone} 
+                        onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} 
+                      />
+                    </div>
+                    <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 7 dígitos numéricos</p>
                   </label>
                 )}
               </div>

@@ -100,19 +100,19 @@ export default function Convocatoria() {
       <div className="card p-4 space-y-3">
         <h2 className="font-semibold">Paso 1. Datos de la convocatoria</h2>
         <div className="grid md:grid-cols-3 gap-3">
-          <input className="input" placeholder="Tipo de sociedad" value={meta.tipo_sociedad || ''} onChange={e => setMeta({ ...meta, tipo_sociedad: e.target.value })} />
+          <input className="input" placeholder="TIPO DE SOCIEDAD" value={meta.tipo_sociedad || ''} onChange={e => setMeta({ ...meta, tipo_sociedad: e.target.value.toUpperCase() })} />
           <select className="input" value={meta.tipo_convocatoria || ''} onChange={e => setMeta({ ...meta, tipo_convocatoria: e.target.value })}>
             <option value="">Tipo de convocatoria</option>
             <option>Asamblea Ordinaria de accionistas o socios</option>
             <option>Asamblea Extraordinaria de accionistas o socios</option>
             <option>Cartel o Edicto Judicial</option>
           </select>
-          <input className="input md:col-span-2" placeholder="Razón o denominación social" value={meta.razon_social || ''} onChange={e => setMeta({ ...meta, razon_social: e.target.value })} />
-          <input className="input" placeholder="RIF" value={meta.rif || ''} onChange={e => setMeta({ ...meta, rif: e.target.value })} />
-          <input className="input" placeholder="Estado" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value })} />
-          <input className="input" placeholder="Oficina de registro mercantil" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value })} />
-          <input className="input" placeholder="Tomo / Letra" value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value })} />
-          <input className="input" placeholder="Número" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value })} />
+          <input className="input md:col-span-2" placeholder="RAZÓN O DENOMINACIÓN SOCIAL" value={meta.razon_social || ''} onChange={e => setMeta({ ...meta, razon_social: e.target.value.toUpperCase() })} />
+          <input className="input" placeholder="RIF" value={meta.rif || ''} onChange={e => setMeta({ ...meta, rif: e.target.value.toUpperCase() })} />
+          <input className="input" placeholder="ESTADO" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value.toUpperCase() })} />
+          <input className="input" placeholder="OFICINA DE REGISTRO MERCANTIL" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value.toUpperCase() })} />
+          <input className="input" placeholder="TOMO (Máx 3)" maxLength={3} value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })} />
+          <input className="input" placeholder="NÚMERO" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '') })} />
           <YearPicker
             value={meta.anio}
             onChange={(y) => setMeta({ ...meta, anio: y })}
@@ -219,16 +219,16 @@ export default function Convocatoria() {
               <span className="font-medium">Bs. {bcv?.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center border-t border-slate-300 pt-2">
-              <span className="text-slate-600">Subtotal:</span>
-              <span className="font-medium">Bs. {totals.sub.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="text-slate-600">Precio USD:</span>
+              <span className="font-medium">${Number(settings.convocatoria_usd || 0).toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-600">IVA ({settings.iva_percent || 16}%):</span>
-              <span className="font-medium">Bs. {totals.iva.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
+            {/* Subtotal e IVA ocultos a petición del cliente */}
             <div className="flex justify-between items-center border-t-2 border-brand-600 pt-2 mt-2">
               <span className="text-base font-bold text-brand-900">TOTAL A PAGAR:</span>
-              <span className="text-xl font-bold text-brand-600">Bs. {totals.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <div className="text-right">
+                <span className="text-xl font-bold text-brand-600 block">Bs. {totals.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="text-[10px] text-slate-400">Tasa: Bs. {bcv?.toFixed(2)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -249,8 +249,14 @@ export default function Convocatoria() {
               <input className="input w-full" value={pay.bank} onChange={e => setPay({ ...pay, bank: e.target.value })} placeholder="Banco desde donde pagó" />
             </label>
             <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Referencia</span>
-              <input className="input w-full" value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value })} placeholder="Nro. Referencia" />
+              <span className="block text-slate-600 mb-1">Últimos 4 dígitos Referencia *</span>
+              <input 
+                className="input w-full" 
+                maxLength={4} 
+                value={pay.ref} 
+                onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} 
+                placeholder="0000" 
+              />
             </label>
             <label className="text-sm block">
               <span className="block text-slate-600 mb-1">Fecha</span>
@@ -258,8 +264,24 @@ export default function Convocatoria() {
             </label>
             {pay.type === 'pago_movil' && (
               <label className="text-sm md:col-span-2 block">
-                <span className="block text-slate-600 mb-1">Teléfono origen (Pago Móvil)</span>
-                <input className="input w-full" value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value })} placeholder="0412..." />
+                <span className="block text-slate-600 mb-1">Teléfono origen (Pago Móvil) *</span>
+                <div className="flex gap-2">
+                   <select className="input w-28 text-xs">
+                     <option>0412</option>
+                     <option>0414</option>
+                     <option>0416</option>
+                     <option>0424</option>
+                     <option>0426</option>
+                   </select>
+                   <input 
+                    className="input flex-1" 
+                    maxLength={7} 
+                    value={pay.mobile_phone} 
+                    onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} 
+                    placeholder="1234567" 
+                   />
+                </div>
+                <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 7 dígitos numéricos</p>
               </label>
             )}
           </div>
