@@ -41,15 +41,15 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=diario-mercantil_app-network"
+      - "traefik.docker.network=traefik-proxy"
       - "traefik.http.routers.diariomercantil-final.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
-      - "traefik.http.routers.diariomercantil-final.entrypoints=websecure"
       - "traefik.http.routers.diariomercantil-final.priority=100"
       - "traefik.http.routers.diariomercantil-final.tls=true"
       - "traefik.http.routers.diariomercantil-final.tls.certresolver=letsencrypt"
       - "traefik.http.services.diariomercantil-final.loadbalancer.server.port=80"
     networks:
       - app-network
+      - traefik-proxy
 
   db:
     image: mysql:8.0
@@ -92,3 +92,5 @@ volumes:
 networks:
   app-network:
     driver: bridge
+  traefik-proxy:
+    external: true
