@@ -79,6 +79,39 @@ TRAEFIK_NETWORK=traefik-proxy
 docker compose up -d --build
 ```
 
+### Produccion sin Traefik de Hostinger
+
+Si el Traefik compartido de Hostinger sigue devolviendo `404 page not found` aunque el `frontend` responda bien por dentro del contenedor, puedes desplegar una variante autocontenida con Caddy.
+
+Antes de usar esta variante:
+
+1. Deten o elimina el proyecto Traefik de Hostinger para liberar `80/443`.
+2. Asegura que el dominio apunte a la IP del VPS.
+3. Configura tu `.env`:
+
+```bash
+cp .env.example .env
+```
+
+Variables minimas:
+
+```bash
+APP_HOST=diariomercantil.com
+ACME_EMAIL=admin@diariomercantil.com
+```
+
+Despliegue:
+
+```bash
+docker compose -f docker-compose.caddy.yml up -d --build
+```
+
+Con esta compose:
+
+- `Caddy` publica `80/443`.
+- El certificado TLS lo gestiona el propio proyecto.
+- `frontend` ya no depende de las labels Traefik de Hostinger.
+
 ### Acceso
 
 - Sitio: `https://diariomercantil.com`
