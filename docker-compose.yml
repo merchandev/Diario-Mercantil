@@ -41,14 +41,11 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}"
+      - "traefik.docker.network=traefik-ivzc_default"
       - "traefik.http.routers.diariomercantil.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`www.${APP_HOST:-diariomercantil.com}`)"
-      - "traefik.http.routers.diariomercantil.entrypoints=websecure"
+      - "traefik.http.routers.diariomercantil.entrypoints=web,websecure"
       - "traefik.http.routers.diariomercantil.tls=true"
       - "traefik.http.routers.diariomercantil.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.diariomercantil-http.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`www.${APP_HOST:-diariomercantil.com}`)"
-      - "traefik.http.routers.diariomercantil-http.entrypoints=web"
-      - "traefik.http.routers.diariomercantil.service=diariomercantil"
       - "traefik.http.services.diariomercantil.loadbalancer.server.port=80"
     networks:
       - app-network
@@ -97,4 +94,4 @@ networks:
     driver: bridge
   traefik-proxy:
     external: true
-    name: ${TRAEFIK_NETWORK:-traefik-proxy}
+    name: "traefik-ivzc_default"
