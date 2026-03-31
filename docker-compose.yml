@@ -37,6 +37,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    ports:
+      - "8081:80"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}"
@@ -44,6 +46,8 @@ services:
       - "traefik.http.routers.diariomercantil.entrypoints=websecure"
       - "traefik.http.routers.diariomercantil.tls=true"
       - "traefik.http.routers.diariomercantil.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.diariomercantil-http.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`www.${APP_HOST:-diariomercantil.com}`)"
+      - "traefik.http.routers.diariomercantil-http.entrypoints=web"
       - "traefik.http.routers.diariomercantil.service=diariomercantil"
       - "traefik.http.services.diariomercantil.loadbalancer.server.port=80"
     networks:
