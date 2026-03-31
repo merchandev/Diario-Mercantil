@@ -42,10 +42,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-proxy"
-      - "traefik.http.routers.dm-prod.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
+      - "traefik.http.routers.dm-prod.rule=Host('diariomercantil.com') || Host('www.diariomercantil.com')"
       - "traefik.http.routers.dm-prod.entrypoints=web,websecure"
       - "traefik.http.routers.dm-prod.tls=true"
       - "traefik.http.routers.dm-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dm-prod.tls.domains[0].main=diariomercantil.com"
+      - "traefik.http.routers.dm-prod.tls.domains[0].sans=www.diariomercantil.com"
       - "traefik.http.services.dm-prod.loadbalancer.server.port=80"
     networks:
       - app-network
