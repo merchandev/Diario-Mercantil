@@ -41,7 +41,7 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=traefik-ivzc_default"
+      - "traefik.docker.network=traefik-proxy"
       - "traefik.http.routers.diariomercantil.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`www.${APP_HOST:-diariomercantil.com}`)"
       - "traefik.http.routers.diariomercantil.entrypoints=web,websecure"
       - "traefik.http.routers.diariomercantil.tls=true"
@@ -94,4 +94,4 @@ networks:
     driver: bridge
   traefik-proxy:
     external: true
-    name: "traefik-ivzc_default"
+    name: "traefik-proxy"
