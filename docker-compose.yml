@@ -24,7 +24,6 @@ services:
         condition: service_healthy
     networks:
       - app-network
-      - traefik-proxy
     healthcheck:
       test: [ "CMD-SHELL", "php-fpm -t || exit 1" ]
       interval: 30s
@@ -41,22 +40,34 @@ services:
       - backend
     expose:
       - "80"
+    networks:
+      app-network:
+        ipv4_address: 172.30.0.10   # IP fija para que traefik-bridge siempre sepa dónde apuntar
+
+  # ── Puente de red ─────────────────────────────────────────────────────────
+  # Traefik corre en "host" network → solo puede descubrir contenedores que
+  # comparten esa red. Este nginx mínimo vive en host network, recibe tráfico
+  # de Traefik en el puerto 8091 y lo reenvía al frontend via su IP fija.
+  traefik-bridge:
+    image: nginx:alpine
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    volumes:
+      - ./deploy/nginx-host-proxy.conf:/etc/nginx/conf.d/default.conf:ro
     labels:
       - "traefik.enable=true"
-      # Traefik corre en host network → necesita saber qué IP del contenedor usar
-      - "traefik.docker.network=traefik-proxy"
 
-      # ── Router HTTPS: ambos dominios en una sola regla ─────────────────
-      # El redirect HTTP→HTTPS ya lo maneja el entrypoint global de Traefik
+      # ── Router HTTPS (websecure) ──────────────────────────────────────────
+      # El redirect HTTP→HTTPS lo gestiona el entrypoint global de Traefik
       - "traefik.http.routers.dm.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
       - "traefik.http.routers.dm.entrypoints=websecure"
       - "traefik.http.routers.dm.tls=true"
       - "traefik.http.routers.dm.tls.certresolver=letsencrypt"
 
-      # ── Servicio: puerto interno nginx ─────────────────────────────────
-      - "traefik.http.services.dm.loadbalancer.server.port=80"
-    networks:
-      - traefik-proxy
+      # ── Servicio: puerto donde escucha ESTE contenedor (host port 8091) ──
+      - "traefik.http.services.dm.loadbalancer.server.port=8091"
 
   db:
     image: mysql:8.0
@@ -99,5 +110,6 @@ volumes:
 networks:
   app-network:
     driver: bridge
-  traefik-proxy:
-    external: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24   # Subred fija para asignar IPs estáticas
