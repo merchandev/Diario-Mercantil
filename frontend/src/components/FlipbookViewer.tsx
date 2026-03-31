@@ -1080,7 +1080,7 @@ function FlipEngine({
             display: "flex",
             position: "relative",
             transformStyle: "preserve-3d",
-            boxShadow: "0 24px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.3)",
             cursor: isFlipping ? "grabbing" : "grab",
             userSelect: "none",
             touchAction: "none", // CRITICAL: Stop mobile from firing pull-to-refresh down-swipes while dragging pages
@@ -1154,7 +1154,7 @@ function FlipEngine({
                 <div
                   style={{
                     position: "relative",
-                    boxShadow: "0 16px 40px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.1)",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.2)",
                   }}
                 >
                   <PageFace page={page} w={pageW} h={pageH} />
