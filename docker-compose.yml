@@ -43,6 +43,8 @@ services:
       - "80"
     labels:
       - "traefik.enable=true"
+      # Traefik corre en host network → necesita saber qué IP del contenedor usar
+      - "traefik.docker.network=traefik-proxy"
 
       # ── Router HTTPS: ambos dominios en una sola regla ─────────────────
       # El redirect HTTP→HTTPS ya lo maneja el entrypoint global de Traefik
