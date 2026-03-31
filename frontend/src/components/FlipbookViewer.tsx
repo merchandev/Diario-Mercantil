@@ -177,159 +177,36 @@ function FoldingPage({
   const isR = side === "right";
   const sign = isR ? -1 : 1;
 
-  // Use 8 segments for high fidelity 3D cylinder
-  const N = 8;
-  const sliceW = w / N;
-
-  // overlap to brutally eliminate pixel gaps between DOM slabs
-  const overlap = 1.5;
-
-  // sin() peaks at 90 deg
+  // curve va de 0 a 1 a en el punto medio del giro (90deg) y vuelve a 0
   const curve = Math.sin((angle / 180) * Math.PI);
+  
+  // Posición de la luz simulando el reflejo dinámico en la página al rotar
+  const lightPosition = isR ? 100 - (angle / 180) * 100 : (angle / 180) * 100;
+  
+  const frontLight = `linear-gradient(to ${isR ? "left" : "right"}, 
+    rgba(255,255,255,0) 0%, 
+    rgba(255,255,255,${curve * 0.3}) ${lightPosition}%, 
+    rgba(0,0,0,${curve * 0.12}) 100%
+  )`;
 
-  // Max paper flexibility
-  const maxSway = 50; // reduced slightly to prevent self-intersection "breaking"
-  const totalBend = curve * maxSway;
-
-  // Absolute pivot of the spine against the table
-  const rootBound = Math.min(Math.max(angle + totalBend, 0), 180);
-
-  // Total angle delta that needs to be distributed across the remaining joints
-  // to ensure the outer edge physically ends up at `angle`
-  const flexLeft = rootBound - angle;
-  const a_inner = N > 1 ? -flexLeft / (N - 1) : 0;
-
-  // Optional: slight X-tilt based on dragY
-  const tiltDir = (dragY - 0.5) * 2;
-  const tiltX = curve * 3 * tiltDir;
+  const backLight = `linear-gradient(to ${isR ? "right" : "left"}, 
+    rgba(255,255,255,0) 0%, 
+    rgba(255,255,255,${curve * 0.3}) ${100 - lightPosition}%, 
+    rgba(0,0,0,${curve * 0.12}) 100%
+  )`;
 
   const castW = 20 + Math.round(curve * 60);
   const castStyle = isR
     ? {
       right: w,
       width: castW,
-      background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.25}), transparent)`,
+      background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.3}), transparent)`,
     }
     : {
       left: w,
       width: castW,
-      background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.25}), transparent)`,
+      background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.3}), transparent)`,
     };
-
-  // CRITICAL: When flipping a container 180 degrees in CSS 3D space, its internal left/right
-  // coordinate axis inverts.
-  const frontProp = isR ? "left" : "right";
-  const backProp = isR ? "right" : "left";
-
-  // OPTICAL SHADING: Instead of rendering 8 individual strip shadows (which causes vertical banding),
-  // we render ONE SINGLE majestic highlight gradient covering the full width (w), representing
-  // the optical apex (highest curve point) where light hits the folding paper.
-  const apexPrc = isR ? 100 - (angle / 180) * 100 : (angle / 180) * 100;
-  const globalShade = `linear-gradient(to right, 
-    rgba(0,0,0,${curve * 0.08}) 0%, 
-    rgba(0,0,0,${curve * 0.02}) max(0%, calc(${apexPrc}% - 20%)), 
-    rgba(255,255,255,${curve * 0.25}) ${apexPrc}%, 
-    rgba(0,0,0,${curve * 0.12}) min(100%, calc(${apexPrc}% + 15%)), 
-    rgba(0,0,0,${curve * 0.08}) 100%
-  )`;
-
-  // Recursively render slices for the cylindrical curve
-  const renderSlice = (i: number): React.ReactNode => {
-    if (i === N) return null;
-
-    // First slice (spine) pivots by rootBound. Inner slices bend relative to their parent.
-    const relAngle = i === 0 ? rootBound : a_inner;
-
-    // Overlap logic: Render physical DOM node slightly wider, offset left/right slightly negative
-    // to bleed into the parent slice and seal the crack.
-    const isInner = i > 0;
-    const wRender = i < N - 1 ? sliceW + overlap : sliceW;
-    // Positioning relative to parent slice
-    const offsetPos = isInner ? sliceW - overlap / 2 : 0;
-
-    return (
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          [isR ? "left" : "right"]: offsetPos,
-          width: wRender,
-          height: h,
-          transformOrigin: isR ? "left center" : "right center",
-          // Tilt ONLY the root so the cylinder doesn't twist into a corkscrew (which breaks geometry)
-          transform: `rotateY(${sign * relAngle}deg) ${i === 0 ? `rotateX(${tiltX}deg)` : ""}`,
-          transformStyle: "preserve-3d",
-        }}
-      >
-        {/* Front Face */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            overflow: "hidden",
-            backfaceVisibility: "hidden",
-            transform: "translateZ(0.1px)", // Prevents Z-fighting gaps
-          }}
-        >
-          {/* Shift image back by exactly the mathematical coordinate, NOT the rendered width */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              [frontProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)),
-              width: w,
-              height: h,
-            }}
-          >
-            <PageFace page={front} w={w} h={h} />
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: globalShade,
-                pointerEvents: "none",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Back Face */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            overflow: "hidden",
-            backfaceVisibility: "hidden",
-            transform: "rotateY(180deg) translateZ(0.1px)", // Prevents Z-fighting
-          }}
-        >
-          {/* Flip X-axis mapping entirely */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              [backProp]: -(i * sliceW + (isInner ? -(overlap / 2) : 0)),
-              width: w,
-              height: h,
-            }}
-          >
-            <PageFace page={back} w={w} h={h} />
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: globalShade,
-                pointerEvents: "none",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Render next slice */}
-        {renderSlice(i + 1)}
-      </div>
-    );
-  };
 
   return (
     <div
@@ -344,6 +221,7 @@ function FoldingPage({
         transformStyle: "preserve-3d",
       }}
     >
+      {/* Sombra base proyectada en la hoja estática */}
       <div
         style={{
           position: "absolute",
@@ -354,7 +232,65 @@ function FoldingPage({
           zIndex: -1,
         }}
       />
-      {renderSlice(0)}
+      
+      {/* Página Rígida Rotatoria */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          [isR ? "left" : "right"]: 0,
+          width: w,
+          height: h,
+          transformOrigin: isR ? "left center" : "right center",
+          transform: `rotateY(${sign * angle}deg)`,
+          transformStyle: "preserve-3d",
+          boxShadow: curve > 0.1 ? (isR ? `-2px 0 10px rgba(0,0,0,${curve * 0.2})` : `2px 0 10px rgba(0,0,0,${curve * 0.2})`) : "none"
+        }}
+      >
+        {/* Cara frontal */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backfaceVisibility: "hidden",
+            background: "#fff",
+            // Un micro translate evita parpadeo Z en algunos navegadores
+            transform: "translateZ(0)", 
+          }}
+        >
+          <PageFace page={front} w={w} h={h} />
+          {/* Overlay de iluminación interactiva */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: frontLight,
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+
+        {/* Cara Trasera */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backfaceVisibility: "hidden",
+            background: "#fff",
+            transform: "rotateY(180deg) translateZ(0)", 
+          }}
+        >
+          <PageFace page={back} w={w} h={h} />
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: backLight,
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+      </div>
     </div>
   );
 }
