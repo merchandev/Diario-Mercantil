@@ -36,6 +36,7 @@ Plataforma integral para la gestion, publicacion y verificacion de documentos le
   - Docker y Docker Compose
   - Nginx
   - MySQL / MariaDB
+  - Traefik compartido en Hostinger Docker Manager
 
 ## Instalacion y despliegue
 
@@ -43,45 +44,65 @@ Plataforma integral para la gestion, publicacion y verificacion de documentos le
 - Docker y Docker Compose instalados.
 - Git.
 
-### Configuracion local
+### Desarrollo local
 
-1. Clonar el repositorio:
-   ```bash
-   git clone <url-del-repositorio>
-   cd diario-mercantil
-   ```
-
-2. Configurar variables de entorno:
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Iniciar los servicios:
-   ```bash
-   docker compose up -d --build
-   ```
-
-4. Acceso:
-   - Sitio: `http://localhost` o el dominio configurado en `VIRTUAL_HOST`.
-   - API: `http://localhost/api/...`
-   - phpMyAdmin: `http://localhost:8080`
-
-## Migracion desde despliegues viejos
-
-Antes del commit `d227c56`, el servicio `frontend` publicaba `80:80` directamente. Desde ese cambio el trafico publico pasa por `nginx-proxy`, y `frontend` queda solo dentro de la red Docker.
-
-Si el VPS todavia intenta levantar `frontend` con `0.0.0.0:80->80/tcp`, estas ejecutando una compose vieja o quedaron contenedores huerfanos del esquema anterior. La secuencia correcta es:
+Para desarrollo local usa la compose de desarrollo:
 
 ```bash
-docker compose down --remove-orphans
-docker compose up -d --build --remove-orphans
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-Si despues de eso el sitio sigue caido por nombre de dominio, revisa DNS antes de seguir depurando Docker:
+### Produccion en Hostinger Docker Manager
 
-- `diariomercantil.com` y `www.diariomercantil.com` deben resolver a la IP del VPS.
-- Los puertos `80` y `443` deben quedar libres para `nginx-proxy`.
-- Si los resolvers publicos responden `SERVFAIL`, el problema esta en la zona DNS o en DNSSEC, no en el contenedor.
+La `docker-compose.yml` raiz esta orientada a Hostinger Docker Manager. En ese entorno no debes publicar `80/443` desde este proyecto, porque Hostinger ya ejecuta un Traefik compartido para todos los proyectos.
+
+Antes de desplegar:
+
+1. Despliega el template de Traefik de Hostinger.
+2. Verifica que exista la red externa `traefik-proxy`.
+3. Configura tu `.env`:
+
+```bash
+cp .env.example .env
+```
+
+4. Ajusta al menos estas variables:
+
+```bash
+APP_HOST=diariomercantil.com
+APP_WWW_HOST=www.diariomercantil.com
+TRAEFIK_NETWORK=traefik-proxy
+```
+
+5. Despliega:
+
+```bash
+docker compose up -d --build
+```
+
+### Acceso
+
+- Sitio: `https://diariomercantil.com`
+- API: `https://diariomercantil.com/api/...`
+- phpMyAdmin: `http://<VPS_IP>:8080`
+
+## Nota importante para Hostinger
+
+Si el proyecto queda en `Partially running` con `nginx-proxy` en estado `Created`, la compose anterior era incorrecta para Hostinger: intentaba bindear `80/443` aunque esos puertos ya pertenecen al Traefik compartido del VPS.
+
+El modelo correcto es:
+
+- Hostinger Traefik escucha en `80/443`.
+- Este proyecto solo publica labels Traefik en el `frontend`.
+- El `frontend` se conecta a la red externa `traefik-proxy`.
+- El `backend` no debe exponerse con un puerto publico; solo atiende a `frontend` por la red Docker.
+
+## DNS
+
+Aunque el proyecto arranque correctamente en Docker, el dominio no funcionara si:
+
+- `diariomercantil.com` y `www.diariomercantil.com` no resuelven hacia la IP del VPS.
+- Los resolvers publicos devuelven `SERVFAIL`, lo que suele indicar zona DNS rota o problema de DNSSEC.
 
 ## Seguridad
 

@@ -1,38 +1,4 @@
 services:
-  nginx-proxy:
-    image: nginxproxy/nginx-proxy:alpine
-    container_name: nginx-proxy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - conf:/etc/nginx/conf.d
-      - vhost:/etc/nginx/vhost.d
-      - html:/usr/share/nginx/html
-      - certs:/etc/nginx/certs:ro
-      - /var/run/docker.sock:/tmp/docker.sock:ro
-    restart: unless-stopped
-    networks:
-      - app-network
-
-  acme-companion:
-    image: nginxproxy/acme-companion
-    container_name: nginx-proxy-acme
-    environment:
-      - DEFAULT_EMAIL=admin@diariomercantil.com # Cambia esto si deseas otro email de registro
-    volumes:
-      - conf:/etc/nginx/conf.d
-      - vhost:/etc/nginx/vhost.d
-      - html:/usr/share/nginx/html
-      - certs:/etc/nginx/certs:rw
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - acme:/etc/acme.sh
-    depends_on:
-      - nginx-proxy
-    restart: unless-stopped
-    networks:
-      - app-network
-
   backend:
     build:
       context: ./backend
@@ -40,8 +6,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./backend/storage:/var/www/html/storage
-    ports:
-      - "3000:9000"
+    expose:
+      - "9000"
     environment:
       APP_ENV: ${APP_ENV}
       DB_CONNECTION: ${DB_CONNECTION}
@@ -69,14 +35,24 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     restart: unless-stopped
-    environment:
-      - VIRTUAL_HOST=diariomercantil.com,www.diariomercantil.com
-      - LETSENCRYPT_HOST=diariomercantil.com,www.diariomercantil.com
-      - VIRTUAL_PORT=80
     depends_on:
       - backend
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}
+      - traefik.http.routers.diario-mercantil.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`${APP_WWW_HOST:-www.diariomercantil.com}`)
+      - traefik.http.routers.diario-mercantil.entrypoints=websecure
+      - traefik.http.routers.diario-mercantil.tls=true
+      - traefik.http.routers.diario-mercantil.tls.certresolver=letsencrypt
+      - traefik.http.routers.diario-mercantil.service=diario-mercantil
+      - traefik.http.services.diario-mercantil.loadbalancer.server.port=80
+      - traefik.http.routers.diario-mercantil-http.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`${APP_WWW_HOST:-www.diariomercantil.com}`)
+      - traefik.http.routers.diario-mercantil-http.entrypoints=web
+      - traefik.http.routers.diario-mercantil-http.middlewares=diario-mercantil-https
+      - traefik.http.middlewares.diario-mercantil-https.redirectscheme.scheme=https
     networks:
       - app-network
+      - traefik-proxy
 
   db:
     image: mysql:8.0
@@ -115,13 +91,10 @@ services:
 
 volumes:
   db_data:
-  conf:
-  vhost:
-  html:
-  certs:
-  acme:
-
 
 networks:
   app-network:
     driver: bridge
+  traefik-proxy:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik-proxy}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Automated deployment script for Ubuntu/Hostinger.
 # Current production topology:
-# nginx-proxy -> frontend nginx -> backend php-fpm.
+# Hostinger Traefik -> frontend nginx -> backend php-fpm.
 
 set -euo pipefail
 
@@ -27,7 +27,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
-DOMAIN="${DOMAIN:-diariomercantil.com}"
+DOMAIN="${APP_HOST:-${DOMAIN:-diariomercantil.com}}"
+TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-traefik-proxy}"
 
 if ! command -v docker >/dev/null 2>&1; then
     print_error "Docker is not installed."
@@ -67,10 +68,19 @@ if [ -f .env ]; then
     # shellcheck disable=SC1091
     . ./.env
     set +a
+    DOMAIN="${APP_HOST:-${DOMAIN}}"
+    TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-traefik-proxy}"
     print_success ".env loaded."
 else
     print_warning ".env was not found. Compose defaults or exported env vars will be used."
 fi
+
+if ! docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
+    print_error "The external Traefik network '$TRAEFIK_NETWORK' does not exist."
+    print_info "Deploy the Hostinger Traefik template first, or create the shared network before running this stack."
+    exit 1
+fi
+print_success "Traefik network '$TRAEFIK_NETWORK' is available."
 
 mkdir -p backend/storage/uploads backend/storage/results backend/storage/database backend/storage/cache
 chmod -R 775 backend/storage
@@ -94,7 +104,7 @@ COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" up -d --remove-orphans
 print_info "\nStep 6: Waiting for services"
 sleep 10
 
-for service in nginx-proxy backend frontend db phpmyadmin; do
+for service in backend frontend db phpmyadmin; do
     if COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" ps --status running --services | grep -qx "$service"; then
         print_success "$service is running."
     else
@@ -122,19 +132,19 @@ done
 printf "\n"
 print_success "Database is ready."
 
-print_info "\nStep 8: Verifying HTTP endpoints"
-if curl -fsS http://localhost/health >/dev/null; then
-    print_success "Frontend health endpoint is responding through nginx-proxy."
+print_info "\nStep 8: Verifying HTTP endpoints via Traefik host routing"
+if curl -fsS -H "Host: ${DOMAIN}" http://127.0.0.1/health >/dev/null; then
+    print_success "Frontend health endpoint is responding through Hostinger Traefik."
 else
-    print_error "Frontend health endpoint is not responding on http://localhost/health."
-    COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs nginx-proxy frontend || true
+    print_error "Frontend health endpoint is not responding through Traefik for host ${DOMAIN}."
+    COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs frontend || true
     exit 1
 fi
 
-if curl -fsS http://localhost/api/settings >/dev/null; then
+if curl -fsS -H "Host: ${DOMAIN}" http://127.0.0.1/api/settings >/dev/null; then
     print_success "Backend API is responding through the frontend gateway."
 else
-    print_warning "Backend API check failed on http://localhost/api/settings."
+    print_warning "Backend API check failed on http://127.0.0.1/api/settings for host ${DOMAIN}."
 fi
 
 print_info "\nStep 9: Current stack"
@@ -148,13 +158,13 @@ print_info "${GREEN}Deployment complete${NC}"
 print_info "${GREEN}===================================${NC}"
 print_info ""
 print_info "Access:"
-print_info "  Site: https://${DOMAIN} or http://${DOMAIN}"
-print_info "  Local health: http://localhost/health"
+print_info "  Site: https://${DOMAIN}"
+print_info "  Local routed health: curl -H 'Host: ${DOMAIN}' http://127.0.0.1/health"
 print_info "  API: https://${DOMAIN}/api/settings"
 print_info "  phpMyAdmin: http://<VPS_IP>:8080"
 print_info ""
-print_info "If the domain still does not open after deployment:"
+print_info "If the site still does not open after deployment:"
 print_info "  1. Confirm DNS for ${DOMAIN} points to the VPS."
-print_info "  2. Confirm ports 80 and 443 are free and reachable."
+print_info "  2. Confirm the Hostinger Traefik project is healthy."
 print_info "  3. Re-run: COMPOSE_PROJECT_NAME=${PROJECT_NAME} ${COMPOSE[*]} down --remove-orphans"
 print_info "  4. Re-run: COMPOSE_PROJECT_NAME=${PROJECT_NAME} ${COMPOSE[*]} up -d --build --remove-orphans"

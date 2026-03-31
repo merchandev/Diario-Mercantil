@@ -14,6 +14,8 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
 PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
+DOMAIN="${APP_HOST:-${DOMAIN:-diariomercantil.com}}"
+TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-traefik-proxy}"
 
 if docker compose version >/dev/null 2>&1; then
     COMPOSE=(docker compose)
@@ -31,6 +33,8 @@ if [ -f .env ]; then
     # shellcheck disable=SC1091
     . ./.env
     set +a
+    DOMAIN="${APP_HOST:-${DOMAIN}}"
+    TRAEFIK_NETWORK="${TRAEFIK_NETWORK:-traefik-proxy}"
 fi
 
 MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root_secure_password_2025}"
@@ -52,6 +56,13 @@ fail() {
 compose_exec() {
     COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" exec -T "$@"
 }
+
+echo -n "Test 0: Shared Traefik network exists... "
+if docker network inspect "$TRAEFIK_NETWORK" >/dev/null 2>&1; then
+    pass
+else
+    fail
+fi
 
 echo -n "Test 1: Database connection... "
 if compose_exec backend php -r "require '/var/www/html/src/Database.php'; Database::pdo(); echo 'OK';" 2>/dev/null | grep -q "OK"; then
@@ -83,15 +94,15 @@ else
     fail
 fi
 
-echo -n "Test 5: Frontend accessible through proxy... "
-if curl -fsS http://localhost/health >/dev/null 2>&1; then
+echo -n "Test 5: Frontend accessible through Traefik... "
+if curl -fsS -H "Host: ${DOMAIN}" http://127.0.0.1/health >/dev/null 2>&1; then
     pass
 else
     fail
 fi
 
-echo -n "Test 6: Backend API accessible through frontend gateway... "
-if curl -fsS http://localhost/api/settings 2>/dev/null | grep -q '{'; then
+echo -n "Test 6: Backend API accessible through routed frontend... "
+if curl -fsS -H "Host: ${DOMAIN}" http://127.0.0.1/api/settings 2>/dev/null | grep -q '{'; then
     pass
 else
     fail
