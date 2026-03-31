@@ -33,7 +33,6 @@ services:
       start_period: 40s
 
   frontend:
-    container_name: dm-frontend
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
@@ -45,14 +44,16 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-proxy"
-      - "traefik.http.routers.mercantilv.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
-      - "traefik.http.routers.mercantilv.entrypoints=web,websecure"
-      - "traefik.http.routers.mercantilv.tls=true"
-      - "traefik.http.routers.mercantilv.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.mercantilv.service=dm-service"
-      - "traefik.http.services.dm-service.loadbalancer.server.port=80"
+      - "traefik.http.routers.dm_main.rule=Host(`diariomercantil.com`)"
+      - "traefik.http.routers.dm_main.entrypoints=web,websecure"
+      - "traefik.http.routers.dm_main.tls=true"
+      - "traefik.http.routers.dm_main.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dm_www.rule=Host(`www.diariomercantil.com`)"
+      - "traefik.http.routers.dm_www.entrypoints=web,websecure"
+      - "traefik.http.routers.dm_www.tls=true"
+      - "traefik.http.routers.dm_www.tls.certresolver=letsencrypt"
+      - "traefik.http.services.dm_service.loadbalancer.server.port=80"
     networks:
-      - app-network
       - traefik-proxy
 
   db:
