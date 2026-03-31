@@ -38,13 +38,14 @@ services:
     depends_on:
       - backend
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.diariomercantil.rule=Host(`${APP_HOST:-diariomercantil.com}`)
-      - traefik.http.routers.diariomercantil.entrypoints=websecure
-      - traefik.http.routers.diariomercantil.tls=true
-      - traefik.http.routers.diariomercantil.tls.certresolver=letsencrypt
-      - traefik.http.routers.diariomercantil.service=diariomercantil
-      - traefik.http.services.diariomercantil.loadbalancer.server.port=80
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:-traefik-proxy}"
+      - "traefik.http.routers.diariomercantil.rule=Host(`${APP_HOST:-diariomercantil.com}`) || Host(`www.${APP_HOST:-diariomercantil.com}`)"
+      - "traefik.http.routers.diariomercantil.entrypoints=websecure"
+      - "traefik.http.routers.diariomercantil.tls=true"
+      - "traefik.http.routers.diariomercantil.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.diariomercantil.service=diariomercantil"
+      - "traefik.http.services.diariomercantil.loadbalancer.server.port=80"
     networks:
       - app-network
       - traefik-proxy
@@ -64,7 +65,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secure_password_2025" ]
+      test: [ "CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}" ]
       interval: 10s
       timeout: 5s
       retries: 5
