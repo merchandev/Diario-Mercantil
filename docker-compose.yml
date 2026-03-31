@@ -23,6 +23,7 @@ services:
       db:
         condition: service_healthy
     networks:
+      - app-network
       - traefik-proxy
     healthcheck:
       test: [ "CMD-SHELL", "php-fpm -t || exit 1" ]
@@ -44,13 +45,14 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-proxy"
-      - "traefik.http.routers.dm.rule=Host('diariomercantil.com') || Host('www.diariomercantil.com')"
+      - "traefik.http.routers.dm.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
       - "traefik.http.routers.dm.entrypoints=web,websecure"
-      - "traefik.http.routers.dm.priority=1000"
+      - "traefik.http.routers.dm.priority=100000"
       - "traefik.http.routers.dm.tls=true"
       - "traefik.http.routers.dm.tls.certresolver=letsencrypt"
       - "traefik.http.services.dm.loadbalancer.server.port=80"
     networks:
+      - app-network
       - traefik-proxy
 
   db:
