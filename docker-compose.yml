@@ -41,7 +41,8 @@ services:
       - "8081:80"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.diariomercantil.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
+      - "traefik.http.routers.diariomercantil.rule=Host('diariomercantil.com') || Host('www.diariomercantil.com')"
+      - "traefik.http.routers.diariomercantil.entrypoints=web,websecure"
       - "traefik.http.routers.diariomercantil.priority=100"
       - "traefik.http.routers.diariomercantil.tls=true"
       - "traefik.http.routers.diariomercantil.tls.certresolver=letsencrypt"
