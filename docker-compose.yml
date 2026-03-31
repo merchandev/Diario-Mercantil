@@ -39,19 +39,34 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "8081:80"
+    expose:
+      - "80"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-proxy"
+
+      # ── Router HTTPS: dominio raíz ─────────────────────────────────────
       - "traefik.http.routers.dm_main.rule=Host(`diariomercantil.com`)"
-      - "traefik.http.routers.dm_main.entrypoints=web,websecure"
+      - "traefik.http.routers.dm_main.entrypoints=websecure"
       - "traefik.http.routers.dm_main.tls=true"
       - "traefik.http.routers.dm_main.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dm_main.service=dm_service"
+
+      # ── Router HTTPS: subdominio www ───────────────────────────────────
       - "traefik.http.routers.dm_www.rule=Host(`www.diariomercantil.com`)"
-      - "traefik.http.routers.dm_www.entrypoints=web,websecure"
+      - "traefik.http.routers.dm_www.entrypoints=websecure"
       - "traefik.http.routers.dm_www.tls=true"
       - "traefik.http.routers.dm_www.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dm_www.service=dm_service"
+
+      # ── Router HTTP → redirección permanente a HTTPS ───────────────────
+      - "traefik.http.routers.dm_http.rule=Host(`diariomercantil.com`) || Host(`www.diariomercantil.com`)"
+      - "traefik.http.routers.dm_http.entrypoints=web"
+      - "traefik.http.routers.dm_http.middlewares=dm_redirect_https"
+      - "traefik.http.middlewares.dm_redirect_https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.dm_redirect_https.redirectscheme.permanent=true"
+
+      # ── Servicio backend: puerto interno del contenedor nginx ──────────
       - "traefik.http.services.dm_service.loadbalancer.server.port=80"
     networks:
       - traefik-proxy
