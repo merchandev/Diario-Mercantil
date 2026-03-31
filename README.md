@@ -70,7 +70,6 @@ cp .env.example .env
 
 ```bash
 APP_HOST=diariomercantil.com
-APP_WWW_HOST=www.diariomercantil.com
 TRAEFIK_NETWORK=traefik-proxy
 ```
 
@@ -101,7 +100,8 @@ El modelo correcto es:
 
 Aunque el proyecto arranque correctamente en Docker, el dominio no funcionara si:
 
-- `diariomercantil.com` y `www.diariomercantil.com` no resuelven hacia la IP del VPS.
+- `diariomercantil.com` no resuelve hacia la IP del VPS.
+- Si luego quieres publicar `www`, crea primero el registro DNS y solo despues agregalo a las labels Traefik.
 - Los resolvers publicos devuelven `SERVFAIL`, lo que suele indicar zona DNS rota o problema de DNSSEC.
 
 ## Seguridad
