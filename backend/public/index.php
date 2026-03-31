@@ -52,6 +52,7 @@ elseif ($uri === "/api/user/avatar" && $method === "POST") { (new UserController
 elseif ($uri === "/api/legal/upload-pdf" && $method === "POST") { (new LegalController())->uploadPdf(); }
 elseif ($uri === "/api/legal/trash" && $method === "GET") { (new LegalController())->listTrashed(); }
 elseif ($uri === "/api/legal/trash" && $method === "DELETE") { (new LegalController())->emptyTrash(); }
+elseif (preg_match("#^/api/legal/trash/(\d+)$#", $uri, $m) && $method === "DELETE") { (new LegalController())->permanentDelete($m[1]); }
 elseif ($uri === "/api/legal" && $method === "GET") { (new LegalController())->list(); }
 elseif ($uri === "/api/legal" && $method === "POST") { (new LegalController())->create(); }
 

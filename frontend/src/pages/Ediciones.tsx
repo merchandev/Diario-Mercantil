@@ -393,17 +393,17 @@ export default function Ediciones() {
                                     }} />
                                   </label>
                                   {detail.edition.file_id && (
-                                    <div className="h-[550px] border rounded-lg overflow-hidden relative group shadow-inner bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex flex-col p-4">
-                                      <div className="flex items-center justify-between text-slate-200 text-sm mb-3 z-10 relative">
-                                        <span className="font-semibold">Visor Espressivo-PDF</span>
-                                        <span className="text-xs bg-white/10 px-2 py-1 rounded-full">Vista tipo revista</span>
+                                    <div className="h-[550px] border border-slate-200 rounded-xl overflow-hidden relative group shadow-sm bg-slate-50 flex flex-col p-4">
+                                      <div className="flex items-center justify-between text-slate-700 text-sm mb-3 z-10 relative">
+                                        <span className="font-semibold text-brand-800">Visor PDF</span>
+                                        <span className="text-xs bg-slate-200/50 px-2 py-1 rounded-md text-slate-600 border border-slate-200">Vista tipo revista</span>
                                       </div>
                                       <div className="flex-1 relative z-10 w-full max-w-full">
                                         <FlipbookViewer src={pdfUrl} height={420} />
                                       </div>
-                                      <div className="flex flex-wrap gap-2 text-xs text-slate-300 mt-4 z-10 relative justify-center">
-                                        <span className="px-2 py-1 rounded bg-white/10">Arrastra o clic para pasar página</span>
-                                        <span className="px-2 py-1 rounded bg-white/10">Usa la rueda para navegar</span>
+                                      <div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-4 z-10 relative justify-center">
+                                        <span className="px-2 py-1 rounded bg-slate-200/50 border border-slate-200">Arrastra o clic para pasar página</span>
+                                        <span className="px-2 py-1 rounded bg-slate-200/50 border border-slate-200">Usa la rueda para navegar</span>
                                       </div>
                                       <div className="absolute bottom-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <a

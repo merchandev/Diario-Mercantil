@@ -208,12 +208,12 @@ function FoldingPage({
     ? {
       right: w,
       width: castW,
-      background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.45}), transparent)`,
+      background: `linear-gradient(to left, rgba(0,0,0,${curve * 0.25}), transparent)`,
     }
     : {
       left: w,
       width: castW,
-      background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.45}), transparent)`,
+      background: `linear-gradient(to right, rgba(0,0,0,${curve * 0.25}), transparent)`,
     };
 
   // CRITICAL: When flipping a container 180 degrees in CSS 3D space, its internal left/right
@@ -226,11 +226,11 @@ function FoldingPage({
   // the optical apex (highest curve point) where light hits the folding paper.
   const apexPrc = isR ? 100 - (angle / 180) * 100 : (angle / 180) * 100;
   const globalShade = `linear-gradient(to right, 
-    rgba(0,0,0,${curve * 0.12}) 0%, 
-    rgba(0,0,0,${curve * 0.05}) max(0%, calc(${apexPrc}% - 20%)), 
-    rgba(255,255,255,${curve * 0.35}) ${apexPrc}%, 
-    rgba(0,0,0,${curve * 0.2}) min(100%, calc(${apexPrc}% + 15%)), 
-    rgba(0,0,0,${curve * 0.15}) 100%
+    rgba(0,0,0,${curve * 0.08}) 0%, 
+    rgba(0,0,0,${curve * 0.02}) max(0%, calc(${apexPrc}% - 20%)), 
+    rgba(255,255,255,${curve * 0.25}) ${apexPrc}%, 
+    rgba(0,0,0,${curve * 0.12}) min(100%, calc(${apexPrc}% + 15%)), 
+    rgba(0,0,0,${curve * 0.08}) 100%
   )`;
 
   // Recursively render slices for the cylindrical curve
@@ -1080,7 +1080,7 @@ function FlipEngine({
             display: "flex",
             position: "relative",
             transformStyle: "preserve-3d",
-            boxShadow: "0 48px 120px rgba(0,0,0,0.8)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.15)",
             cursor: isFlipping ? "grabbing" : "grab",
             userSelect: "none",
             touchAction: "none", // CRITICAL: Stop mobile from firing pull-to-refresh down-swipes while dragging pages
@@ -1154,7 +1154,7 @@ function FlipEngine({
                 <div
                   style={{
                     position: "relative",
-                    boxShadow: "0 28px 80px rgba(0,0,0,0.72)",
+                    boxShadow: "0 16px 40px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.1)",
                   }}
                 >
                   <PageFace page={page} w={pageW} h={pageH} />
@@ -1520,9 +1520,9 @@ export default function FlipbookViewer({
           minHeight: isFs ? "100vh" : viewerH,
           height: isFs ? "100vh" : undefined,
           background:
-            "linear-gradient(150deg,#5a0c0c 0%,#7c1515 40%,#3d0808 100%)",
+            "linear-gradient(150deg,#111827 0%,#1f2937 40%,#0f172a 100%)",
           borderRadius: isFs ? 0 : 24,
-          boxShadow: isFs ? "none" : "0 40px 120px rgba(0,0,0,0.65)",
+          boxShadow: isFs ? "none" : "0 20px 40px rgba(0,0,0,0.3)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

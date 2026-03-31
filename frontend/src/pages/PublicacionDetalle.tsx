@@ -486,7 +486,7 @@ export default function PublicacionDetalle() {
             <p className="text-sm text-slate-600">No hay pagos cargados por el solicitante.</p>
           )}
           <div className="border-t pt-3 text-xs text-slate-600">
-            Desde aquÇ­ el administrador valida el pago y puede aprobar/rechazar en la secciÇün superior.
+            Desde aquí el administrador valida el pago y puede aprobar/rechazar en la sección superior.
           </div>
         </div>
       </div>
