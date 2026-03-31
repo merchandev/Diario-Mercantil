@@ -1,81 +1,93 @@
-﻿# Sistema de Gestión Digital - Diario Mercantil de Venezuela
+# Sistema de Gestion Digital - Diario Mercantil de Venezuela
 
-Plataforma integral para la gestión, publicación y verificación de documentos legales y avisos mercantiles. Este sistema automatiza el flujo de trabajo editorial, desde la solicitud del cliente hasta la publicación digital y la generación de ediciones compaginadas.
+Plataforma integral para la gestion, publicacion y verificacion de documentos legales y avisos mercantiles. El sistema automatiza el flujo editorial, desde la solicitud del cliente hasta la publicacion digital y la generacion de ediciones compaginadas.
 
-## 🚀 Características Principales
+## Caracteristicas principales
 
-### 👥 Gestión de Usuarios
-- **Roles y Permisos**: Sistema jerárquico (SuperAdmin, Administrador, Solicitante).
-- **Autenticación Segura**: Manejo de sesiones persistentes y cierre automático por inactividad.
+### Gestion de usuarios
+- Roles y permisos: sistema jerarquico (SuperAdmin, Administrador, Solicitante).
+- Autenticacion segura: sesiones persistentes y cierre automatico por inactividad.
 
-### 📄 Publicaciones Legales
-- **Procesamiento de Documentos**: Carga y análisis de documentos PDF.
-- **Cálculo Automático**: Estimación de costos basada en folios y tasas indexadas (BCV).
-- **Recibos Digitales**: Generación automática de órdenes de servicio y recibos en PDF.
+### Publicaciones legales
+- Procesamiento de documentos PDF.
+- Calculo automatico basado en folios y tasas indexadas (BCV).
+- Generacion de ordenes de servicio y recibos en PDF.
 
-### 🔍 Verificación y Acceso Público
-- **Validación QR**: Módulo de acceso público para verificar la autenticidad de las publicaciones.
-- **Ruta Pública**: Acceso directo a documentos mediante `/ver/{orden}`.
+### Verificacion y acceso publico
+- Validacion QR para verificar autenticidad de publicaciones.
+- Ruta publica directa mediante `/ver/{orden}`.
 
-### 📚 Ediciones Digitales
-- **Compaginación**: Organización y publicación de la edición diaria del diario.
-- **Visor Interactivo**: Visualización fluida de las ediciones digitales.
+### Ediciones digitales
+- Compaginacion y publicacion de la edicion diaria.
+- Visor interactivo para las ediciones digitales.
 
-## 🛠️ Stack Tecnológico
+## Stack tecnologico
 
-La aplicación está construida utilizando una arquitectura moderna y robusta:
-
-- **Frontend**: 
+- Frontend:
   - React 18
   - TypeScript
   - TailwindCSS
-  - Vite (Build tool)
-
-- **Backend**: 
-  - PHP 8.2 (Arquitectura MVC personalizada)
-  - PDO (Abstracción de Base de Datos)
-  - FPDF (Generación de documentos)
-
-- **Infraestructura**:
-  - Docker & Docker Compose
-  - Nginx (Web Server)
+  - Vite
+- Backend:
+  - PHP 8.2
+  - PDO
+  - FPDF
+- Infraestructura:
+  - Docker y Docker Compose
+  - Nginx
   - MySQL / MariaDB
 
-## 📦 Instalación y Despliegue
+## Instalacion y despliegue
 
-### Requisitos Previos
+### Requisitos previos
 - Docker y Docker Compose instalados.
 - Git.
 
-### Configuración Local
+### Configuracion local
 
-1. **Clonar el repositorio**:
+1. Clonar el repositorio:
    ```bash
    git clone <url-del-repositorio>
    cd diario-mercantil
    ```
 
-2. **Configurar variables de entorno**:
-   Copia el archivo de ejemplo y ajusta los valores necesarios.
+2. Configurar variables de entorno:
    ```bash
    cp .env.example .env
    ```
 
-3. **Iniciar los servicios**:
+3. Iniciar los servicios:
    ```bash
-   docker-compose up -d --build
+   docker compose up -d --build
    ```
 
-4. **Acceso**:
-   - Frontend: `http://localhost` (o puerto configurado)
-   - Backend API: `http://localhost:8000`
+4. Acceso:
+   - Sitio: `http://localhost` o el dominio configurado en `VIRTUAL_HOST`.
+   - API: `http://localhost/api/...`
+   - phpMyAdmin: `http://localhost:8080`
 
-## 🔒 Seguridad
+## Migracion desde despliegues viejos
 
-Este proyecto sigue buenas prácticas de seguridad:
-- Las credenciales y configurariones sensibles se manejan mediante variables de entorno.
-- No se versionan archivos de configuración con secretos reales.
-- El sistema incluye logs de auditoría para acciones críticas.
+Antes del commit `d227c56`, el servicio `frontend` publicaba `80:80` directamente. Desde ese cambio el trafico publico pasa por `nginx-proxy`, y `frontend` queda solo dentro de la red Docker.
+
+Si el VPS todavia intenta levantar `frontend` con `0.0.0.0:80->80/tcp`, estas ejecutando una compose vieja o quedaron contenedores huerfanos del esquema anterior. La secuencia correcta es:
+
+```bash
+docker compose down --remove-orphans
+docker compose up -d --build --remove-orphans
+```
+
+Si despues de eso el sitio sigue caido por nombre de dominio, revisa DNS antes de seguir depurando Docker:
+
+- `diariomercantil.com` y `www.diariomercantil.com` deben resolver a la IP del VPS.
+- Los puertos `80` y `443` deben quedar libres para `nginx-proxy`.
+- Si los resolvers publicos responden `SERVFAIL`, el problema esta en la zona DNS o en DNSSEC, no en el contenedor.
+
+## Seguridad
+
+- Las credenciales y configuraciones sensibles deben manejarse mediante variables de entorno.
+- No se deben versionar secretos reales.
+- El sistema incluye logs de auditoria para acciones criticas.
 
 ---
 © Diario Mercantil de Venezuela - Todos los derechos reservados.

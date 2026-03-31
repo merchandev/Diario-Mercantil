@@ -1,73 +1,72 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -euo pipefail
 
 echo "========================================"
-echo "  Verificación de Accesibilidad Docker"
+echo "Docker / Domain accessibility check"
 echo "========================================"
 echo ""
 
-# 1. Verificar contenedores
-echo "1. ✓ Verificando contenedores..."
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep dashboard
-echo ""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
+DOMAIN="${DOMAIN:-diariomercantil.com}"
 
-# 2. Verificar puertos expuestos
-echo "2. ✓ Verificando puertos expuestos..."
-echo "Frontend:"
-docker port dashboard-frontend 2>/dev/null || echo "  Contenedor no encontrado"
-echo ""
-
-# 3. Probar acceso local
-echo "3. ✓ Probando acceso local (curl localhost:80)..."
-RESPONSE=$(docker exec dashboard-frontend curl -I -s http://localhost 2>/dev/null | head -n1)
-if [ -z "$RESPONSE" ]; then
-    echo "  ❌ No responde"
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
 else
-    echo "  ✓ $RESPONSE"
+    echo "Docker Compose is not installed."
+    exit 1
+fi
+
+cd "$PROJECT_DIR"
+
+echo "1. Compose services"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" ps || true
+echo ""
+
+echo "2. Published ports"
+echo "nginx-proxy :80  -> $(COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" port nginx-proxy 80 2>/dev/null || echo 'not published')"
+echo "nginx-proxy :443 -> $(COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" port nginx-proxy 443 2>/dev/null || echo 'not published')"
+echo "phpMyAdmin :80   -> $(COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" port phpmyadmin 80 2>/dev/null || echo 'not published')"
+echo ""
+
+echo "3. Local HTTP check through nginx-proxy"
+local_http="$(curl -I -s http://localhost/health | head -n1 || true)"
+if [ -n "$local_http" ]; then
+    echo "  $local_http"
+else
+    echo "  No response from http://localhost/health"
 fi
 echo ""
 
-# 4. Verificar conexión al backend
-echo "4. ✓ Probando conexión frontend → backend..."
-BACKEND_RESPONSE=$(docker exec dashboard-frontend curl -I -s http://backend:9000 2>/dev/null | head -n1)
-if [ -z "$BACKEND_RESPONSE" ]; then
-    echo "  ❌ Backend no responde"
+echo "4. API check through frontend gateway"
+api_status="$(curl -s -o /dev/null -w '%{http_code}' http://localhost/api/settings || true)"
+if [ -n "$api_status" ]; then
+    echo "  HTTP $api_status on http://localhost/api/settings"
 else
-    echo "  ✓ $BACKEND_RESPONSE"
+    echo "  API did not answer on localhost"
 fi
 echo ""
 
-# 5. Verificar firewall (si ufw está instalado)
-echo "5. ✓ Verificando firewall..."
-if command -v ufw &> /dev/null; then
-    sudo ufw status | grep -E "80|Status"
+echo "5. Listening ports on host"
+if command -v ss >/dev/null 2>&1; then
+    ss -tuln | grep -E ':80 |:443 |:8080 ' || echo "  No listeners detected on 80/443/8080"
 else
-    echo "  ufw no instalado, verificar en panel de Hostinger"
+    echo "  ss is not installed"
 fi
 echo ""
 
-# 6. Verificar nginx escuchando
-echo "6. ✓ Verificando que nginx escucha en 0.0.0.0:80..."
-if docker exec dashboard-frontend command -v netstat &> /dev/null; then
-    docker exec dashboard-frontend netstat -tuln 2>/dev/null | grep :80
-else
-    echo "  netstat no disponible, pero nginx debería escuchar por defecto"
-fi
+echo "6. Public DNS check"
+nslookup "$DOMAIN" 1.1.1.1 || true
+nslookup "www.${DOMAIN#www.}" 1.1.1.1 || true
 echo ""
 
-# 7. Resumen
-echo "========================================"
-echo "  RESUMEN"
-echo "========================================"
-echo ""
-echo "Si todo lo anterior muestra ✓:"
-echo "  → La aplicación está configurada correctamente"
-echo "  → El problema puede ser:"
-echo "    1. Firewall del VPS (configurar en Hostinger)"
-echo "    2. DNS no configurado o no propagado"
-echo "    3. Acceso por URL incorrecta"
-echo ""
-echo "Intenta acceder:"
-echo "  - http://72.61.77.167 (IP directa)"
-echo "  - http://merchan.cloud (si DNS está configurado)"
-echo ""
-echo "========================================"
+echo "Summary"
+echo "  If localhost works but DNS fails, fix the DNS zone or DNSSEC at the domain provider."
+echo "  If DNS works but localhost fails, inspect docker logs and free ports 80/443."
+echo "  If both fail, remove old orphans and recreate the stack:"
+echo "    COMPOSE_PROJECT_NAME=$PROJECT_NAME ${COMPOSE[*]} down --remove-orphans"
+echo "    COMPOSE_PROJECT_NAME=$PROJECT_NAME ${COMPOSE[*]} up -d --build --remove-orphans"

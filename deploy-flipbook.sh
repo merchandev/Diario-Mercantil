@@ -1,27 +1,28 @@
 #!/usr/bin/env bash
-# ============================================================
-# Deploy script: Actualizar contenedor y configuración de Docker
-# Uso: ./deploy-flipbook.sh <RUTA_PROYECTO_EN_VPS>
-# Ejemplo: ./deploy-flipbook.sh /docker/diario-mercantil
-# ============================================================
+# Deploy selected frontend files and recreate the production stack.
+# Usage: ./deploy-flipbook.sh <REMOTE_PATH>
 
-SERVER="root@72.61.77.167"
+set -euo pipefail
+
+SERVER="${SERVER:-root@72.61.77.167}"
 REMOTE_PATH="${1:-/docker/diario-mercantil}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
 
-echo "📤 Subiendo archivos de React al servidor..."
+echo "Uploading React files..."
 scp "frontend/src/components/FlipbookViewer.tsx" "$SERVER:$REMOTE_PATH/frontend/src/components/FlipbookViewer.tsx"
 scp "frontend/src/components/MagazineViewer.tsx" "$SERVER:$REMOTE_PATH/frontend/src/components/MagazineViewer.tsx"
-scp "frontend/src/pages/EditionPublic.tsx"       "$SERVER:$REMOTE_PATH/frontend/src/pages/EditionPublic.tsx"
-scp "frontend/src/pages/VisorEspressivoPDF.tsx"  "$SERVER:$REMOTE_PATH/frontend/src/pages/VisorEspressivoPDF.tsx"
+scp "frontend/src/pages/EditionPublic.tsx" "$SERVER:$REMOTE_PATH/frontend/src/pages/EditionPublic.tsx"
+scp "frontend/src/pages/VisorEspressivoPDF.tsx" "$SERVER:$REMOTE_PATH/frontend/src/pages/VisorEspressivoPDF.tsx"
 
-echo "📤 Subiendo Docker Compose..."
+echo "Uploading docker-compose.yml..."
 scp "docker-compose.yml" "$SERVER:$REMOTE_PATH/docker-compose.yml"
 
 echo ""
-echo "🐳 Reconstruyendo contenedores y reiniciando stack..."
-ssh "$SERVER" "cd $REMOTE_PATH && docker compose build frontend && docker compose up -d"
+echo "Recreating production stack..."
+ssh "$SERVER" "set -e; cd '$REMOTE_PATH'; COMPOSE_PROJECT_NAME='$PROJECT_NAME' docker compose down --remove-orphans || true; COMPOSE_PROJECT_NAME='$PROJECT_NAME' docker compose up -d --build --remove-orphans"
 
 echo ""
-echo "✅ Despliegue listo."
-echo "🌍 El certificado SSL debería generarse en 1 o 2 minutos si el dominio apunta a esta IP."
-echo "▶ Verifica en: https://diariomercantil.com/"
+echo "Deploy finished."
+echo "Verify:"
+echo "  https://diariomercantil.com/"
+echo "  http://localhost/health on the VPS"

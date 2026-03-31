@@ -1,33 +1,40 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Script de Actualización Forzada para Hostinger VPS
-# Uso: ./update.sh
+set -euo pipefail
 
-echo "🚀 Iniciando actualización del proyecto..."
+echo "Updating Diario Mercantil..."
 
-# 1. Asegurar que estamos en el directorio correcto (ajusta si es necesario)
-# Usualmente es la carpeta donde está el docker-compose.yml
-# cd /home/usuario/proyecto o donde esté clonado
-# Asumimos que se ejecuta desde la raíz del proyecto
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
+DOMAIN="${DOMAIN:-diariomercantil.com}"
 
-# 2. Descargar últimos cambios de GitHub
-echo "⬇️  Haciendo Git Pull..."
-git pull origin main
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+else
+    echo "Docker Compose is not installed."
+    exit 1
+fi
 
-# 3. Reconstruir imágenes (Forzando no-cache para asegurar cambios)
-echo "🏗️  Reconstruyendo contenedores (esto puede tardar unos minutos)..."
-docker compose build --no-cache
+cd "$PROJECT_DIR"
 
-# 4. Reiniciar servicios
-echo "🔄 Reiniciando servicios..."
-docker compose down
-docker compose up -d
+echo "Pulling latest changes..."
+git pull --ff-only origin main
 
-# 5. Limpieza (Opcional, para ahorrar espacio)
-echo "🧹 Limpiando imágenes antiguas..."
+echo "Validating compose file..."
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" config >/dev/null
+
+echo "Recreating stack with current topology..."
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" down --remove-orphans || true
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" up -d --build --remove-orphans
+
+echo "Cleaning unused images..."
 docker image prune -f
 
-echo "✅ Actualización completada!"
-echo "   Frontend: http://localhost:80"
-echo "   Backend:  http://localhost:3000"
-echo "   phpMyAdmin: http://localhost:8081"
+echo "Update complete."
+echo "  Site: https://${DOMAIN}"
+echo "  Local health: http://localhost/health"
+echo "  API: https://${DOMAIN}/api/settings"
+echo "  phpMyAdmin: http://<VPS_IP>:8080"

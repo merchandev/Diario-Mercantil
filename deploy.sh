@@ -1,164 +1,160 @@
-#!/bin/bash
-# Automated deployment script for Ubuntu/Hostinger
-# This script deploys the Diario Mercantil application with all necessary checks
+#!/usr/bin/env bash
+# Automated deployment script for Ubuntu/Hostinger.
+# Current production topology:
+# nginx-proxy -> frontend nginx -> backend php-fpm.
 
-set -e  # Exit on error
+set -euo pipefail
 
 echo "==================================="
 echo "Diario Mercantil - Deployment Script"
 echo "==================================="
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Function to print colored output
-print_success() { echo -e "${GREEN}✓ $1${NC}"; }
-print_error() { echo -e "${RED}✗ $1${NC}"; }
-print_warning() { echo -e "${YELLOW}⚠ $1${NC}"; }
+print_success() { echo -e "${GREEN}[OK] $1${NC}"; }
+print_error() { echo -e "${RED}[ERR] $1${NC}"; }
+print_warning() { echo -e "${YELLOW}[WARN] $1${NC}"; }
 print_info() { echo -e "$1"; }
 
-# Check if running as root or with sudo
-if [ "$EUID" -ne 0 ]; then 
-    print_error "Please run as root or with sudo"
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+    print_error "Run this script as root or with sudo."
     exit 1
 fi
 
-print_info "\n📋 Step 1: Checking Prerequisites"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="${PROJECT_DIR:-$SCRIPT_DIR}"
+PROJECT_NAME="${COMPOSE_PROJECT_NAME:-diario-mercantil}"
+DOMAIN="${DOMAIN:-diariomercantil.com}"
 
-# Check for Docker
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed"
+if ! command -v docker >/dev/null 2>&1; then
+    print_error "Docker is not installed."
     print_info "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sh get-docker.sh
     systemctl enable docker
     systemctl start docker
-    print_success "Docker installed"
-else
-    print_success "Docker is already installed"
+    print_success "Docker installed."
 fi
 
-# Check for Docker Compose
-if ! command -v docker-compose &> /dev/null; then
-    print_error "Docker Compose is not installed"
-    print_info "Installing Docker Compose..."
+if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+else
+    print_error "Docker Compose is not installed."
+    print_info "Installing standalone docker-compose..."
     curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
-    print_success "Docker Compose installed"
-else
-    print_success "Docker Compose is already installed"
+    COMPOSE=(docker-compose)
+    print_success "Docker Compose installed."
 fi
 
-print_info "\n🔧 Step 2: Preparing Application"
+print_info "\nStep 1: Preparing application"
 
-# Navigate to project directory (adjust path as needed)
-PROJECT_DIR="/root/DIARIO-MERCANTIL-05012026"
 if [ ! -d "$PROJECT_DIR" ]; then
     print_error "Project directory not found: $PROJECT_DIR"
-    print_info "Please adjust PROJECT_DIR in this script"
     exit 1
 fi
 
 cd "$PROJECT_DIR"
-print_success "Changed to project directory"
+print_success "Using project directory: $PROJECT_DIR"
 
-# Create storage directories if they don't exist
-mkdir -p backend/storage/{uploads,results,database,cache}
-chmod -R 775 backend/storage
-print_success "Storage directories prepared"
-
-print_info "\n🔄 Step 3: Stopping Existing Containers"
-docker-compose down || true
-print_success "Containers stopped"
-
-print_info "\n🏗️  Step 4: Building Images (this may take several minutes)"
-docker-compose build --no-cache
-print_success "Images built successfully"
-
-print_info "\n🚀 Step 5: Starting Services"
-docker-compose up -d
-
-# Wait for services to be ready
-print_info "\n⏳ Waiting for services to start..."
-sleep 10
-
-# Check container health
-print_info "\n🏥 Step 6: Health Checks"
-for service in backend db frontend; do
-    if docker-compose ps | grep -q "$service.*Up"; then
-        print_success "$service is running"
-    else
-        print_error "$service failed to start"
-        docker-compose logs $service
-        exit 1
-    fi
-done
-
-# Wait for database to be fully ready
-print_info "\n⏳ Waiting for database initialization (this may take 30-60 seconds)..."
-max_wait=60
-waited=0
-until docker-compose exec -T backend php -r "require '/var/www/html/src/Database.php'; Database::healthCheck();" 2>/dev/null; do
-    if [ $waited -ge $max_wait ]; then
-        print_error "Database did not become ready in time"
-        docker-compose logs backend
-        docker-compose logs db
-        exit 1
-    fi
-    echo -n "."
-    sleep 2
-    waited=$((waited+2))
-done
-print_success "\nDatabase is ready"
-
-print_info "\n📊 Step 7: Verifying Application"
-
-# Test backend API
-if curl -f -s http://localhost/api/rate/bcv > /dev/null; then
-    print_success "Backend API is responding"
+if [ -f .env ]; then
+    set -a
+    # shellcheck disable=SC1091
+    . ./.env
+    set +a
+    print_success ".env loaded."
 else
-    print_warning "Backend API test failed (may be normal if endpoint requires auth)"
+    print_warning ".env was not found. Compose defaults or exported env vars will be used."
 fi
 
-# Test frontend
-if curl -f -s http://localhost/ > /dev/null; then
-    print_success "Frontend is accessible"
+mkdir -p backend/storage/uploads backend/storage/results backend/storage/database backend/storage/cache
+chmod -R 775 backend/storage
+print_success "Storage directories prepared."
+
+print_info "\nStep 2: Validating Compose configuration"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" config >/dev/null
+print_success "Compose file is valid."
+
+print_info "\nStep 3: Stopping previous stack"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" down --remove-orphans || true
+print_success "Previous stack stopped."
+
+print_info "\nStep 4: Building images"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" build --no-cache
+print_success "Images built successfully."
+
+print_info "\nStep 5: Starting services"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" up -d --remove-orphans
+
+print_info "\nStep 6: Waiting for services"
+sleep 10
+
+for service in nginx-proxy backend frontend db phpmyadmin; do
+    if COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" ps --status running --services | grep -qx "$service"; then
+        print_success "$service is running."
+    else
+        print_error "$service failed to start."
+        COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs "$service" || true
+        exit 1
+    fi
+done
+
+print_info "\nStep 7: Waiting for database readiness"
+MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root_secure_password_2025}"
+max_wait=90
+waited=0
+until COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" exec -T db \
+    mysqladmin ping -h localhost -u root "-p${MYSQL_ROOT_PASSWORD}" --silent >/dev/null 2>&1; do
+    if [ "$waited" -ge "$max_wait" ]; then
+        print_error "Database did not become ready in time."
+        COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs db || true
+        exit 1
+    fi
+    printf "."
+    sleep 3
+    waited=$((waited + 3))
+done
+printf "\n"
+print_success "Database is ready."
+
+print_info "\nStep 8: Verifying HTTP endpoints"
+if curl -fsS http://localhost/health >/dev/null; then
+    print_success "Frontend health endpoint is responding through nginx-proxy."
 else
-    print_error "Frontend is not accessible"
+    print_error "Frontend health endpoint is not responding on http://localhost/health."
+    COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs nginx-proxy frontend || true
     exit 1
 fi
 
-# Show running containers
-print_info "\n📦 Running Containers:"
-docker-compose ps
+if curl -fsS http://localhost/api/settings >/dev/null; then
+    print_success "Backend API is responding through the frontend gateway."
+else
+    print_warning "Backend API check failed on http://localhost/api/settings."
+fi
 
-# Show logs (last 20 lines)
-print_info "\n📝 Recent Logs:"
-docker-compose logs --tail=20
+print_info "\nStep 9: Current stack"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" ps
 
-print_info "\n${GREEN}==================================="
-print_info "✅ Deployment Complete!"
-print_info "===================================${NC}"
+print_info "\nStep 10: Recent logs"
+COMPOSE_PROJECT_NAME="$PROJECT_NAME" "${COMPOSE[@]}" logs --tail=20
+
+print_info "\n${GREEN}===================================${NC}"
+print_info "${GREEN}Deployment complete${NC}"
+print_info "${GREEN}===================================${NC}"
 print_info ""
-print_info "Access your application:"
-print_info "  • Frontend: http://YOUR_SERVER_IP"
-print_info "  • phpMyAdmin: http://YOUR_SERVER_IP:8088"
+print_info "Access:"
+print_info "  Site: https://${DOMAIN} or http://${DOMAIN}"
+print_info "  Local health: http://localhost/health"
+print_info "  API: https://${DOMAIN}/api/settings"
+print_info "  phpMyAdmin: http://<VPS_IP>:8080"
 print_info ""
-print_info "Default admin credentials:"
-print_info "  • Username: merchandev"
-print_info "  • Password: G0ku*1896"
-print_info ""
-print_info "Useful commands:"
-print_info "  • View logs: docker-compose logs -f"
-print_info "  • Restart: docker-compose restart"
-print_info "  • Stop: docker-compose down"
-print_info "  • Check status: docker-compose ps"
-print_info ""
-print_info "For troubleshooting, check:"
-print_info "  docker-compose logs backend"
-print_info "  docker-compose logs frontend"
-print_info "  docker-compose logs db"
-print_info ""
+print_info "If the domain still does not open after deployment:"
+print_info "  1. Confirm DNS for ${DOMAIN} points to the VPS."
+print_info "  2. Confirm ports 80 and 443 are free and reachable."
+print_info "  3. Re-run: COMPOSE_PROJECT_NAME=${PROJECT_NAME} ${COMPOSE[*]} down --remove-orphans"
+print_info "  4. Re-run: COMPOSE_PROJECT_NAME=${PROJECT_NAME} ${COMPOSE[*]} up -d --build --remove-orphans"
