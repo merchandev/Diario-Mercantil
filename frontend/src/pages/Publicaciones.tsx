@@ -6,6 +6,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import QRCodeModal from '../components/QRCodeModal'
 
 const estOpts = ['Todos', 'Pendiente', 'Por verificar', 'En trámite', 'Publicado', 'Rechazado']
+const mapFilterStatus = (s: string) => s === 'Pendiente' ? 'Borrador' : (s === 'Publicado' ? 'Publicada' : s)
 
 export default function Publicaciones() {
   const location = useLocation()
@@ -23,7 +24,7 @@ export default function Publicaciones() {
   const [payments, setPayments] = useState<LegalPayment[]>([])
   const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'danger' | 'warning' | 'info'; onConfirm: () => void }>({ isOpen: false, title: '', message: '', variant: 'info', onConfirm: () => { } })
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; url: string; title: string }>({ isOpen: false, url: '', title: '' })
-  const mapFilterStatus = (s: string) => s === 'Pendiente' ? 'Borrador' : (s === 'Publicado' ? 'Publicada' : s)
+
   const reload = () => {
     console.log('🔄 [Publicaciones Admin] Recargando lista de publicaciones...')
     console.log('🔍 [Publicaciones Admin] Filtros:', { q, status, reqFrom, reqTo, pubFrom, pubTo })
@@ -316,12 +317,11 @@ export default function Publicaciones() {
                         setConfirmDialog({
                           isOpen: true,
                           title: 'Verificar solicitud',
-                          message: '¿Marcar esta solicitud como Verificada?\n\nSe registrará la fecha de hoy como fecha de verificación.',
+                          message: '¿Marcar esta solicitud como En trámite?\n\nSe registrará la fecha de hoy como fecha de verificación. La publicación quedará pendiente de ser incorporada a una edición del diario.',
                           variant: 'info',
                           onConfirm: async () => {
-                            // Set to 'Verificada' and set verification_date to today
                             await updateLegal(sel.id, {
-                              status: 'Verificada',
+                              status: 'En trámite',
                               verification_date: new Date().toISOString().slice(0, 10)
                             })
                             reload()

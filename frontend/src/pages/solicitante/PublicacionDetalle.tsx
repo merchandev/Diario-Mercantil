@@ -46,7 +46,6 @@ export default function PublicacionDetalleSolicitante() {
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      console.error('Error descargando PDF:', err)
       setAlertDialog({ isOpen: true, title: 'Error', message: 'No se pudo descargar el PDF', variant: 'error' })
     }
   }
@@ -85,7 +84,15 @@ export default function PublicacionDetalleSolicitante() {
 
   const meta = typeof req.meta === 'string' ? JSON.parse(req.meta) : (req.meta || {})
   const totalPagado = payments.reduce((sum, p) => sum + (p.amount_bs || 0), 0)
+  const isPublicada = req.status === 'Publicada'
   const publicUrl = `${window.location.origin}/publicaciones/${req.order_no || req.id}/${encodeURIComponent(req.name || 'publicacion')}`
+
+  // Date: use created_at (system date) for "Fecha de solicitud", fallback to date
+  const fechaSolicitud = (() => {
+    const raw = (req as any).created_at || req.date
+    if (!raw) return '-'
+    return raw.slice(0, 10).split('-').reverse().join('/')
+  })()
 
   return (
     <section className="space-y-6">
@@ -131,9 +138,10 @@ export default function PublicacionDetalleSolicitante() {
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">Fecha de Solicitud</label>
-                <div className="font-medium">{req.date}</div>
+                <div className="font-medium">{fechaSolicitud}</div>
               </div>
-              {req.publish_date && (
+              {/* Only show publish_date when actually published */}
+              {isPublicada && req.publish_date && (
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Fecha de Publicación</label>
                   <div className="font-medium">{req.publish_date}</div>
@@ -150,43 +158,10 @@ export default function PublicacionDetalleSolicitante() {
             </div>
           </div>
 
-          {/* Datos del solicitante */}
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4 text-brand-800">Datos del Solicitante</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">Razón Social / Nombre</label>
-                <div className="font-medium">{req.name || '-'}</div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">RIF / Cédula</label>
-                <div className="font-medium">{req.document || '-'}</div>
-              </div>
-              {req.phone && (
-                <div>
-                  <label className="block text-sm text-slate-600 mb-1">Teléfono</label>
-                  <div className="font-medium">{req.phone}</div>
-                </div>
-              )}
-              {req.email && (
-                <div>
-                  <label className="block text-sm text-slate-600 mb-1">Email</label>
-                  <div className="font-medium">{req.email}</div>
-                </div>
-              )}
-              {req.address && (
-                <div className="sm:col-span-2">
-                  <label className="block text-sm text-slate-600 mb-1">Dirección</label>
-                  <div className="font-medium">{req.address}</div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Información adicional */}
+          {/* Datos Registrales del Documento (obs. 5 & 6) */}
           {Object.keys(meta).length > 0 && (
             <div className="card p-6">
-              <h2 className="text-lg font-semibold mb-4 text-brand-800">Información Adicional</h2>
+              <h2 className="text-lg font-semibold mb-4 text-brand-800">Datos Registrales del Documento</h2>
               <div className="grid sm:grid-cols-2 gap-4">
                 {meta.tipo_sociedad && (
                   <div>
@@ -196,7 +171,7 @@ export default function PublicacionDetalleSolicitante() {
                 )}
                 {meta.tipo_acto && (
                   <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tipo de Acto</label>
+                    <label className="block text-sm text-slate-600 mb-1">Tipo de Acto Inscrito</label>
                     <div className="font-medium">{meta.tipo_acto}</div>
                   </div>
                 )}
@@ -204,6 +179,12 @@ export default function PublicacionDetalleSolicitante() {
                   <div>
                     <label className="block text-sm text-slate-600 mb-1">Tipo de Convocatoria</label>
                     <div className="font-medium">{meta.tipo_convocatoria}</div>
+                  </div>
+                )}
+                {(meta.razon_denominacion_social || meta.razon_social) && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm text-slate-600 mb-1">Razón / Denominación Social</label>
+                    <div className="font-medium">{meta.razon_denominacion_social || meta.razon_social}</div>
                   </div>
                 )}
                 {meta.estado && (
@@ -214,14 +195,20 @@ export default function PublicacionDetalleSolicitante() {
                 )}
                 {meta.oficina && (
                   <div>
-                    <label className="block text-sm text-slate-600 mb-1">Oficina</label>
+                    <label className="block text-sm text-slate-600 mb-1">Oficina de Registro Mercantil</label>
                     <div className="font-medium">{meta.oficina}</div>
                   </div>
                 )}
                 {meta.registrador && (
                   <div>
-                    <label className="block text-sm text-slate-600 mb-1">Registrador</label>
+                    <label className="block text-sm text-slate-600 mb-1">Nombre del Registrador(a)</label>
                     <div className="font-medium">{meta.registrador}</div>
+                  </div>
+                )}
+                {meta.tipo_registrador && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Tipo de Registrador(a)</label>
+                    <div className="font-medium">{meta.tipo_registrador}</div>
                   </div>
                 )}
                 {meta.tomo && (
@@ -230,17 +217,47 @@ export default function PublicacionDetalleSolicitante() {
                     <div className="font-medium">{meta.tomo}</div>
                   </div>
                 )}
+                {meta.letra && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Letra</label>
+                    <div className="font-medium">{meta.letra}</div>
+                  </div>
+                )}
                 {meta.numero && (
                   <div>
                     <label className="block text-sm text-slate-600 mb-1">Número</label>
                     <div className="font-medium">{meta.numero}</div>
                   </div>
                 )}
+                {meta.año && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Año</label>
+                    <div className="font-medium">{meta.año}</div>
+                  </div>
+                )}
+                {meta.expediente && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Número de Expediente</label>
+                    <div className="font-medium">{meta.expediente}</div>
+                  </div>
+                )}
+                {meta.fecha_registro && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Fecha del Registro</label>
+                    <div className="font-medium">{meta.fecha_registro}</div>
+                  </div>
+                )}
+                {meta.planilla && (
+                  <div>
+                    <label className="block text-sm text-slate-600 mb-1">Número de Planilla</label>
+                    <div className="font-medium">{meta.planilla}</div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Historial de pagos */}
+          {/* Historial de pagos (obs. 8 — added phone column) */}
           <div className="card p-6">
             <h2 className="text-lg font-semibold mb-4 text-brand-800">Historial de Pagos</h2>
             {payments.length === 0 ? (
@@ -248,12 +265,13 @@ export default function PublicacionDetalleSolicitante() {
             ) : (
               <div className="space-y-4">
                 <div className="overflow-x-auto pb-2">
-                  <table className="min-w-[800px] w-full text-left text-sm">
+                  <table className="min-w-[900px] w-full text-left text-sm">
                     <thead>
                       <tr className="border-b">
                         <th className="text-left py-2">Referencia</th>
                         <th className="text-left py-2">Tipo</th>
                         <th className="text-left py-2">Banco</th>
+                        <th className="text-left py-2">Teléfono Pago Móvil</th>
                         <th className="text-left py-2">Fecha</th>
                         <th className="text-right py-2">Monto (Bs.)</th>
                         <th className="text-center py-2">Estado</th>
@@ -265,6 +283,7 @@ export default function PublicacionDetalleSolicitante() {
                           <td className="py-2 font-mono text-xs">{p.ref || '-'}</td>
                           <td className="py-2">{p.type}</td>
                           <td className="py-2">{p.bank || '-'}</td>
+                          <td className="py-2">{(p as any).phone || '-'}</td>
                           <td className="py-2">{p.date}</td>
                           <td className="py-2 text-right font-semibold">{Number(p.amount_bs || 0).toFixed(2)}</td>
                           <td className="py-2 text-center">
@@ -312,43 +331,7 @@ export default function PublicacionDetalleSolicitante() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* QR Code */}
-          <div className="card p-6">
-            <h3 className="font-semibold mb-3 text-brand-800">Código QR</h3>
-            <p className="text-xs text-slate-600 mb-4">Comparte este código para acceder a tu publicación</p>
-            <div ref={qrWrapRef} className="bg-white inline-block p-4 rounded-lg shadow-md border mx-auto block">
-              <QRCode value={publicUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
-            </div>
-            <div className="text-xs text-center mt-3 text-slate-500 font-mono break-all">
-              {req.order_no || String(req.id).padStart(8, '0')}
-            </div>
-            <button
-              onClick={handleDownloadQR}
-              className="btn btn-outline w-full mt-4 inline-flex items-center justify-center gap-2"
-            >
-              <IconDownload /> Descargar QR
-            </button>
-          </div>
-
-          {/* URL Pública */}
-          <div className="card p-6">
-            <h3 className="font-semibold mb-3 text-brand-800">Enlace Público</h3>
-            <p className="text-xs text-slate-600 mb-3">Comparte este enlace para que otros vean tu publicación</p>
-            <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
-              <p className="text-xs font-mono break-all text-slate-700">{publicUrl}</p>
-            </div>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(publicUrl)
-                setAlertDialog({ isOpen: true, title: 'Copiado', message: 'Enlace copiado al portapapeles', variant: 'success' })
-              }}
-              className="btn btn-outline w-full inline-flex items-center justify-center gap-2"
-            >
-              <IconCheck /> Copiar enlace
-            </button>
-          </div>
-
-          {/* Info */}
+          {/* Estado de la solicitud — always shown */}
           <div className="card p-6 bg-slate-50">
             <h3 className="font-semibold mb-3 text-brand-800">Estado de la Solicitud</h3>
             <dl className="space-y-3 text-sm">
@@ -360,14 +343,73 @@ export default function PublicacionDetalleSolicitante() {
                 <dt className="text-slate-600">Folios:</dt>
                 <dd className="font-semibold">{req.folios || 1}</dd>
               </div>
-              {req.publish_date && (
+              {isPublicada && req.publish_date && (
                 <div>
                   <dt className="text-slate-600">Publicado:</dt>
                   <dd className="font-semibold">{req.publish_date}</dd>
                 </div>
               )}
             </dl>
+            {!isPublicada && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                <p>Su solicitud se encuentra en proceso. El código QR y el enlace público estarán disponibles una vez que la publicación sea incorporada a una edición del diario.</p>
+              </div>
+            )}
           </div>
+
+          {/* QR Code — only when published (obs. 9) */}
+          {isPublicada && (
+            <div className="card p-6">
+              <h3 className="font-semibold mb-3 text-brand-800">Código QR</h3>
+              <p className="text-xs text-slate-600 mb-4">Comparte este código para acceder a tu publicación</p>
+              <div ref={qrWrapRef} className="bg-white inline-block p-4 rounded-lg shadow-md border mx-auto block">
+                <QRCode value={publicUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
+              </div>
+              <div className="text-xs text-center mt-3 text-slate-500 font-mono break-all">
+                {req.order_no || String(req.id).padStart(8, '0')}
+              </div>
+              <button
+                onClick={handleDownloadQR}
+                className="btn btn-outline w-full mt-4 inline-flex items-center justify-center gap-2"
+              >
+                <IconDownload /> Descargar QR
+              </button>
+            </div>
+          )}
+
+          {/* URL Pública — only when published (obs. 9) */}
+          {isPublicada && (
+            <div className="card p-6">
+              <h3 className="font-semibold mb-3 text-brand-800">Enlace Público</h3>
+              <p className="text-xs text-slate-600 mb-3">Comparte este enlace para que otros vean tu publicación</p>
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
+                <p className="text-xs font-mono break-all text-slate-700">{publicUrl}</p>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(publicUrl)
+                  setAlertDialog({ isOpen: true, title: 'Copiado', message: 'Enlace copiado al portapapeles', variant: 'success' })
+                }}
+                className="btn btn-outline w-full inline-flex items-center justify-center gap-2"
+              >
+                <IconCheck /> Copiar enlace
+              </button>
+            </div>
+          )}
+
+          {/* Acceso a la edición — only when published (obs. 10) */}
+          {isPublicada && (
+            <div className="card p-6 bg-green-50 border border-green-200">
+              <h3 className="font-semibold mb-3 text-green-800">Publicación en Edición</h3>
+              <p className="text-xs text-green-700 mb-4">Su documento ya forma parte de una edición del Diario Mercantil de Venezuela.</p>
+              <a
+                href="/ediciones"
+                className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+              >
+                <IconDownload /> Ver Ediciones del Diario
+              </a>
+            </div>
+          )}
         </div>
       </div>
 

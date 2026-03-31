@@ -1,4 +1,38 @@
 services:
+  nginx-proxy:
+    image: nginxproxy/nginx-proxy:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - conf:/etc/nginx/conf.d
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs:ro
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  acme-companion:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    environment:
+      - DEFAULT_EMAIL=admin@diariomercantil.com # Cambia esto si deseas otro email de registro
+    volumes:
+      - conf:/etc/nginx/conf.d
+      - vhost:/etc/nginx/vhost.d
+      - html:/usr/share/nginx/html
+      - certs:/etc/nginx/certs:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - acme:/etc/acme.sh
+    depends_on:
+      - nginx-proxy
+    restart: unless-stopped
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./backend
@@ -35,10 +69,11 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    environment:
+      - VIRTUAL_HOST=diariomercantil.com,www.diariomercantil.com
+      - LETSENCRYPT_HOST=diariomercantil.com,www.diariomercantil.com
     depends_on:
       - backend
-    ports:
-      - "80:80"
     networks:
       - app-network
 
@@ -79,6 +114,11 @@ services:
 
 volumes:
   db_data:
+  conf:
+  vhost:
+  html:
+  certs:
+  acme:
 
 
 networks:

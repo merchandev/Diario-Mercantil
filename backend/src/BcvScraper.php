@@ -208,7 +208,7 @@ final class BcvScraper
         return null;
     }
 
-    private static function httpGet(string $url): string|false
+    private static function httpGet(string $url): string
     {
         if (function_exists('curl_init')) {
             $ch = curl_init();

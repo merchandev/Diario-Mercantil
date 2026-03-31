@@ -4,7 +4,7 @@ require_once __DIR__ . '/../src/Database.php';
 header('Content-Type: application/json');
 
 try {
-    $db = Database::getInstance();
+    $db = Database::pdo();
     
     // Get all users
     $stmt = $db->prepare("SELECT id, document, name, role, created_at FROM users ORDER BY id");

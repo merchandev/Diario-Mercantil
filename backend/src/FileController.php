@@ -118,7 +118,7 @@ class FileController {
     Response::json(['ok'=>true, 'count'=>$count]);
   }
 
-  public function sse() {
+  public function sse(): never {
     // Auth via Authorization: Bearer or token query
     AuthController::requireAuth();
     Response::sseHeaders();

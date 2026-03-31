@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../src/Database.php';
 
 try {
-    $db = Database::getInstance();
+    $db = Database::pdo();
     
     echo "📋 Current settings:\n";
     $stmt = $db->query("SELECT `key`, value FROM settings");

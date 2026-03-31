@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { listEditions, type Edition } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
+import FlipbookViewer from '../components/FlipbookViewer'
 
 export default function EdicionesPublic() {
   const [searchParams] = useSearchParams()
@@ -9,6 +10,7 @@ export default function EdicionesPublic() {
   const [from, setFrom] = useState(searchParams.get('from') || '')
   const [to, setTo] = useState(searchParams.get('to') || '')
   const [loading, setLoading] = useState(false)
+  const [showList, setShowList] = useState(false)
 
   const load = async () => {
     setLoading(true)
@@ -28,6 +30,7 @@ export default function EdicionesPublic() {
     const fTo = to ? new Date(to) : null
     return [...rows]
       .filter(ed => {
+        if (ed.status !== 'Publicada') return false
         const t = (String(ed.code || '') + ' ' + String(ed.edition_no || '') + ' ' + String(ed.status || '')).toLowerCase()
         if (q && !t.includes(q.toLowerCase())) return false
         const d = ed.date ? new Date(ed.date) : (ed.created_at ? new Date(ed.created_at) : null)
@@ -42,72 +45,161 @@ export default function EdicionesPublic() {
       })
   }, [rows, q, from, to])
 
+  // Latest published edition
+  const latestEdition = useMemo(() => {
+    if (showList || q || from || to) return null
+    return filtered[0] || null
+  }, [filtered, showList, q, from, to])
+
+  const latestPdfUrl = latestEdition?.file_url
+    || (latestEdition?.code ? `/api/e/${encodeURIComponent(latestEdition.code)}/download` : '')
+
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl p-6 space-y-4">
-        <h1 className="text-xl font-semibold">Ediciones</h1>
-        <p className="text-sm text-slate-700">Consulta las ediciones publicadas, filtra por fechas y abre el PDF con efecto revista.</p>
-
-        <div className="card p-4 grid md:grid-cols-[1fr,auto,auto,auto] gap-3 items-end">
-          <label className="text-sm">Buscar
-            <input className="input w-full mt-1" placeholder="Codigo, numero o estado" value={q} onChange={e => setQ(e.target.value)} />
-          </label>
-          <label className="text-sm">Desde
-            <input type="date" className="input mt-1" value={from} onChange={e => setFrom(e.target.value)} />
-          </label>
-          <label className="text-sm">Hasta
-            <input type="date" className="input mt-1" value={to} onChange={e => setTo(e.target.value)} />
-          </label>
-          <div className="flex gap-2">
-            <button onClick={load} className="btn btn-outline">Actualizar</button>
-            <button onClick={() => { setQ(''); setFrom(''); setTo('') }} className="btn btn-ghost">Limpiar</button>
+      <div className="mx-auto max-w-7xl p-6 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-brand-800">Ediciones del Diario</h1>
+            <p className="text-sm text-slate-600 mt-1">Consulta las ediciones publicadas del Diario Mercantil de Venezuela.</p>
           </div>
+          <button
+            onClick={() => setShowList(prev => !prev)}
+            className="btn btn-outline text-sm"
+          >
+            {showList ? 'Ver última edición' : 'Ver todas las ediciones'}
+          </button>
         </div>
 
-        <div className="card overflow-x-auto pb-2 pt-1">
-          {loading ? (
-            <div className="p-6 text-sm text-slate-600">Cargando...</div>
-          ) : filtered.length === 0 ? (
-            <div className="p-6 text-sm text-slate-600">No hay ediciones para mostrar.</div>
-          ) : (
-            <table className="min-w-[800px] w-full text-left text-sm">
-              <thead>
-                <tr className="text-left border-b">
-                  <th className="p-3">Fecha</th>
-                  <th className="p-3">Edicion</th>
-                  <th className="p-3">Codigo</th>
-                  <th className="p-3">Estado</th>
-                  <th className="p-3 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((ed: any) => {
-                  const dateTxt = ed.date || ed.created_at
-                  const pdfUrl = ed.file_url || (ed.code ? `/api/e/${encodeURIComponent(ed.code)}/download` : '')
-                  const hasPdf = Boolean(ed.file_id || ed.file_url)
-                  return (
-                    <tr key={ed.id || ed.code} className="border-b last:border-0">
-                      <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
-                      <td className="p-3">{ed.edition_no ? `Nro ${ed.edition_no}` : '-'}</td>
-                      <td className="p-3 font-mono">{ed.code || '-'}</td>
-                      <td className="p-3">{ed.status || '-'}</td>
-                      <td className="p-3">
-                        <div className="flex items-center justify-end gap-2">
-                          {ed.code && <Link className="btn btn-outline h-9 text-xs" to={`/edicion/${encodeURIComponent(ed.code)}`}>Ver en linea</Link>}
-                          {hasPdf ? (
-                            <a className="btn btn-primary h-9 text-xs" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">Descargar</a>
-                          ) : (
-                            <span className="text-xs text-slate-500">Sin PDF</span>
-                          )}
-                        </div>
-                      </td>
+        {/* Default view: latest published edition viewer (obs. 42) */}
+        {!showList && !q && !from && !to && (
+          <>
+            {loading ? (
+              <div className="card p-8 text-center text-slate-500">Cargando ediciones...</div>
+            ) : latestEdition ? (
+              <div className="card p-6 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-brand-800">
+                      Edición N° {latestEdition.edition_no}
+                    </h2>
+                    <p className="text-sm text-slate-600">
+                      Fecha: {latestEdition.date ? new Date(latestEdition.date).toLocaleDateString('es-VE') : '-'}
+                    </p>
+                    {latestEdition.code && (
+                      <p className="text-xs text-slate-500 font-mono mt-1">
+                        CEV: {latestEdition.code}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    {latestEdition.code && (
+                      <Link
+                        className="btn btn-outline text-sm"
+                        to={`/edicion/${encodeURIComponent(latestEdition.code)}`}
+                      >
+                        Ver en línea
+                      </Link>
+                    )}
+                    {latestPdfUrl && (
+                      <a
+                        className="btn btn-primary text-sm"
+                        href={`${latestPdfUrl}?download=1`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Descargar PDF
+                      </a>
+                    )}
+                  </div>
+                </div>
+                {latestPdfUrl && (
+                  <div className="h-[600px] border rounded-lg overflow-hidden bg-slate-800">
+                    <FlipbookViewer src={latestPdfUrl} height={580} />
+                  </div>
+                )}
+                {!latestPdfUrl && (
+                  <div className="p-6 text-center text-slate-500 bg-slate-100 rounded-lg">
+                    PDF no disponible para esta edición.
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="card p-8 text-center text-slate-500">
+                No hay ediciones publicadas aún.
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Filters + list — shown when searching or toggled (obs. 43) */}
+        {(showList || q || from || to) && (
+          <>
+            <div className="card p-4 grid md:grid-cols-[1fr,auto,auto,auto] gap-3 items-end">
+              <label className="text-sm">Buscar
+                <input className="input w-full mt-1" placeholder="Código, número o estado" value={q} onChange={e => setQ(e.target.value)} />
+              </label>
+              <label className="text-sm">Desde
+                <input type="date" className="input mt-1" value={from} onChange={e => setFrom(e.target.value)} />
+              </label>
+              <label className="text-sm">Hasta
+                <input type="date" className="input mt-1" value={to} onChange={e => setTo(e.target.value)} />
+              </label>
+              <div className="flex gap-2">
+                <button onClick={load} className="btn btn-outline">Actualizar</button>
+                <button onClick={() => { setQ(''); setFrom(''); setTo('') }} className="btn btn-ghost">Limpiar</button>
+              </div>
+            </div>
+
+            <div className="card overflow-x-auto pb-2 pt-1">
+              {loading ? (
+                <div className="p-6 text-sm text-slate-600">Cargando...</div>
+              ) : filtered.length === 0 ? (
+                <div className="p-6 text-sm text-slate-600">No hay ediciones para mostrar.</div>
+              ) : (
+                <table className="min-w-[800px] w-full text-left text-sm">
+                  <thead>
+                    <tr className="text-left border-b bg-brand-800 text-white">
+                      <th className="p-3">Fecha de la Edición</th>
+                      <th className="p-3">N° de Edición</th>
+                      <th className="p-3">Código de Verificación (CEV)</th>
+                      <th className="p-3">Estado</th>
+                      <th className="p-3 text-right">Acciones</th>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((ed: any) => {
+                      const dateTxt = ed.date || ed.created_at
+                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/${encodeURIComponent(ed.code)}/download` : '')
+                      const hasPdf = Boolean(ed.file_id || ed.file_url)
+                      return (
+                        <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">
+                          <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
+                          <td className="p-3">{ed.edition_no ? `N° ${ed.edition_no}` : '-'}</td>
+                          <td className="p-3 font-mono text-xs">{ed.code || '-'}</td>
+                          <td className="p-3">
+                            <span className={`pill text-xs ${ed.status === 'Publicada' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {ed.status || '-'}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center justify-end gap-2">
+                              {ed.code && <Link className="btn btn-outline h-9 text-xs" to={`/edicion/${encodeURIComponent(ed.code)}`}>Ver en línea</Link>}
+                              {hasPdf ? (
+                                <a className="btn btn-primary h-9 text-xs" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">Descargar</a>
+                              ) : (
+                                <span className="text-xs text-slate-500">Sin PDF</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

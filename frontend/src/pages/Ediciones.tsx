@@ -52,16 +52,13 @@ export default function Ediciones() {
 
   const onCreate = async (e: any) => {
     e.preventDefault()
-    if (!createPdf) {
-      setAlertDialog({ isOpen: true, title: 'PDF requerido', message: 'Debes adjuntar el PDF de la edicion para crearla.', variant: 'error' })
-      return
-    }
     setCreating(true)
     try {
-      const payload = { status: 'Publicada', date: form.date, edition_no: form.edition_no, orders: form.selectedOrders }
+      // Create edition as 'Borrador' — PDF is optional at this stage
+      const payload = { status: 'Borrador', date: form.date, edition_no: form.edition_no, orders: form.selectedOrders }
       const res = await createEdition(payload) as any
       const newId = res?.id
-      if (newId) {
+      if (newId && createPdf) {
         await uploadEditionPdf(newId, createPdf)
       }
       setForm({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
@@ -73,11 +70,12 @@ export default function Ediciones() {
         const [det, leg] = await Promise.all([getEdition(newId), listLegal()])
         setSelId(newId)
         setDetail(det)
+        setAllOrders(leg.items)
       }
-      setAlertDialog({ isOpen: true, title: 'Exito', message: `Edicion creada y publicada con código: ${res?.code || 'Generado'}`, variant: 'success' })
+      setAlertDialog({ isOpen: true, title: 'Edición creada', message: `Edición creada en borrador con código: ${res?.code || 'Generado'}. ${!createPdf ? 'Recuerda cargar el PDF antes de publicar.' : ''}`, variant: 'success' })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      setAlertDialog({ isOpen: true, title: 'Error', message: `No se pudo crear la edicion: ${errorMsg}`, variant: 'error' })
+      setAlertDialog({ isOpen: true, title: 'Error', message: `No se pudo crear la edición: ${errorMsg}`, variant: 'error' })
     } finally {
       setCreating(false)
     }
@@ -143,8 +141,16 @@ export default function Ediciones() {
         <div className="p-5 space-y-6 bg-white">
           <div className="grid md:grid-cols-3 gap-6">
             <label className="block">
-              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de Publicación</span>
-              <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} required />
+              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de la Edición</span>
+              <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => {
+                // Validate: date cannot be before the last published edition
+                const lastPublished = rows.filter(r => r.status === 'Publicada').map(r => r.date).sort().reverse()[0]
+                if (lastPublished && e.target.value < lastPublished) {
+                  setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha de la edición no puede ser anterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
+                  return
+                }
+                setForm({ ...form, date: e.target.value })
+              }} required />
             </label>
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Número de Edición</span>
@@ -155,12 +161,11 @@ export default function Ediciones() {
               <div className="flex items-end">
                 <button type="button" className="btn btn-primary w-full h-[42px] shadow-sm select-none" onClick={() => {
                   const dateObj = new Date(form.date);
-                  // Convert to user local time zone equivalent to get correct 'ddmmyy' string for the form context
                   const d = String(dateObj.getUTCDate()).padStart(2, '0');
                   const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
                   const y = String(dateObj.getUTCFullYear());
                   const dateStrNum = `${d}${m}${y}`;
-                  setGeneratedCode(`dm${form.edition_no}${dateStrNum}`);
+                  setGeneratedCode(`DMV${form.edition_no}${dateStrNum}`);
                   setQrGenerated(true);
                 }}>
                   Nueva Edición
@@ -168,10 +173,10 @@ export default function Ediciones() {
               </div>
             ) : (
               <label className="block">
-                <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final</span>
+                <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final <span className="text-slate-400 font-normal">(opcional — puede cargarse después)</span></span>
                 <label className="btn btn-outline border-dashed hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 text-slate-600 w-full flex items-center justify-center gap-2 cursor-pointer h-[42px] transition-colors">
                   <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; setCreatePdf(f || null); }} />
-                  <IconUpload /> <span className="truncate">{createPdf ? createPdf.name : 'Click para subir PDF'}</span>
+                  <IconUpload /> <span className="truncate">{createPdf ? createPdf.name : 'Click para subir PDF (opcional)'}</span>
                 </label>
               </label>
             )}
@@ -212,7 +217,7 @@ export default function Ediciones() {
                 </div>
                 <div className="p-3 bg-white">
                   <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).map(o => {
+                {allOrders.filter(o => o.status === 'En trámite').map(o => {
                       const isSelected = form.selectedOrders.includes(o.id)
                       const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                       return (
@@ -230,7 +235,12 @@ export default function Ediciones() {
                               <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
                               <span className="text-xs text-slate-400">{o.date}</span>
                             </div>
-                            <div className="text-slate-700 font-medium mt-0.5">{o.name || 'Sin nombre asociado'}</div>
+                           <div className="text-slate-700 font-medium mt-0.5">
+                              {(() => {
+                                const m = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
+                                return m.razon_denominacion_social || m.razon_social || o.name || 'Sin nombre asociado'
+                              })()}
+                            </div>
                             <div className="text-slate-500 text-xs mt-1.5 flex flex-wrap gap-2">
                               {meta?.tipo_sociedad && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_sociedad}</span>}
                               {meta?.tipo_acto && <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">{meta.tipo_acto}</span>}
@@ -240,7 +250,7 @@ export default function Ediciones() {
                         </label>
                       )
                     })}
-                    {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status)).length === 0 && (
+                    {allOrders.filter(o => o.status === 'En trámite').length === 0 && (
                       <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                         <div className="text-3xl mb-2 opacity-50">📄</div>
                         <p className="text-sm font-medium">No hay publicaciones disponibles</p>
@@ -252,8 +262,8 @@ export default function Ediciones() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button type="button" onClick={onCreate} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || !createPdf || form.selectedOrders.length === 0}>
-                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición</span></>)}
+                <button type="button" onClick={onCreate} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || form.selectedOrders.length === 0}>
+                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición (borrador)</span></>)}
                 </button>
               </div>
             </>
@@ -330,7 +340,7 @@ export default function Ediciones() {
                                 <input className="input w-full font-mono" value={detail.edition.code} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, code: e.target.value } })} />
                               </label>
                               <label className="block">
-                                <span className="block text-sm font-medium mb-2">Fecha de publicacion</span>
+                                <span className="block text-sm font-medium mb-2">Fecha de la Edición</span>
                                 <input className="input w-full" type="date" value={detail.edition.date} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
                               </label>
                               <label className="block">
@@ -452,7 +462,7 @@ export default function Ediciones() {
                                   <div className="mt-4 border-t pt-4">
                                     <h4 className="text-sm font-semibold mb-2 text-slate-700">Añadir más publicaciones</h4>
                                     <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status) && !detail.orders.some(d => d.id === o.id)).map(o => {
+                                      {allOrders.filter(o => o.status === 'En trámite' && !detail.orders.some(d => d.id === o.id)).map(o => {
                                         const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                                         return (
                                           <div key={o.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:border-brand-300 transition-all">
@@ -474,7 +484,7 @@ export default function Ediciones() {
                                           </div>
                                         )
                                       })}
-                                      {allOrders.filter(o => !['Rechazado', 'Borrador'].includes(o.status) && !detail.orders.some(d => d.id === o.id)).length === 0 && (
+                                      {allOrders.filter(o => o.status === 'En trámite' && !detail.orders.some(d => d.id === o.id)).length === 0 && (
                                         <p className="text-xs text-slate-500 text-center py-4">No hay más publicaciones disponibles para añadir.</p>
                                       )}
                                     </div>

@@ -79,13 +79,13 @@ export default function Publications() {
     async function handleApprove(id: number) {
         setConfirmDialog({
             isOpen: true,
-            title: 'Aprobar Solicitud',
-            message: '¿Aprobar esta solicitud y marcarla como Publicada?',
+            title: 'Verificar Solicitud',
+            message: '¿Marcar esta solicitud como En trámite?\n\nSe registrará la fecha de hoy como verificación. La publicación quedará pendiente hasta ser incorporada a una edición del diario.',
             variant: 'info',
             onConfirm: async () => {
                 await updateLegal(id, {
-                    status: 'Publicada',
-                    publish_date: new Date().toISOString().slice(0, 10)
+                    status: 'En trámite',
+                    verification_date: new Date().toISOString().slice(0, 10)
                 })
                 loadSubmissions()
                 setSelected(null)
@@ -174,7 +174,7 @@ export default function Publications() {
     )
 
     const getStatusBadge = (status?: string) => {
-        if (!status) return { label: '-', color: 'bg-gray-500/10 text-gray-400' }
+        if (!status) return { label: '-', color: 'bg-gray-500/10 text-gray-400', icon: FileText }
 
         const normalized = status === 'Borrador' || status === 'Pendiente' ? 'Pendiente' :
             status === 'Publicada' ? 'Publicado' : status
@@ -487,16 +487,20 @@ export default function Publications() {
                                 <h3 className="font-semibold text-white mb-3">Información</h3>
                                 <div className="space-y-2 text-sm mb-4">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-400">Nombre:</span>
+                                        <span className="text-gray-400">Nombre / Razón Social:</span>
                                         <span className="text-white font-medium">{selected.name}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-gray-400">Documento:</span>
+                                        <span className="text-gray-400">RIF / Documento:</span>
                                         <span className="text-white font-mono">{selected.document}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Teléfono:</span>
                                         <span className="text-white">{selected.phone || '-'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Email:</span>
+                                        <span className="text-white">{selected.email || '-'}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Tipo:</span>
@@ -507,10 +511,24 @@ export default function Publications() {
                                         <span className="text-white">{selected.folios || 1}</span>
                                     </div>
                                     <div className="flex justify-between">
+                                        <span className="text-gray-400">Nº de Orden:</span>
+                                        <span className="text-white font-mono">{selected.order_no || String(selected.id).padStart(8, '0')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400">Fecha de Solicitud:</span>
+                                        <span className="text-white">{prettyDate((selected as any).created_at?.slice(0, 10) || selected.date)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
                                         <span className="text-gray-400">Estado:</span>
                                         <span className="text-white">{getStatusBadge(selected.status).label}</span>
                                     </div>
-                                    {selected.publish_date && (
+                                    {selected.verification_date && (
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Fecha de Verificación:</span>
+                                            <span className="text-white">{prettyDate(selected.verification_date)}</span>
+                                        </div>
+                                    )}
+                                    {selected.publish_date && selected.status === 'Publicada' && (
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Fecha Publicación:</span>
                                             <span className="text-white">{prettyDate(selected.publish_date)}</span>

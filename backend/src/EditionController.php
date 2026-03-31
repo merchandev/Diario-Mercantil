@@ -130,11 +130,11 @@ class EditionController {
     if (!is_array($orders)) $orders = [];
     $orders_count = count($orders);
 
-    // Auto-generate edition number and code (Format: dm-e-<edition_no>-<date>)
+    // Auto-generate edition number and code (Format: DMV<edition_no><date>)
     $dateObj = new DateTime($date);
     $dateStr = $dateObj->format('Y-m-d');
     $dateStrNum = $dateObj->format('dmY'); // Use full year Y (e.g., 2026 instead of 26)
-    $code = "dm{$edition_no}{$dateStrNum}";
+    $code = "DMV{$edition_no}{$dateStrNum}";
 
     $fileId = isset($input['file_id']) ? (int)$input['file_id'] : null;
     $fileName = trim($input['file_name'] ?? '');
@@ -159,12 +159,7 @@ class EditionController {
             foreach ($orders as $oid) {
                 $ins->execute([$editionId, (int)$oid]);
             }
-            
-            if ($status === 'Publicada') {
-                $inQuery = implode(',', array_fill(0, $orders_count, '?'));
-                $updateOrders = $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)");
-                $updateOrders->execute($orders);
-            }
+            // Do NOT auto-mark orders as Publicada here; only do so when the edition is formally published via publish()
         }
         $pdo->commit();
         Response::json(['ok'=>true, 'id'=>$editionId, 'code'=>$code]);
@@ -203,19 +198,13 @@ class EditionController {
   public function setOrders($id){
     $pdo = Database::pdo();
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
-    $ids = $in['order_ids'] ?? [];
+    $ids = $in['order_ids'] ?? isset($in['orders']) ? ($in['orders'] ?? []) : [];
     if (!is_array($ids)) $ids = [];
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
     $ins = $pdo->prepare('INSERT OR IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
     foreach ($ids as $oid) { $ins->execute([$id,(int)$oid]); }
-    
-    // Also mark them as Publicada so they reflect correctly in the system
-    if (!empty($ids)) {
-        $inQuery = implode(',', array_fill(0, count($ids), '?'));
-        $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)")->execute($ids);
-    }
-    
+    // Do NOT mark orders as Publicada here; only mark them when the edition is formally published
     $cnt = (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE edition_id='.(int)$id)->fetchColumn();
     $pdo->prepare('UPDATE editions SET orders_count=? WHERE id=?')->execute([$cnt,$id]);
     $pdo->commit();
@@ -227,12 +216,13 @@ class EditionController {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $limit = (int)($in['limit'] ?? 10);
     
-    $stmt = $pdo->prepare("SELECT id FROM legal_requests WHERE status='Verificada' AND deleted_at IS NULL ORDER BY id DESC LIMIT ?");
+    // Only auto-select orders that are 'En trámite' (verified but not yet published)
+    $stmt = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND deleted_at IS NULL ORDER BY id DESC LIMIT ?");
     $stmt->execute([$limit]);
     $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     if (empty($orderIds)) {
-      Response::json(['ok'=>false, 'message'=>'No hay ordenes publicadas disponibles'], 400);
+      Response::json(['ok'=>false, 'message'=>'No hay ordenes en trámite disponibles'], 400);
     }
     
     $pdo->beginTransaction();
@@ -252,18 +242,23 @@ class EditionController {
     
     $pdo->beginTransaction();
     try {
-        // 1. Update Edition Status
-        $pdo->prepare("UPDATE editions SET status='Publicada', date=? WHERE id=?")->execute([$now, $id]);
+        // 1. Get the edition date (do NOT overwrite it with today)
+        $edStmt = $pdo->prepare('SELECT date FROM editions WHERE id=?');
+        $edStmt->execute([$id]);
+        $editionDate = $edStmt->fetchColumn() ?: $now;
         
-        // 2. Update Status of all associated Legal Requests to 'Publicada'
-        // Get all order IDs from edition_orders
+        // 2. Update Edition Status to Publicada (keep existing date)
+        $pdo->prepare("UPDATE editions SET status='Publicada' WHERE id=?")->execute([$id]);
+        
+        // 3. Update all associated Legal Requests: status='Publicada' AND publish_date=edition date
         $stmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
         $stmt->execute([$id]);
         $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
-        if($orderIds) {
+        if ($orderIds) {
             $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
-            $pdo->prepare("UPDATE legal_requests SET status='Publicada' WHERE id IN ($inQuery)")->execute($orderIds);
+            $params = array_merge([$editionDate], $orderIds);
+            $pdo->prepare("UPDATE legal_requests SET status='Publicada', publish_date=? WHERE id IN ($inQuery)")->execute($params);
         }
         
         $pdo->commit();
