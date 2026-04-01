@@ -78,7 +78,17 @@ export default function Publicaciones() {
   const open = async (id: number) => {
     const d = await getLegal(id); setSel(d.item); setPayments(d.payments)
   }
-  const prettyDate = (s?: string) => s ? s.split('-').reverse().join('/') : '-'
+  const prettyDate = (s?: string) => {
+    if (!s) return '-'
+    const d = s.slice(0, 10)
+    return d.split('-').reverse().join('/')
+  }
+  const razonSocial = (r: LegalRequest) => {
+    const meta = typeof r.meta === 'string'
+      ? (() => { try { return JSON.parse(r.meta) } catch { return {} } })()
+      : (r.meta || {})
+    return meta.razon_denominacion_social || meta.razon_social || meta.razon_social_convocatoria || r.name || '-'
+  }
   const prettyStatus = (s?: string) => {
     if (!s) return '-'
     if (s === 'Borrador' || s === 'Pendiente') return 'Pendiente'
@@ -184,9 +194,9 @@ export default function Publicaciones() {
               {rows.map(r => (
                 <tr key={r.id} className="border-t">
                   <td className="px-4 py-2 font-mono">{r.order_no || r.id}</td>
-                  <td className="px-4 py-2">{prettyDate(r.date)}</td>
+                  <td className="px-4 py-2">{prettyDate((r as any).created_at || r.date)}</td>
                   <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
-                  <td className="px-4 py-2">{r.name}</td>
+                  <td className="px-4 py-2">{razonSocial(r)}</td>
                   <td className="px-4 py-2">{prettyStatus(r.status)}</td>
                   <td className="px-4 py-2">{prettyDate(r.verification_date)}</td>
                   <td className="px-4 py-2">{prettyDate(r.publish_date)}</td>
@@ -223,6 +233,7 @@ export default function Publicaciones() {
                       <th className="text-left px-2 py-1">Ref.</th>
                       <th className="text-left px-2 py-1">Fecha</th>
                       <th className="text-left px-2 py-1">Banco</th>
+                      <th className="text-left px-2 py-1">Teléfono</th>
                       <th className="text-left px-2 py-1">Tipo</th>
                       <th className="text-left px-2 py-1">Monto (Bs.)</th>
                       <th className="text-left px-2 py-1">Estado</th>
@@ -235,6 +246,7 @@ export default function Publicaciones() {
                         <td className="px-2 py-1">{p.ref}</td>
                         <td className="px-2 py-1">{p.date}</td>
                         <td className="px-2 py-1">{p.bank}</td>
+                        <td className="px-2 py-1">{(p as any).mobile_phone || '-'}</td>
                         <td className="px-2 py-1">{p.type}</td>
                         <td className="px-2 py-1">{Number(p.amount_bs).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="px-2 py-1">{p.status}</td>
@@ -282,7 +294,7 @@ export default function Publicaciones() {
                 <div><span className="font-semibold">Teléfono:</span> {sel.phone || '-'}</div>
                 <div><span className="font-semibold">Dirección:</span> {sel.address || '-'}</div>
                 <div><span className="font-semibold">CI/RIF:</span> {sel.document}</div>
-                <div><span className="font-semibold">Fecha:</span> {sel.date}</div>
+                <div><span className="font-semibold">Fecha de Solicitud:</span> {prettyDate((sel as any).created_at || sel.date)}</div>
                 <div className="mt-3"><span className="font-semibold">Descripción:</span> Servicio de publicación electrónica en el Diario Mercantil de Venezuela</div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">

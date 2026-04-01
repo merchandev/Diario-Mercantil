@@ -114,13 +114,58 @@ class LegalController {
     $role = strtolower($u['role'] ?? '');
     
     $sql = "SELECT * FROM legal_requests WHERE deleted_at IS NULL";
+    $params = [];
+    
     // Si no es staff, solo ve sus cosas
     if ($uid && !in_array($role, ['admin','staff','manager'])) {
-        $sql .= " AND user_id = $uid";
+        $sql .= " AND user_id = ?";
+        $params[] = $uid;
     }
-    $sql .= " ORDER BY id DESC LIMIT 200";
+
+    $q = $_GET['q'] ?? '';
+    if ($q !== '') {
+        $sql .= " AND (name LIKE ? OR order_no LIKE ? OR document LIKE ? OR id = ?)";
+        $params[] = "%$q%";
+        $params[] = "%$q%";
+        $params[] = "%$q%";
+        $params[] = $q;
+    }
+
+    $status = $_GET['status'] ?? '';
+    if ($status !== '') {
+        $sql .= " AND status = ?";
+        $params[] = $status;
+    }
+
+    $req_from = $_GET['req_from'] ?? '';
+    if ($req_from !== '') {
+        $sql .= " AND DATE(created_at) >= ?";
+        $params[] = $req_from;
+    }
+
+    $req_to = $_GET['req_to'] ?? '';
+    if ($req_to !== '') {
+        $sql .= " AND DATE(created_at) <= ?";
+        $params[] = $req_to;
+    }
+
+    $pub_from = $_GET['pub_from'] ?? '';
+    if ($pub_from !== '') {
+        $sql .= " AND publish_date >= ?";
+        $params[] = $pub_from;
+    }
+
+    $pub_to = $_GET['pub_to'] ?? '';
+    if ($pub_to !== '') {
+        $sql .= " AND publish_date <= ?";
+        $params[] = $pub_to;
+    }
+
+    $sql .= " ORDER BY id DESC LIMIT 500";
     
-    $items = $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     Response::json(['items' => $items]);
   }
 

@@ -165,7 +165,7 @@ export default function Ediciones() {
                   const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
                   const y = String(dateObj.getUTCFullYear());
                   const dateStrNum = `${d}${m}${y}`;
-                  setGeneratedCode(`DMV${form.edition_no}${dateStrNum}`);
+                  setGeneratedCode(`DMV-${form.edition_no}${dateStrNum}`);
                   setQrGenerated(true);
                 }}>
                   Nueva Edición

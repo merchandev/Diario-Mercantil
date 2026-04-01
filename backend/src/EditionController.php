@@ -130,11 +130,11 @@ class EditionController {
     if (!is_array($orders)) $orders = [];
     $orders_count = count($orders);
 
-    // Auto-generate edition number and code (Format: DMV<edition_no><date>)
+    // Auto-generate edition number and code (Format: DMV-<edition_no><date>)
     $dateObj = new DateTime($date);
     $dateStr = $dateObj->format('Y-m-d');
     $dateStrNum = $dateObj->format('dmY'); // Use full year Y (e.g., 2026 instead of 26)
-    $code = "DMV{$edition_no}{$dateStrNum}";
+    $code = "DMV-{$edition_no}{$dateStrNum}";
 
     $fileId = isset($input['file_id']) ? (int)$input['file_id'] : null;
     $fileName = trim($input['file_name'] ?? '');

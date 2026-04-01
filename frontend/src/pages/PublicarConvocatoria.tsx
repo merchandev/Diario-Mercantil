@@ -175,8 +175,8 @@ export default function PublicarConvocatoria() {
                 {TIPO_CONV_OPTS.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
 
-              <input className="input md:col-span-2" placeholder="Razón o denominación social (nombre de la sociedad mercantil)" value={f1.nombre} onChange={e => setF1({ ...f1, nombre: e.target.value })} />
-              <input className="input" placeholder="RIF" value={f1.rif} onChange={e => setF1({ ...f1, rif: e.target.value })} />
+              <input className="input md:col-span-2" placeholder="Razón o denominación social (nombre de la sociedad mercantil)" value={f1.nombre} onChange={e => setF1({ ...f1, nombre: e.target.value.toUpperCase() })} />
+              <input className="input" placeholder="RIF" value={f1.rif} onChange={e => setF1({ ...f1, rif: e.target.value.toUpperCase() })} />
 
               <select className="input w-full" value={f1.estado} onChange={e => setF1({ ...f1, estado: e.target.value })}>
                 <option value="">Estado</option>
@@ -188,14 +188,14 @@ export default function PublicarConvocatoria() {
                 {registrosDisponibles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
 
-              <input className="input" placeholder="Tomo / Letra" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value })} />
-              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value })} />
+              <input className="input" placeholder="Tomo / Letra" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.toUpperCase() })} />
+              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.toUpperCase() })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
-              <input className="input" placeholder="Número de expediente" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value })} />
+              <input className="input" placeholder="Número de expediente" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
               <input className="input" type="date" placeholder="Fecha" value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
 
-              <input className="input" placeholder="Nombres y apellidos del representante legal de la sociedad" value={f1.representante} onChange={e => setF1({ ...f1, representante: e.target.value })} />
-              <input className="input" placeholder="Número de documento de identidad" value={f1.ci_rep} onChange={e => setF1({ ...f1, ci_rep: e.target.value })} />
+              <input className="input" placeholder="Nombres y apellidos del representante legal de la sociedad" value={f1.representante} onChange={e => setF1({ ...f1, representante: e.target.value.toUpperCase() })} />
+              <input className="input" placeholder="Número de documento de identidad" value={f1.ci_rep} onChange={e => setF1({ ...f1, ci_rep: e.target.value.toUpperCase() })} />
             </div>
 
             <div className="flex gap-2">
@@ -272,10 +272,12 @@ export default function PublicarConvocatoria() {
                   <div><input className="input w-20" type="number" min={1} value={folios} onChange={e => setFolios(Math.max(1, Number(e.target.value || 1)))} /></div>
                   <div>{unitBs !== undefined ? unitBs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
                   <div>{subTotal !== undefined ? subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
-                  <div className="col-span-3">IVA ({ivaPct}%)</div>
-                  <div>{ivaAmt !== undefined ? ivaAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
-                  <div className="col-span-3 font-semibold">TOTAL</div>
-                  <div className="font-semibold">{total !== undefined ? total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
+                  <div className="hidden">
+                    <div className="col-span-3">IVA ({ivaPct}%)</div>
+                    <div>{ivaAmt !== undefined ? ivaAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
+                  </div>
+                  <div className="col-span-3 font-semibold text-lg border-t-2 border-brand-600 pt-2 mt-2">TOTAL A PAGAR:</div>
+                  <div className="font-semibold text-lg border-t-2 border-brand-600 pt-2 mt-2 text-brand-600">{total !== undefined ? total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'} Bs.</div>
                 </div>
 
                 <div className="mt-3 text-sm space-y-1">
@@ -296,11 +298,12 @@ export default function PublicarConvocatoria() {
                     <option>pago móvil</option>
                     <option>depósito</option>
                   </select>
-                  <input className="input" placeholder="Referencia" value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value })} />
+                  <input className="input" placeholder="Referencia (4 dígitos)" maxLength={4} value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} />
                   <input className="input" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
-                  <input className="input" type="number" step="0.01" placeholder="Monto (Bs.)" value={pay.amount_bs} onChange={e => setPay({ ...pay, amount_bs: e.target.value })} />
+                  {/* pay.amount_bs hidden logic since amount is implicitly total: */}
+                  <input type="hidden" value={pay.amount_bs} />
                   {pay.tipo_operacion === 'pago móvil' && (
-                    <input className="input md:col-span-3" placeholder="Número de teléfono desde donde realizó el pago móvil" value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value })} />
+                    <input className="input md:col-span-3" placeholder="Celular Ej: 04XXXXXXXX (7 dígitos)" maxLength={7} value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} />
                   )}
                 </div>
 
@@ -311,7 +314,7 @@ export default function PublicarConvocatoria() {
 
                 <div className="mt-3 flex gap-2">
                   <button type="button" className="btn" onClick={() => setStep(2)} disabled={busy}>Atrás</button>
-                  <button className="btn btn-primary uppercase" disabled={busy}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
+                  <button className="btn btn-primary uppercase" disabled={busy || !accepted || !pay.ref || pay.ref.length < 4 || !pay.date || (pay.tipo_operacion === 'pago móvil' && (!pay.mobile_phone || pay.mobile_phone.length < 7))}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
                 </div>
               </div>
             </div>

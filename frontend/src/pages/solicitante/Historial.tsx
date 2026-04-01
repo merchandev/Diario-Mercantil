@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listLegal, type LegalRequest, downloadLegal, me, deleteLegal } from '../../lib/api'
 import AdvertisingSlider from '../../components/AdvertisingSlider'
 
-const STATUS_OPTS = ['Todos', 'Por verificar', 'En trámite', 'Publicada', 'Rechazado']
+const STATUS_OPTS = ['Todos', 'Borrador', 'Por verificar', 'En trámite', 'Publicada', 'Rechazado']
 
 export default function Historial() {
   const navigate = useNavigate()
@@ -36,7 +36,11 @@ export default function Historial() {
     if (status === 'Todos') {
       setRows(allRows)
     } else {
-      setRows(allRows.filter(r => r.status === status))
+      setRows(allRows.filter(r => {
+        const visual = (r.status === 'Pendiente' || r.status === 'Borrador') ? 'Borrador' 
+                        : (r.status === 'Publicado' ? 'Publicada' : r.status)
+        return visual === status
+      }))
     }
   }
 
@@ -58,7 +62,7 @@ export default function Historial() {
     const meta = typeof r.meta === 'string'
       ? (() => { try { return JSON.parse(r.meta) } catch { return {} } })()
       : (r.meta || {})
-    return meta.razon_denominacion_social || meta.razon_social || r.name || '-'
+    return meta.razon_denominacion_social || meta.razon_social || meta.razon_social_convocatoria || r.name || '-'
   }
 
   return (

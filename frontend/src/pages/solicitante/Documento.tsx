@@ -1446,7 +1446,7 @@ export default function Documento() {
             <div className="flex gap-3 pt-4">
               <button
                 className="btn btn-primary flex-1 h-12 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!accept || loading || !pay.bank || !pay.ref || !pay.date || (pay.type === 'pago_movil' && !pay.mobile_phone)}
+                disabled={!accept || loading || !pay.bank || !pay.ref || pay.ref.length < 4 || !pay.date || (pay.type === 'pago_movil' && (!pay.mobile_phone || pay.mobile_phone.length < 7))}
                 onClick={submitStep3}
               >
                 {loading ? (

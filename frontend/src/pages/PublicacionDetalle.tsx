@@ -93,13 +93,12 @@ export default function PublicacionDetalle() {
 
   const onApprove = async () => {
     if (!item) return
-    if (!confirm('¿Aprobar esta solicitud y marcarla como Publicada?')) return
+    if (!confirm('¿Verificar esta solicitud y marcarla como En trámite?')) return
     try {
       await updateLegal(item.id, {
-        status: 'Publicada',
-        publish_date: new Date().toISOString().slice(0, 10)
+        status: 'En trámite'
       })
-      alert('✅ Solicitud aprobada y publicada')
+      alert('✅ Solicitud verificada y en trámite')
       loadData()
     } catch (err) {
       console.error('Error approving:', err)
@@ -278,20 +277,23 @@ export default function PublicacionDetalle() {
             <input
               className="input w-full"
               type="date"
-              value={item.date || ''}
+              value={(item as any).created_at ? (item as any).created_at.slice(0, 10) : item.date || ''}
               onChange={e => setItem({ ...item, date: e.target.value })}
+              disabled
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Publicación</label>
-            <input
-              className="input w-full"
-              type="date"
-              value={item.publish_date || ''}
-              onChange={e => setItem({ ...item, publish_date: e.target.value })}
-            />
-          </div>
+          {item.status === 'Publicada' && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Publicación</label>
+              <input
+                className="input w-full"
+                type="date"
+                value={item.publish_date || ''}
+                onChange={e => setItem({ ...item, publish_date: e.target.value })}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
@@ -375,7 +377,7 @@ export default function PublicacionDetalle() {
 
         {/* Column 3: Metadata */}
         <div className="card p-4 space-y-4">
-          <h3 className="font-semibold text-lg border-b pb-2">Información Adicional</h3>
+          <h3 className="font-semibold text-lg border-b pb-2">Datos registrales del documento</h3>
 
           {meta.tipo_sociedad && (
             <div>
