@@ -30,6 +30,7 @@ require_once __DIR__."/../src/PagesController.php";
 require_once __DIR__."/../src/FileController.php";
 require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
+require_once __DIR__."/../src/MetricsController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
@@ -138,9 +139,10 @@ elseif ($uri === "/api/directory/profile" && $method === "GET") { (new SystemCon
 elseif ($uri === "/api/directory/areas" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
 elseif ($uri === "/api/directory/colleges" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
 
-// Health Checks
+// Health Checks & Metrics
 elseif ($uri === "/api/health/live" && $method === "GET") { (new HealthController())->live(); }
 elseif ($uri === "/api/health/ready" && $method === "GET") { (new HealthController())->ready(); }
+elseif ($uri === "/metrics" && $method === "GET") { (new MetricsController())->prometheus(); }
 
 // OpenAPI Docs
 elseif ($uri === "/api/docs/openapi.yaml" && $method === "GET") {
