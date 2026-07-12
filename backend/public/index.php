@@ -29,6 +29,7 @@ require_once __DIR__."/../src/SuperAdminController.php";
 require_once __DIR__."/../src/PagesController.php";
 require_once __DIR__."/../src/FileController.php";
 require_once __DIR__."/../src/EditionController.php";
+require_once __DIR__."/../src/HealthController.php";
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
@@ -136,6 +137,10 @@ elseif (preg_match("#^/api/publications/(\d+)$#", $uri, $m)) {
 elseif ($uri === "/api/directory/profile" && $method === "GET") { (new SystemController())->getDirectoryProfile(); }
 elseif ($uri === "/api/directory/areas" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
 elseif ($uri === "/api/directory/colleges" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
+
+// Health Checks
+elseif ($uri === "/api/health/live" && $method === "GET") { (new HealthController())->live(); }
+elseif ($uri === "/api/health/ready" && $method === "GET") { (new HealthController())->ready(); }
 
 // Fallback
 else {

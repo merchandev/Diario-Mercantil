@@ -25,7 +25,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD-SHELL", "php-fpm -t || exit 1" ]
+      test: [ "CMD-SHELL", "php /var/www/html/bin/readiness.php" ]
       interval: 30s
       timeout: 10s
       retries: 3
