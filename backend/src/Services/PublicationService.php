@@ -46,7 +46,7 @@ class PublicationService {
                 $role = strtolower($userData['role'] ?? '');
                 $isAdmin = in_array($role, ['admin','staff','manager']);
                 
-                $sql = "UPDATE legal_requests SET folios=?, updated_at=? WHERE id=?";
+                $sql = "UPDATE legal_requests SET folios=?, updated_at=? WHERE id=? AND status='Borrador'";
                 $params = [$folios, $now, $existingRequestId];
                 
                 if (!$isAdmin) {

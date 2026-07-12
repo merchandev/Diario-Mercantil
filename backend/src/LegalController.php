@@ -381,7 +381,7 @@ class LegalController {
       }
 
       $pdo = Database::pdo();
-      $status = 'Pendiente'; // El cliente no dicta el estado
+      $status = 'Por verificar'; // El cliente no dicta el estado
       $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
       $pdo->prepare('INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone,created_at) VALUES(?,?,?,?,?,?,?,?,NOW())')
           ->execute([$id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $in['amount_bs'], $status, $mobile_phone]);
@@ -391,7 +391,16 @@ class LegalController {
   public function deletePayment($id,$pid){
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
-      Database::pdo()->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
+      
+      $pdo = Database::pdo();
+      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
+      $reqStatus = $s->fetchColumn();
+      
+      if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
+          return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya está en trámite'], 403);
+      }
+      
+      $pdo->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
       Response::json(['ok'=>true]);
   }
 

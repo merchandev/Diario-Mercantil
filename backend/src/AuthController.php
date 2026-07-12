@@ -109,11 +109,7 @@ class AuthController {
         // Convert both to timestamps to be safe
         if (strtotime($user["expires_at"]) <= time()) {
              http_response_code(401); 
-             echo json_encode([
-                 "error"=>"unauthorized_expired", 
-                 "expiry"=>$user["expires_at"], 
-                 "now"=>gmdate("Y-m-d H:i:s")
-             ]); 
+             echo json_encode(["error"=>"unauthorized", "message"=>"Sesión inválida o vencida"]); 
              exit;
         }
         return $user;
@@ -127,7 +123,7 @@ class AuthController {
     if ($admin) {
          if (strtotime($admin["expires_at"]) <= time()) {
              http_response_code(401); 
-             echo json_encode(["error"=>"unauthorized_expired"]); 
+             echo json_encode(["error"=>"unauthorized", "message"=>"Sesión inválida o vencida"]); 
              exit;
         }
         // Return a mock user structure compatible with controllers
@@ -212,7 +208,7 @@ class AuthController {
     } catch (Throwable $e) {
         // Force JSON response even on fatal errors
         http_response_code(500);
-        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        echo json_encode(["error" => "server_error", "message" => "Error interno de autenticación"]);
         exit;
     }
   }
@@ -290,7 +286,7 @@ class AuthController {
     } catch (Throwable $e) {
         // Force JSON response even on fatal errors
         http_response_code(500);
-        echo json_encode(["error" => "server_error", "message" => $e->getMessage()]);
+        echo json_encode(["error" => "server_error", "message" => "Error interno al registrar usuario"]);
         exit;
     }
   }

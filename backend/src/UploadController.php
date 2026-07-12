@@ -22,6 +22,8 @@ class UploadController {
   }
 
   public function upload() {
+    require_once __DIR__.'/AuthController.php';
+    AuthController::requireAuth();
     if (!isset($_FILES['files'])) {
       Response::json(['error' => 'No files field'], 400);
     }

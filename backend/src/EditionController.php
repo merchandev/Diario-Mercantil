@@ -240,6 +240,18 @@ class EditionController {
     if (!is_array($ids)) $ids = [];
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
+    
+    if (count($ids) > 0) {
+        $inQuery = implode(',', array_fill(0, count($ids), '?'));
+        $statusStmt = $pdo->prepare("SELECT COUNT(*) FROM legal_requests WHERE id IN ($inQuery) AND status != 'En trámite'");
+        $statusStmt->execute($ids);
+        if ((int)$statusStmt->fetchColumn() > 0) {
+            $pdo->rollBack();
+            Response::json(['error'=>'Todas las solicitudes seleccionadas deben estar En trámite'], 400);
+            exit;
+        }
+    }
+    
     $ins = $pdo->prepare('INSERT IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
     foreach ($ids as $oid) { $ins->execute([$id,(int)$oid]); }
     // Do NOT mark orders as Publicada here; only mark them when the edition is formally published

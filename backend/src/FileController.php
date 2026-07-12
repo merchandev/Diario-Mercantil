@@ -217,15 +217,11 @@ class FileController {
     
     if ($path && file_exists($uploadDir.'/'.$path)) {
         $filePath = $uploadDir.'/'.$path;
-    } else {
-        // Fallback: try to find file by pattern
-        error_log("File path not found: {$uploadDir}/{$path}. File record: " . json_encode($file));
     }
     
     if (!$filePath || !file_exists($filePath)) {
         http_response_code(404);
-        error_log("File not found on disk: ID $id");
-        die(json_encode(['error' => 'El archivo no existe en el disco']));
+        die(json_encode(['error' => 'Archivo no encontrado']));
     }
 
     // Serve with proper CORS headers
