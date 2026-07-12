@@ -314,7 +314,6 @@ export default function PublicacionDetalle() {
               onChange={e => setItem({ ...item, email: e.target.value })}
             />
           </div>
-          </div>
         </div>
 
         {/* Column 4: Pago reportado */}
