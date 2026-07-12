@@ -5,6 +5,7 @@ require_once __DIR__.'/AuthController.php';
 require_once __DIR__.'/Services/BcvService.php';
 require_once __DIR__.'/Services/PublicationService.php';
 require_once __DIR__.'/Services/PdfGenerationService.php';
+require_once __DIR__.'/Services/LegalRequestStateMachine.php';
 
 class LegalController {
   
@@ -30,15 +31,28 @@ class LegalController {
       }
   }
 
-  
+  private function ensureMutable(int $reqId) {
+      $pdo = Database::pdo();
+      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?');
+      $s->execute([$reqId]);
+      if ($s->fetchColumn() === 'Publicada') {
+          Response::json(['error'=>'conflict', 'message'=>'No se puede modificar una solicitud que ya está publicada.'], 409);
+          exit;
+      }
+  }
+
   public function uploadPdf(){
     $u = AuthController::requireAuth();
     if (!isset($_FILES['file'])) return Response::json(['error'=>'No se ha enviado ningún archivo'], 400);
     $file = $_FILES['file'];
     $name = $file['name'] ?? '';
-    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+    
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        return Response::json(['error'=>'Error en la subida del archivo', 'sys_err'=>$file['error']], 400);
+    }
     
     // Validate Extension
+    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     if ($ext !== 'pdf') return Response::json(['error'=>'Solo archivos PDF'], 400);
     
     // Validate MIME Type
@@ -51,7 +65,7 @@ class LegalController {
     }
     
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
     
     $dest = $uploadDir.'/'.uniqid('doc_', true).'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($name));
     if (!move_uploaded_file($file['tmp_name'], $dest)) return Response::json(['error'=>'Error moviendo archivo'], 500);
@@ -59,23 +73,22 @@ class LegalController {
     $pdo = Database::pdo();
     $now = gmdate('c');
     
-    // Store relative path (relative to storage/uploads? or full relative?)
-    // FileController logic will expect relative to storage/uploads if we stick to a pattern, 
-    // or we can store "uploads/..."
-    // Let's store the filename as it lies in storage/uploads.
     $storageName = basename($dest);
     
     $stmt = $pdo->prepare('INSERT INTO files(name,path,size,type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
     $stmt->execute([$name,$storageName,$file['size'],'pdf','uploaded',$now,$now]);
     $fileId = (int)$pdo->lastInsertId();
 
-    // Contar paginas
     $folios = 1;
     $content = @file_get_contents($dest);
     if(preg_match_all('/\/Type\s*\/Page[\s\/>]/', $content, $m)) $folios = count($m[0]);
 
-    // Check if we should attach to existing draft
     $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
+    
+    if ($reqId > 0) {
+        $this->checkAccess($reqId, $u);
+        $this->ensureMutable($reqId);
+    }
     
     $bcvService = new BcvService($pdo);
     $publicationService = new PublicationService($pdo, $bcvService);
@@ -98,8 +111,6 @@ class LegalController {
     }
   }
 
-  // == CRUD Methods que faltaban ==
-
   public function list(){
     $u = AuthController::requireAuth();
     $pdo = Database::pdo();
@@ -109,7 +120,6 @@ class LegalController {
     $sql = "SELECT * FROM legal_requests WHERE deleted_at IS NULL";
     $params = [];
     
-    // Si no es staff, solo ve sus cosas
     if ($uid && !in_array($role, ['admin','staff','manager'])) {
         $sql .= " AND user_id = ?";
         $params[] = $uid;
@@ -130,30 +140,6 @@ class LegalController {
         $params[] = $status;
     }
 
-    $req_from = $_GET['req_from'] ?? '';
-    if ($req_from !== '') {
-        $sql .= " AND DATE(submitted_at) >= ?";
-        $params[] = $req_from;
-    }
-
-    $req_to = $_GET['req_to'] ?? '';
-    if ($req_to !== '') {
-        $sql .= " AND DATE(submitted_at) <= ?";
-        $params[] = $req_to;
-    }
-
-    $pub_from = $_GET['pub_from'] ?? '';
-    if ($pub_from !== '') {
-        $sql .= " AND publish_date >= ?";
-        $params[] = $pub_from;
-    }
-
-    $pub_to = $_GET['pub_to'] ?? '';
-    if ($pub_to !== '') {
-        $sql .= " AND publish_date <= ?";
-        $params[] = $pub_to;
-    }
-
     $sql .= " ORDER BY id DESC LIMIT 500";
     
     $stmt = $pdo->prepare($sql);
@@ -166,7 +152,7 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
+    $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
     
@@ -184,7 +170,6 @@ class LegalController {
       $u = AuthController::requireAuth();
       $pdo = Database::pdo();
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
-      // Default to 'Borrador' always
       $status = 'Borrador';
       $uid = (int)$u['id'];
       $now = gmdate('c');
@@ -203,17 +188,18 @@ class LegalController {
       ]);
       Response::json(['ok'=>true,'id'=>$pdo->lastInsertId()]);
     } catch (Throwable $e) {
-      Response::json(['error'=>$e->getMessage()], 500);
+      Response::json(['error'=>'server_error'], 500);
     }
   }
 
   public function update($id){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
+    $this->ensureMutable($id);
+    
     $pdo = Database::pdo();
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     
-    // Solo permitir edición de borradores (los admins pueden saltarse, pero lo ideal es devolver a borrador)
     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
     $currStatus = $s->fetchColumn();
     $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
@@ -221,7 +207,6 @@ class LegalController {
         return Response::json(['error'=>'No se puede editar una solicitud formalizada. Debe estar en Borrador.'], 403);
     }
     
-    // Normalizar llaves de meta
     if (isset($in['meta']) && is_array($in['meta'])) {
         $m = $in['meta'];
         if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
@@ -230,7 +215,6 @@ class LegalController {
         if (isset($m['expediente'])) { $m['numero_expediente'] = $m['expediente']; unset($m['expediente']); }
         if (isset($m['planilla'])) { $m['numero_planilla'] = $m['planilla']; unset($m['planilla']); }
 
-        // Validaciones RegEx en meta
         if (!empty($m['numero_expediente']) && !preg_match('/^\d{3}-\d{1,8}$/', $m['numero_expediente'])) {
             return Response::json(['error'=>'El expediente debe tener formato 000-00000000'], 400);
         }
@@ -246,7 +230,6 @@ class LegalController {
         $in['meta'] = $m;
     }
     
-    // Excluir status, publish_date, verification_date y order_no de la actualización genérica
     $fields = ['name','document','date','phone','email','address','folios','comment','pub_type','meta'];
     $set=[]; $vals=[];
     foreach ($fields as $f) {
@@ -266,9 +249,9 @@ class LegalController {
   public function submit($id){
      $u = AuthController::requireAuth();
      $this->checkAccess($id, $u);
+     $this->ensureMutable($id);
      $pdo = Database::pdo();
      
-     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $orderNo = $machine->submit($id);
@@ -281,9 +264,9 @@ class LegalController {
   public function verify($id){
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
+     $this->ensureMutable($id);
      $pdo = Database::pdo();
      
-     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $machine->verify($id);
@@ -296,9 +279,9 @@ class LegalController {
   public function returnToDraft($id){
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
+     $this->ensureMutable($id);
      $pdo = Database::pdo();
      
-     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $machine->returnToDraft($id);
@@ -311,10 +294,10 @@ class LegalController {
   public function reject($id){
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
+     $this->ensureMutable($id);
      $pdo = Database::pdo();
      $in = json_decode(file_get_contents('php://input'), true) ?: [];
      
-     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $machine->reject($id, $in['reason']??'');
@@ -324,19 +307,35 @@ class LegalController {
      }
   }
 
-  // == Trash & Actions ==
-
   public function listTrashed(){
-     AuthController::requireAuth();
+     $u = AuthController::requireAuth();
      $pdo = Database::pdo();
-     $stmt = $pdo->query("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+     $uid = (int)$u['id'];
+     $role = strtolower($u['role'] ?? '');
+     
+     if (in_array($role, ['admin','staff','manager'])) {
+         $stmt = $pdo->query("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
+     } else {
+         $stmt = $pdo->prepare("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL AND user_id=? ORDER BY deleted_at DESC");
+         $stmt->execute([$uid]);
+     }
      Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
 
   public function softDelete($id){
      $u = AuthController::requireAuth();
      $this->checkAccess($id, $u);
+     $this->ensureMutable($id);
+     
      $pdo = Database::pdo();
+     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
+     $currStatus = $s->fetchColumn();
+     
+     $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
+     if (!$isAdmin && $currStatus !== 'Borrador') {
+         return Response::json(['error'=>'Solo puedes eliminar solicitudes en Borrador'], 403);
+     }
+     
      $now = gmdate("c");
      $pdo->prepare("UPDATE legal_requests SET deleted_at=? WHERE id=?")->execute([$now, $id]);
      Response::json(["ok"=>true]);
@@ -345,7 +344,17 @@ class LegalController {
   public function restore($id){
      $u = AuthController::requireAuth();
      $this->checkAccess($id, $u);
+     $this->ensureMutable($id);
+     
      $pdo = Database::pdo();
+     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
+     $currStatus = $s->fetchColumn();
+     
+     $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
+     if (!$isAdmin && $currStatus !== 'Borrador') {
+         return Response::json(['error'=>'Solo puedes restaurar solicitudes en Borrador'], 403);
+     }
+     
      $pdo->prepare("UPDATE legal_requests SET deleted_at=NULL WHERE id=?")->execute([$id]);
      Response::json(["ok"=>true]);
   }
@@ -353,6 +362,8 @@ class LegalController {
   public function permanentDelete($id){
     $u = AuthController::requireAuth();
     $this->requireAdmin($u);
+    // Should NOT permanent delete if Published, though they shouldn't even be soft deleted.
+    $this->ensureMutable($id);
     Database::pdo()->prepare('DELETE FROM legal_requests WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
   }
@@ -361,15 +372,25 @@ class LegalController {
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
      $pdo = Database::pdo();
-     $pdo->prepare("DELETE FROM legal_requests WHERE deleted_at IS NOT NULL")->execute();
+     // Do not empty if status is Publicada (just in case they were soft deleted before the fix)
+     $pdo->prepare("DELETE FROM legal_requests WHERE deleted_at IS NOT NULL AND status != 'Publicada'")->execute();
      Response::json(["ok"=>true]);
   }
 
   public function addPayment($id){
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
-      $in = json_decode(file_get_contents('php://input'),true);
+      $this->ensureMutable($id);
+      $pdo = Database::pdo();
       
+      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
+      $reqStatus = $s->fetchColumn();
+      
+      if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
+          return Response::json(['error'=>'Solo se pueden agregar pagos en Borrador o Por verificar'], 403);
+      }
+      
+      $in = json_decode(file_get_contents('php://input'),true);
       if (!preg_match('/^\d{4}$/', $in['ref'] ?? '')) {
           return Response::json(['error'=>'La referencia debe tener exactamente 4 dígitos'], 400);
       }
@@ -380,17 +401,22 @@ class LegalController {
           return Response::json(['error'=>'El monto debe ser un número positivo'], 400);
       }
 
-      $pdo = Database::pdo();
-      $status = 'Por verificar'; // El cliente no dicta el estado
+      $status = 'Por verificar';
       $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
       $pdo->prepare('INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone,created_at) VALUES(?,?,?,?,?,?,?,?,NOW())')
           ->execute([$id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $in['amount_bs'], $status, $mobile_phone]);
+      
+      // Audit
+      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+          ->execute([$u['id'], 'add_payment', 'legal_request', $id]);
+          
       Response::json(['ok'=>true]);
   }
   
   public function deletePayment($id,$pid){
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
+      $this->ensureMutable($id);
       
       $pdo = Database::pdo();
       $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
@@ -401,13 +427,15 @@ class LegalController {
       }
       
       $pdo->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
+      
+      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+          ->execute([$u['id'], 'delete_payment', 'legal_request', $id]);
+          
       Response::json(['ok'=>true]);
   }
 
   public function download($id){
-      // Require authentication
       $u = AuthController::requireAuth();
-      
       $pdo = Database::pdo();
       $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
       $r = $s->fetch(PDO::FETCH_ASSOC);
@@ -416,7 +444,6 @@ class LegalController {
           die('Orden no encontrada');
       }
 
-      // Fetch associated Edition for QR Code
       $stmt = $pdo->prepare("SELECT e.code, e.id FROM editions e JOIN edition_orders eo ON eo.edition_id = e.id WHERE eo.legal_request_id = ? LIMIT 1");
       $stmt->execute([$id]);
       $edition = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -425,10 +452,8 @@ class LegalController {
           $r['edition_id'] = $edition['id'];
       }
       
-      // Check if user has access to this order
       $role = strtolower($u['role'] ?? '');
       if (!in_array($role, ['admin','staff','manager'])) {
-          // Regular users can only download their own orders
           if ((int)$r['user_id'] !== (int)$u['id']) {
               http_response_code(403);
               die('No tienes acceso a esta orden');
@@ -444,17 +469,15 @@ class LegalController {
       
       $output = $pdfGenerationService->generateOrderPdf($r, $pay);
       
-      // Clean previous output to prevent PDF corruption
-      // if (ob_get_length()) ob_end_clean();
-      
       header('Content-Type: application/pdf');
-      header('Content-Disposition: inline; filename="orden_'.$r['order_no'].'.pdf"'); // Changed to inline for preview
+      header('Content-Disposition: inline; filename="orden_'.$r['order_no'].'.pdf"');
       header('Content-Length: ' . strlen($output));
       header('Cache-Control: no-cache, no-store, must-revalidate');
       header('Pragma: no-cache');
       header('Expires: 0');
       echo $output;
   }
+  
   public function getPublic($order){ 
     $pdo = Database::pdo();
     $r = $pdo->prepare("SELECT * FROM legal_requests WHERE (order_no=? OR id=?) AND status='Publicada'");
@@ -464,12 +487,10 @@ class LegalController {
     Response::json(['item'=>$item]);
   }
 
-  // == FILES ==
   public function listFiles($id){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    // Select f.id as file_id to ensure we get the clean integer ID from the files table
     $stmt = $pdo->prepare("SELECT lf.id, lf.kind, f.id as file_id, f.name, f.size, f.type, f.created_at FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?");
     $stmt->execute([$id]);
     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -478,10 +499,10 @@ class LegalController {
   public function attachFile($id){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
+    $this->ensureMutable($id);
     $in = json_decode(file_get_contents('php://input'),true);
     $pdo = Database::pdo();
     
-    // Remove existing file of the same kind to ensure 1:1 relationship per kind
     $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $in['kind']]);
     
     $pdo->prepare("INSERT INTO legal_files(legal_request_id,file_id,kind,created_at) VALUES(?,?,?,NOW())")
@@ -492,6 +513,7 @@ class LegalController {
   public function detachFile($id, $fid){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
+    $this->ensureMutable($id);
     Database::pdo()->prepare("DELETE FROM legal_files WHERE id=?")->execute([$fid]);
     Response::json(['ok'=>true]);
   }

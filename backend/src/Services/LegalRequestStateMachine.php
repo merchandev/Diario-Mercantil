@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../Database.php';
+require_once __DIR__.'/../AuthController.php';
 
 final class LegalRequestStateMachine {
     private PDO $pdo;
@@ -7,67 +8,97 @@ final class LegalRequestStateMachine {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
+    
+    private function executeTransition(int $id, string $action, callable $logic) {
+        $ownsTransaction = !$this->pdo->inTransaction();
+        if ($ownsTransaction) {
+            $this->pdo->beginTransaction();
+        }
+
+        try {
+            // Lock row
+            $stmt = $this->pdo->prepare('SELECT status, created_at FROM legal_requests WHERE id=? FOR UPDATE');
+            $stmt->execute([$id]);
+            $req = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$req) {
+                throw new Exception("Solicitud no encontrada.", 404);
+            }
+            
+            // Execute specific logic
+            $result = $logic($req);
+
+            // Audit
+            $u = AuthController::userFromToken(AuthController::bearerToken());
+            $actorId = $u['id'] ?? null;
+            $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+                ->execute([$actorId, $action, 'legal_request', $id]);
+
+            if ($ownsTransaction) {
+                $this->pdo->commit();
+            }
+            
+            return $result;
+
+        } catch (Throwable $exception) {
+            if ($ownsTransaction && $this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
 
     public function submit(int $id): string {
-        $stmt = $this->pdo->prepare('SELECT status, created_at FROM legal_requests WHERE id=? FOR UPDATE');
-        $stmt->execute([$id]);
-        $req = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $this->executeTransition($id, 'submit', function($req) use ($id) {
+            if ($req['status'] !== 'Borrador' && $req['status'] !== 'Rechazado') {
+                throw new Exception("La solicitud no está en Borrador ni Rechazado.", 409);
+            }
 
-        if (!$req) {
-            throw new Exception("Solicitud no encontrada.");
-        }
-        
-        if ($req['status'] !== 'Borrador' && $req['status'] !== 'Rechazado') {
-            throw new Exception("La solicitud ya fue formalizada anteriormente o está en un estado inválido.");
-        }
+            $now = gmdate('Y-m-d H:i:s');
+            $year = substr($req['created_at'], 0, 4) ?: gmdate('Y');
+            $orderNo = "ORD-{$year}-" . str_pad((string)$id, 6, "0", STR_PAD_LEFT);
 
-        $now = gmdate('Y-m-d H:i:s');
-        $year = substr($req['created_at'], 0, 4) ?: gmdate('Y');
-        $orderNo = "ORD-{$year}-" . str_pad((string)$id, 6, "0", STR_PAD_LEFT);
-
-        $update = $this->pdo->prepare("UPDATE legal_requests SET status='Por verificar', submitted_at=?, order_no=? WHERE id=?");
-        $update->execute([$now, $orderNo, $id]);
-        
-        return $orderNo;
+            $update = $this->pdo->prepare("UPDATE legal_requests SET status='Por verificar', submitted_at=?, order_no=? WHERE id=?");
+            $update->execute([$now, $orderNo, $id]);
+            
+            return $orderNo;
+        });
     }
 
     public function verify(int $id): void {
-        $stmt = $this->pdo->prepare('SELECT status FROM legal_requests WHERE id=? FOR UPDATE');
-        $stmt->execute([$id]);
-        $status = $stmt->fetchColumn();
+        $this->executeTransition($id, 'verify', function($req) use ($id) {
+            if ($req['status'] !== 'Por verificar') {
+                throw new Exception("La solicitud no está en estado 'Por verificar'.", 409);
+            }
 
-        if ($status !== 'Por verificar') {
-            throw new Exception("La solicitud no está en estado 'Por verificar'.");
-        }
-
-        $now = gmdate('Y-m-d H:i:s');
-        $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")
-             ->execute([$now, $id]);
+            $now = gmdate('Y-m-d H:i:s');
+            $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")
+                 ->execute([$now, $id]);
+            return true;
+        });
     }
 
     public function reject(int $id, string $reason = ''): void {
-        $stmt = $this->pdo->prepare('SELECT status FROM legal_requests WHERE id=? FOR UPDATE');
-        $stmt->execute([$id]);
-        $status = $stmt->fetchColumn();
+        $this->executeTransition($id, 'reject', function($req) use ($id, $reason) {
+            if ($req['status'] !== 'Por verificar') {
+                throw new Exception("Solo se puede rechazar una solicitud que está 'Por verificar'.", 409);
+            }
 
-        if ($status !== 'Por verificar') {
-            throw new Exception("Solo se puede rechazar una solicitud que está 'Por verificar'. Estado actual: $status");
-        }
-
-        $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")
-             ->execute([$reason, $id]);
+            $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")
+                 ->execute([$reason, $id]);
+            return true;
+        });
     }
 
     public function returnToDraft(int $id, string $comment = 'Devuelto a borrador por administrador.'): void {
-        $stmt = $this->pdo->prepare('SELECT status FROM legal_requests WHERE id=? FOR UPDATE');
-        $stmt->execute([$id]);
-        $status = $stmt->fetchColumn();
+        $this->executeTransition($id, 'returnToDraft', function($req) use ($id, $comment) {
+            if ($req['status'] !== 'Por verificar' && $req['status'] !== 'En trámite') {
+                throw new Exception("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'.", 409);
+            }
 
-        if ($status !== 'Por verificar' && $status !== 'En trámite') {
-            throw new Exception("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'. Estado actual: $status");
-        }
-
-        $this->pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")
-             ->execute([$comment, $id]);
+            $this->pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")
+                 ->execute([$comment, $id]);
+            return true;
+        });
     }
 }

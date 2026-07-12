@@ -53,6 +53,10 @@ elseif (preg_match("#^/api/users/(\d+)$#", $uri, $m)) {
     if ($method === "PUT") (new UserController())->update($m[1]);
     if ($method === "DELETE") (new UserController())->delete($m[1]);
 }
+elseif (preg_match("#^/api/admin/users/(\d+)/suspend$#", $uri, $m) && $method === "POST") { (new UserController())->suspend($m[1]); }
+elseif (preg_match("#^/api/admin/users/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new UserController())->restore($m[1]); }
+elseif (preg_match("#^/api/admin/users/(\d+)/role$#", $uri, $m) && $method === "POST") { (new UserController())->changeRole($m[1]); }
+elseif (preg_match("#^/api/admin/users/(\d+)/reset-password$#", $uri, $m) && $method === "POST") { (new UserController())->resetPassword($m[1]); }
 // Profile specific
 elseif ($uri === "/api/user/profile" && $method === "PUT") { 
     $u = AuthController::requireAuth(); 

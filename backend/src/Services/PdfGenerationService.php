@@ -1,17 +1,12 @@
 <?php
 require_once __DIR__ . '/../OrderPdf.php';
-require_once __DIR__ . '/BcvService.php';
-require_once __DIR__ . '/PublicationService.php';
 
 class PdfGenerationService {
     private PDO $pdo;
-    private BcvService $bcvService;
-    private PublicationService $publicationService;
     
-    public function __construct(PDO $pdo, BcvService $bcvService, PublicationService $publicationService) {
+    public function __construct(PDO $pdo, $ignoredParam1 = null, $ignoredParam2 = null) {
         $this->pdo = $pdo;
-        $this->bcvService = $bcvService;
-        $this->publicationService = $publicationService;
+        // Ignored params to avoid breaking old instantiation patterns temporarily
     }
     
     public function generateOrderPdf(array $requestData, array $payments): string {
@@ -20,35 +15,51 @@ class PdfGenerationService {
         $pdf->orderInfo = $requestData;
         $pdf->AddPage();
         
-        $pricePerFolio = $this->publicationService->getPricePerFolio();
-        $bcv = $this->bcvService->getRate();
+        // Extract snapshot fields safely
+        // If not available (historical orphans), mark as N/A or 0.0
+        $pricePerFolio = isset($requestData['precio_unitario_usd']) ? (float)$requestData['precio_unitario_usd'] : 0.0;
+        $bcv = isset($requestData['tasa_bcv']) ? (float)$requestData['tasa_bcv'] : 0.0;
+        $ivaPercent = isset($requestData['porcentaje_iva']) ? (float)$requestData['porcentaje_iva'] : 0.0;
         
-        $totalUsd = $requestData['folios'] * $pricePerFolio;
+        $folios = (int)($requestData['folios'] ?? 1);
+        $totalUsd = $folios * $pricePerFolio;
         $subtotalBs = $totalUsd * $bcv;
         
         $clientData = [
-            'Cliente:' => $requestData['name'],
-            'Documento:' => $requestData['document'],
+            'Cliente:' => $requestData['name'] ?? '---',
+            'Documento:' => $requestData['document'] ?? '---',
             'Email:' => $requestData['email'] ?? '---',
             'Telefono:' => $requestData['phone'] ?? '---'
         ];
         
         $orderDetails = [
-            'Estado:' => $requestData['status'],
+            'Estado:' => $requestData['status'] ?? '---',
             'Tipo:' => $requestData['pub_type'] ?? 'Documento',
-            'Folios:' => $requestData['folios'],
-            'Tasa BCV:' => number_format($bcv, 2)
+            'Folios:' => (string)$folios,
+            'Tasa BCV:' => $bcv > 0 ? number_format($bcv, 2) : 'No disponible'
         ];
 
         $pdf->InfoSection($clientData, $orderDetails);
         
-        $ivaBs = $subtotalBs * 0.16;
-        $totalBs = $subtotalBs + $ivaBs;
+        $ivaBs = $subtotalBs * ($ivaPercent / 100);
+        
+        // If snapshot has total_bs use it directly to avoid floating point drift, else calculate
+        if (isset($requestData['total_bs']) && $requestData['total_bs'] > 0) {
+            $totalBs = (float)$requestData['total_bs'];
+        } else {
+            $totalBs = $subtotalBs + $ivaBs;
+        }
 
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->Cell(50, 6, 'Total Estimado (Bs):', 0, 0);
-        $pdf->SetTextColor(143, 25, 32); 
-        $pdf->Cell(0, 6, number_format($totalBs, 2).' Bs', 0, 1);
+        $pdf->SetTextColor(143, 25, 32);
+        
+        if ($bcv <= 0) {
+            $pdf->Cell(0, 6, 'Cálculo histórico no disponible', 0, 1);
+        } else {
+            $pdf->Cell(0, 6, number_format($totalBs, 2).' Bs', 0, 1);
+        }
+        
         $pdf->SetTextColor(0); 
         $pdf->Ln(5);
 
@@ -71,11 +82,11 @@ class PdfGenerationService {
             $amount = isset($py['amount_bs']) ? (float)$py['amount_bs'] : 0.0;
             if($py['status'] == 'Aprobado') $totalPaid += $amount;
             
-            $pdf->Cell(30, 8, substr($py['date'], 0, 10), 'B', 0, 'C');
-            $pdf->Cell(40, 8, $py['ref'], 'B', 0, 'C');
-            $pdf->Cell(40, 8, $py['bank'], 'B', 0, 'C');
+            $pdf->Cell(30, 8, substr($py['date'] ?? '', 0, 10), 'B', 0, 'C');
+            $pdf->Cell(40, 8, $py['ref'] ?? '', 'B', 0, 'C');
+            $pdf->Cell(40, 8, $py['bank'] ?? '', 'B', 0, 'C');
             $pdf->Cell(30, 8, number_format($amount, 2), 'B', 0, 'R');
-            $pdf->Cell(30, 8, $py['status'], 'B', 1, 'C');
+            $pdf->Cell(30, 8, $py['status'] ?? '', 'B', 1, 'C');
         }
         
         if(empty($payments)) {

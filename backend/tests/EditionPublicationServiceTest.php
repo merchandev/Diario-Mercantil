@@ -18,7 +18,7 @@ class EditionPublicationServiceTest extends TestCase {
         $this->expectExceptionMessage("Edición no encontrada");
         $this->expectExceptionCode(404);
         
-        $service->publish(1);
+        $service->publish(1, 1);
     }
     
     public function testPublishFailsIfNotDraft() {
@@ -34,7 +34,7 @@ class EditionPublicationServiceTest extends TestCase {
         $this->expectExceptionMessage("La edición debe estar en estado Borrador para ser publicada.");
         $this->expectExceptionCode(409);
         
-        $service->publish(1);
+        $service->publish(1, 1);
     }
     
     public function testPublishFailsIfNoPdf() {
@@ -50,7 +50,7 @@ class EditionPublicationServiceTest extends TestCase {
         $this->expectExceptionMessage("Debe subir el PDF definitivo antes de publicar la edición.");
         $this->expectExceptionCode(422);
         
-        $service->publish(1);
+        $service->publish(1, 1);
     }
 
     public function testPublishFailsIfNoOrders() {
@@ -66,6 +66,6 @@ class EditionPublicationServiceTest extends TestCase {
         $this->expectExceptionMessage("La edición debe tener al menos una solicitud asociada.");
         $this->expectExceptionCode(400);
         
-        $service->publish(1);
+        $service->publish(1, 1);
     }
 }

@@ -15,7 +15,7 @@ class LegalRequestStateMachineTest extends TestCase {
         $machine = new LegalRequestStateMachine($pdo);
         
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("La solicitud ya fue formalizada anteriormente o está en un estado inválido.");
+        $this->expectExceptionMessage("La solicitud no está en Borrador ni Rechazado.");
         
         $machine->submit(1);
     }
@@ -24,7 +24,7 @@ class LegalRequestStateMachineTest extends TestCase {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetchColumn')->willReturn('Borrador');
+        $stmt->method('fetch')->willReturn(['status' => 'Borrador']);
         $pdo->method('prepare')->willReturn($stmt);
         
         $machine = new LegalRequestStateMachine($pdo);
@@ -39,13 +39,13 @@ class LegalRequestStateMachineTest extends TestCase {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetchColumn')->willReturn('En trámite');
+        $stmt->method('fetch')->willReturn(['status' => 'En trámite']);
         $pdo->method('prepare')->willReturn($stmt);
         
         $machine = new LegalRequestStateMachine($pdo);
         
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("Solo se puede rechazar una solicitud que está 'Por verificar'. Estado actual: En trámite");
+        $this->expectExceptionMessage("Solo se puede rechazar una solicitud que está 'Por verificar'.");
         
         $machine->reject(1, 'Reason');
     }
@@ -54,13 +54,13 @@ class LegalRequestStateMachineTest extends TestCase {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetchColumn')->willReturn('Publicada');
+        $stmt->method('fetch')->willReturn(['status' => 'Publicada']);
         $pdo->method('prepare')->willReturn($stmt);
         
         $machine = new LegalRequestStateMachine($pdo);
         
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'. Estado actual: Publicada");
+        $this->expectExceptionMessage("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'.");
         
         $machine->returnToDraft(1);
     }

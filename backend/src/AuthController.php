@@ -100,7 +100,7 @@ class AuthController {
     
     // 1. Try Normal User Token
     // Use simple query first
-    $stmt = $pdo->prepare("SELECT u.*, t.expires_at FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=?");
+    $stmt = $pdo->prepare("SELECT u.*, t.expires_at FROM auth_tokens t JOIN users u ON u.id=t.user_id WHERE t.token=? AND u.status='active' AND u.deleted_at IS NULL");
     $stmt->execute([$token]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     
@@ -165,7 +165,7 @@ class AuthController {
         $this->checkRateLimit($doc);
         
         // Try multiple document formats for flexible login
-        $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active'");
+        $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active' AND deleted_at IS NULL");
         $u->execute([$doc]);
         $user = $u->fetch(PDO::FETCH_ASSOC);
 

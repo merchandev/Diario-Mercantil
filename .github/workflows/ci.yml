@@ -84,10 +84,12 @@ jobs:
         run: |
           mysql -h 127.0.0.1 -u root -proot dm_test < migrations/init.sql
           mysql -h 127.0.0.1 -u root -proot dm_test < migrations/02_audit_schema.sql
+          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/03_phase5_schema.sql
           mysql -h 127.0.0.1 -u root -proot dm_test -e "INSERT INTO settings(\`key\`, \`value\`) VALUES ('price_per_folio_usd', '1.5'), ('iva_percent', '16.0');"
 
       - name: Run backend tests
         env:
+          DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
           DB_DATABASE: dm_test
           DB_USERNAME: root
