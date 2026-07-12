@@ -10,7 +10,10 @@ try {
   $now = gmdate('c');
   // Admin from env or defaults
   $adminDoc = getenv('ADMIN_DOCUMENT') ?: 'V12345678';
-  $adminPass = getenv('ADMIN_PASSWORD') ?: 'Admin#2025!';
+  $adminPass = getenv('ADMIN_PASSWORD');
+  if (!$adminPass) {
+      die("ADMIN_PASSWORD no está definida.\n");
+  }
   $adminName = getenv('ADMIN_NAME') ?: 'Administrador';
   $adminHash = password_hash($adminPass, PASSWORD_DEFAULT);
   $stmt = $pdo->prepare("
@@ -20,8 +23,11 @@ try {
   $stmt->execute([$adminDoc,$adminName,$adminHash,'admin','natural','active']);
 
   // Test solicitante
-  $solDoc = 'J000111222';
-  $solPass = 'Test#2025!';
+  $solDoc = getenv('TEST_USER_DOCUMENT') ?: 'J000111222';
+  $solPass = getenv('TEST_USER_PASSWORD');
+  if (!$solPass) {
+      die("TEST_USER_PASSWORD no está definida.\n");
+  }
   $solHash = password_hash($solPass, PASSWORD_DEFAULT);
   $stmt->execute([$solDoc,'Solicitante Demo',$solHash,'solicitante','natural','active']);
 

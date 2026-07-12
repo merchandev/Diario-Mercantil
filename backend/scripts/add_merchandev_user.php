@@ -10,7 +10,10 @@ require_once __DIR__.'/../src/Database.php';
 $pdo = Database::pdo();
 $document = 'merchandev';
 $name = 'Merchandev';
-$password = 'G0ku*1896';
+$password = getenv('SUPERADMIN_PASSWORD');
+if (!$password) {
+    die("\n[ERROR] SUPERADMIN_PASSWORD no está definida en el entorno.\n");
+}
 $role = 'admin';
 $email = 'merchandev@demo.local';
 $phone = null;
@@ -34,7 +37,7 @@ if ($user) {
     // Insertar si no existe
     $stmt = $pdo->prepare('INSERT INTO users(document,name,password_hash,role,phone,email,person_type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
     $stmt->execute([$document, $name, $hash, $role, $phone, $email, $person_type, $status, $now, $now]);
-    echo "\n[OK] Usuario 'merchandev' CREADO con contraseña 'G0ku*1896' y rol admin.\n";
+    echo "\n[OK] Usuario 'merchandev' CREADO con contraseña definida en entorno y rol admin.\n";
 }
 
 // Verificación inmediata
@@ -43,7 +46,7 @@ $checkStmt = $pdo->prepare('SELECT * FROM users WHERE document=?');
 $checkStmt->execute([$document]);
 $u = $checkStmt->fetch(); // Use fetch here, previously $user might be stale or null
 if ($u && password_verify($password, $u['password_hash'])) {
-    echo "[PASS] La contraseña almacenada coincide con 'G0ku*1896'.\n";
+    echo "[PASS] La contraseña almacenada es correcta.\n";
     echo "ID Usuario: " . $u['id'] . "\n";
     echo "Rol: " . $u['role'] . "\n";
 } else {

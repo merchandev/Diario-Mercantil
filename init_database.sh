@@ -7,7 +7,7 @@ echo "============================================"
 
 # Wait for MySQL to be ready
 echo "Waiting for MySQL to be ready..."
-until docker exec diario-mercantil-db-1 mysqladmin ping -h localhost -u root -proot_secure_password_2025 --silent; do
+until docker exec diario-mercantil-db-1 mysqladmin ping -h localhost -u root -p"${MYSQL_ROOT_PASSWORD}" --silent; do
     echo "MySQL not ready yet, waiting..."
     sleep 2
 done
@@ -17,7 +17,7 @@ echo ""
 
 # Initialize database with clean script
 echo "Initializing database..."
-cat backend/migrations/CLEAN_INIT.sql | docker exec -i diario-mercantil-db-1 mysql -u root -proot_secure_password_2025
+cat backend/migrations/CLEAN_INIT.sql | docker exec -i diario-mercantil-db-1 mysql -u root -p"${MYSQL_ROOT_PASSWORD}"
 
 echo ""
 echo "✅ Database initialized successfully"
@@ -27,7 +27,7 @@ echo ""
 echo "Verifying database..."
 echo ""
 
-docker exec -i diario-mercantil-db-1 mysql -u root -proot_secure_password_2025 diario_mercantil -e "
+docker exec -i diario-mercantil-db-1 mysql -u root -p"${MYSQL_ROOT_PASSWORD}" diario_mercantil -e "
 SELECT 'Superadmins:' AS info, COUNT(*) AS count FROM superadmins
 UNION ALL
 SELECT 'Users:', COUNT(*) FROM users
@@ -40,8 +40,5 @@ echo "============================================"
 echo "✅ Initialization Complete"
 echo "============================================"
 echo ""
-echo "Credentials:"
-echo "- Superadmin: merchandev / G0ku*1896"
-echo "- Admin: V12345678 / Admin#2025!"
-echo "- Solicitante: J000111222 / Test#2025!"
+echo "Please check your environment variables for superadmin and admin credentials."
 echo ""
