@@ -188,11 +188,21 @@ export default function PublicarConvocatoria() {
                 {registrosDisponibles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
 
-              <input className="input" placeholder="Tomo / Letra" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.toUpperCase() })} />
-              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.toUpperCase() })} />
+              <input className="input" placeholder="Tomo" 
+                     maxLength={3} 
+                     pattern="^\d{1,3}$"
+                     title="Debe ingresar hasta 3 números"
+                     value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.replace(/\D/g, '') })} />
+              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '') })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
-              <input className="input" placeholder="Número de expediente" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
-              <input className="input" type="date" placeholder="Fecha" value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
+              <input className="input" placeholder="Número de expediente" 
+                     maxLength={12} 
+                     pattern="^\d{3}-\d{1,8}$"
+                     title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)"
+                     value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
+              <input className="input" type="date" placeholder="Fecha" 
+                     max={new Date().toISOString().split('T')[0]}
+                     value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
 
               <input className="input" placeholder="Nombres y apellidos del representante legal de la sociedad" value={f1.representante} onChange={e => setF1({ ...f1, representante: e.target.value.toUpperCase() })} />
               <input className="input" placeholder="Número de documento de identidad" value={f1.ci_rep} onChange={e => setF1({ ...f1, ci_rep: e.target.value.toUpperCase() })} />

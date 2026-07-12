@@ -64,7 +64,9 @@ elseif (preg_match("#^/api/legal/(\d+)$#", $uri, $m)) {
 // Actions
 elseif (preg_match("#^/api/legal/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new LegalController())->restore($m[1]); }
 elseif (preg_match("#^/api/legal/(\d+)/reject$#", $uri, $m) && $method === "POST") { (new LegalController())->reject($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
+elseif (preg_match("#^/api/legal/(\d+)/submit$#", $uri, $m) && $method === "POST") { (new LegalController())->submit($m[1]); }
+elseif (preg_match("#^/api/legal/(\d+)/verify$#", $uri, $m) && $method === "POST") { (new LegalController())->verify($m[1]); }
+elseif (preg_match("#^/api/legal/(\d+)/return-to-draft$#", $uri, $m) && $method === "POST") { (new LegalController())->returnToDraft($m[1]); }
 elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
 // Files
 elseif (preg_match("#^/api/uploads/avatars/(.+)$#", $uri, $m)) { (new FileController())->serveAvatar($m[1]); }

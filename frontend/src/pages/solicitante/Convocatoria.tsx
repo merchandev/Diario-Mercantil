@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPayments, type PaymentMethod } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPayments, type PaymentMethod, submitLegal } from '../../lib/api'
 import YearPicker from '../../components/YearPicker'
 
 type ConvocatoriaPaymentForm = {
@@ -86,8 +86,9 @@ export default function Convocatoria() {
       return
     }
 
-    await updateLegal(req.id, { status: 'Por verificar', meta, name: meta.razon_social || '', document: meta.rif || '' })
-    await addLegalPayment(req.id, { type: pay.type, bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Verificado', mobile_phone: pay.type === 'pago_movil' ? pay.mobile_phone : undefined })
+    await updateLegal(req.id, { meta, name: meta.razon_social || '', document: meta.rif || '' })
+    await addLegalPayment(req.id, { type: pay.type, bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Por verificar', mobile_phone: pay.type === 'pago_movil' ? pay.mobile_phone : undefined })
+    await submitLegal(req.id)
     alert('Solicitud de convocatoria enviada para verificación')
     navigate('/solicitante/historial')
   }
@@ -111,15 +112,25 @@ export default function Convocatoria() {
           <input className="input" placeholder="RIF" value={meta.rif || ''} onChange={e => setMeta({ ...meta, rif: e.target.value.toUpperCase() })} />
           <input className="input" placeholder="ESTADO" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value.toUpperCase() })} />
           <input className="input" placeholder="OFICINA DE REGISTRO MERCANTIL" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value.toUpperCase() })} />
-          <input className="input" placeholder="TOMO (Máx 3)" maxLength={3} value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })} />
+          <input className="input" placeholder="TOMO (Máx 3)" 
+                 maxLength={3} 
+                 pattern="^\d{1,3}$"
+                 title="Debe ingresar hasta 3 números"
+                 value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })} />
           <input className="input" placeholder="NÚMERO" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '') })} />
           <YearPicker
             value={meta.anio}
             onChange={(y) => setMeta({ ...meta, anio: y })}
             placeholder="Año"
           />
-          <input className="input" placeholder="Número de expediente" value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value })} />
-          <input className="input" type="date" placeholder="Fecha" value={meta.fecha || ''} onChange={e => setMeta({ ...meta, fecha: e.target.value })} />
+          <input className="input" placeholder="Número de expediente" 
+                 maxLength={12} 
+                 pattern="^\d{3}-\d{1,8}$"
+                 title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)"
+                 value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
+          <input className="input" type="date" placeholder="Fecha" 
+                 max={new Date().toISOString().split('T')[0]}
+                 value={meta.fecha || ''} onChange={e => setMeta({ ...meta, fecha: e.target.value })} />
           <input className="input md:col-span-2" placeholder="Nombres y apellidos del representante legal" value={meta.representante || ''} onChange={e => setMeta({ ...meta, representante: e.target.value })} />
           <input className="input" placeholder="Documento de identidad del representante" value={meta.ci_representante || ''} onChange={e => setMeta({ ...meta, ci_representante: e.target.value })} />
         </div>

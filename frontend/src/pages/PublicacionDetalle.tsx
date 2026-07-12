@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getLegal, updateLegal, rejectLegal, addLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
+import { getLegal, updateLegal, rejectLegal, verifyLegal, returnToDraftLegal, addLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import { IconTrash, IconDownload, IconSave, IconClose, IconPlus, IconArrowLeft, IconQrCode } from '../components/icons'
 import QRCodeModal from '../components/QRCodeModal'
+import LegalRequestDetails from '../components/LegalRequestDetails'
 
 export default function PublicacionDetalle() {
   const { id } = useParams()
@@ -95,14 +96,25 @@ export default function PublicacionDetalle() {
     if (!item) return
     if (!confirm('¿Verificar esta solicitud y marcarla como En trámite?')) return
     try {
-      await updateLegal(item.id, {
-        status: 'En trámite'
-      })
+      await verifyLegal(item.id)
       alert('✅ Solicitud verificada y en trámite')
       loadData()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error approving:', err)
-      alert('Error al aprobar')
+      alert(err.message || 'Error al aprobar')
+    }
+  }
+
+  const onReturnToDraft = async () => {
+    if (!item) return
+    if (!confirm('¿Devolver esta solicitud a Borrador?')) return
+    try {
+      await returnToDraftLegal(item.id)
+      alert('✅ Solicitud devuelta a Borrador')
+      loadData()
+    } catch (err: any) {
+      console.error('Error returning to draft:', err)
+      alert(err.message || 'Error al devolver a borrador')
     }
   }
 
@@ -118,6 +130,7 @@ export default function PublicacionDetalle() {
       type: fd.get('type') || '',
       amount_bs: Number(fd.get('amount_bs') || 0),
       status: fd.get('pstatus') || 'Verificado',
+      mobile_phone: fd.get('mobile_phone') || '',
       comment: fd.get('comment') || ''
     }
     try {
@@ -238,67 +251,21 @@ export default function PublicacionDetalle() {
             <button className="btn bg-red-600 text-white hover:bg-red-700" onClick={onReject}>
               ✗ Rechazar
             </button>
+            <button className="btn bg-slate-600 text-white hover:bg-slate-700" onClick={onReturnToDraft}>
+              Devolver a Borrador
+            </button>
           </div>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-4 gap-4">
-        {/* Column 1: Basic Info */}
-        <div className="card p-4 space-y-4 lg:col-span-2">
-          <h3 className="font-semibold text-lg border-b pb-2">Información Básica</h3>
+      <div className="grid lg:grid-cols-3 gap-4 items-start">
+        <div className="lg:col-span-2 space-y-4">
+          <LegalRequestDetails item={item} meta={meta} />
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">N° de Orden</label>
-            <input
-              className="input w-full"
-              value={item.order_no || ''}
-              onChange={e => setItem({ ...item, order_no: e.target.value })}
-              placeholder="ORD-2025-XXX"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
-            <select
-              className="input w-full"
-              value={item.status}
-              onChange={e => setItem({ ...item, status: e.target.value })}
-            >
-              <option value="Borrador">Pendiente</option>
-              <option value="Por verificar">Por verificar</option>
-              <option value="En trámite">En trámite</option>
-              <option value="Publicada">Publicado</option>
-              <option value="Rechazado">Rechazado</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Solicitud</label>
-            <input
-              className="input w-full"
-              type="date"
-              value={(item as any).created_at ? (item as any).created_at.slice(0, 10) : item.date || ''}
-              onChange={e => setItem({ ...item, date: e.target.value })}
-              disabled
-            />
-          </div>
-
-          {item.status === 'Publicada' && (
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Fecha de Publicación</label>
-              <input
-                className="input w-full"
-                type="date"
-                value={item.publish_date || ''}
-                onChange={e => setItem({ ...item, publish_date: e.target.value })}
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-            <input className="input w-full" value={item.pub_type || 'Documento'} disabled />
-          </div>
+        {/* Column 2: Solicitante Info (Editable) */}
+        <div className="card p-4 space-y-4">
+          <h3 className="font-semibold text-lg border-b pb-2">Datos del Solicitante (Editar)</h3>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Folios</label>
@@ -310,11 +277,6 @@ export default function PublicacionDetalle() {
               onChange={e => setItem({ ...item, folios: Number(e.target.value) })}
             />
           </div>
-        </div>
-
-        {/* Column 2: Solicitante Info */}
-        <div className="card p-4 space-y-4">
-          <h3 className="font-semibold text-lg border-b pb-2">Datos del Solicitante</h3>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Razón Social / Nombre</label>
@@ -352,106 +314,7 @@ export default function PublicacionDetalle() {
               onChange={e => setItem({ ...item, email: e.target.value })}
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Dirección</label>
-            <textarea
-              className="input w-full"
-              rows={3}
-              value={item.address || ''}
-              onChange={e => setItem({ ...item, address: e.target.value })}
-            />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Comentarios</label>
-            <textarea
-              className="input w-full"
-              rows={3}
-              value={item.comment || ''}
-              onChange={e => setItem({ ...item, comment: e.target.value })}
-              placeholder="Notas adicionales..."
-            />
-          </div>
-        </div>
-
-        {/* Column 3: Metadata */}
-        <div className="card p-4 space-y-4">
-          <h3 className="font-semibold text-lg border-b pb-2">Datos registrales del documento</h3>
-
-          {meta.tipo_sociedad && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Tipo de Sociedad:</span>
-              <p className="text-slate-900">{meta.tipo_sociedad}</p>
-            </div>
-          )}
-
-          {meta.tipo_acto && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Tipo de Acto:</span>
-              <p className="text-slate-900">{meta.tipo_acto}</p>
-            </div>
-          )}
-
-          {meta.tipo_convocatoria && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Tipo de Convocatoria:</span>
-              <p className="text-slate-900">{meta.tipo_convocatoria}</p>
-            </div>
-          )}
-
-          {meta.estado && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Estado:</span>
-              <p className="text-slate-900">{meta.estado}</p>
-            </div>
-          )}
-
-          {meta.oficina && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Oficina:</span>
-              <p className="text-slate-900">{meta.oficina}</p>
-            </div>
-          )}
-
-          {meta.registrador && (
-            <div>
-              <span className="text-sm font-medium text-slate-700">Registrador:</span>
-              <p className="text-slate-900">{meta.registrador}</p>
-            </div>
-          )}
-
-          {meta.tomo && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-sm font-medium text-slate-700">Tomo:</span>
-                <p className="text-slate-900">{meta.tomo}</p>
-              </div>
-              <div>
-                <span className="text-sm font-medium text-slate-700">Número:</span>
-                <p className="text-slate-900">{meta.numero}</p>
-              </div>
-            </div>
-          )}
-
-          {meta.anio && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <span className="text-sm font-medium text-slate-700">Año:</span>
-                <p className="text-slate-900">{meta.anio}</p>
-              </div>
-              {meta.expediente && (
-                <div>
-                  <span className="text-sm font-medium text-slate-700">Expediente:</span>
-                  <p className="text-slate-900">{meta.expediente}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {Object.keys(meta).length === 0 && (
-            <p className="text-slate-500 text-sm">No hay información adicional</p>
-          )}
         </div>
 
         {/* Column 4: Pago reportado */}
@@ -519,6 +382,7 @@ export default function PublicacionDetalle() {
             <option>Verificado</option>
             <option>Pendiente</option>
           </select>
+          <input className="input" name="mobile_phone" placeholder="Telf. Pago Móvil (Opcional)" />
           <input
             className="input md:col-span-2"
             name="comment"

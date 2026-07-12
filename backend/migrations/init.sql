@@ -80,7 +80,10 @@ CREATE TABLE IF NOT EXISTS legal_requests (
   pub_type VARCHAR(50) DEFAULT 'Documento',
   meta TEXT,
   deleted_at DATETIME,
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  submitted_at DATETIME NULL,
+  verification_date DATETIME NULL,
+  UNIQUE KEY uq_legal_order_no (order_no)
 );
 
 -- Editions
@@ -102,7 +105,8 @@ CREATE TABLE IF NOT EXISTS edition_orders (
   legal_request_id INT NOT NULL,
   PRIMARY KEY (edition_id, legal_request_id),
   FOREIGN KEY(edition_id) REFERENCES editions(id) ON DELETE CASCADE,
-  FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id)
+  FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id),
+  UNIQUE KEY uq_edition_orders_request (legal_request_id)
 );
 
 -- Payments linked to legal requests

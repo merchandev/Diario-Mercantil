@@ -405,6 +405,18 @@ export async function rejectLegal(id: number, reason: string) {
   const res = await fetchAuth(`/api/legal/${id}/reject`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) })
   return res.json()
 }
+export async function submitLegal(id: number) {
+  const res = await fetchAuth(`/api/legal/${id}/submit`, { method: 'POST' })
+  return res.json() as Promise<{ ok: boolean; order_no?: string; error?: string }>
+}
+export async function verifyLegal(id: number) {
+  const res = await fetchAuth(`/api/legal/${id}/verify`, { method: 'POST' })
+  return res.json() as Promise<{ ok: boolean; error?: string }>
+}
+export async function returnToDraftLegal(id: number) {
+  const res = await fetchAuth(`/api/legal/${id}/return-to-draft`, { method: 'POST' })
+  return res.json() as Promise<{ ok: boolean; error?: string }>
+}
 export async function addLegalPayment(id: number, body: Partial<LegalPayment>) {
   const res = await fetchAuth(`/api/legal/${id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json() as Promise<{ ok: true; payment_id: number }>

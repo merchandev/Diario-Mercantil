@@ -232,12 +232,12 @@ export default function PublicarDocumento() {
                   </svg>
                 </div>
               </div>
-              <input className="input" placeholder="Tomo / Letra" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value })} />
-              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value })} />
+              <input className="input" placeholder="Tomo" maxLength={3} pattern="^\d{1,3}$" title="Debe ingresar hasta 3 números" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.replace(/\D/g, '') })} />
+              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '') })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
-              <input className="input" placeholder="Número de expediente" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value })} />
-              <input className="input" type="date" placeholder="Fecha" value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
-              <input className="input" placeholder="Número de planilla" value={f1.planilla} onChange={e => setF1({ ...f1, planilla: e.target.value })} />
+              <input className="input" placeholder="Número de expediente" maxLength={12} pattern="^\d{3}-\d{1,8}$" title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
+              <input className="input" type="date" placeholder="Fecha" max={new Date().toISOString().split('T')[0]} value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
+              <input className="input" placeholder="Número de planilla" maxLength={17} pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" title="Formato: 000.0000.0.000000" value={f1.planilla} onChange={e => setF1({ ...f1, planilla: e.target.value.toUpperCase() })} />
             </div>
             <div className="bg-slate-50 border rounded p-3 text-sm">
               <div className="flex items-center justify-between">

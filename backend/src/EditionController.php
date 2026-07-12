@@ -46,8 +46,7 @@ class EditionController {
 
   public function publicByCode($code){
     $pdo = Database::pdo();
-    // Allow matching exact or by date suffix (e.g. 28022026 matches dm328022026)
-    $ed = $pdo->prepare('SELECT * FROM editions WHERE code=? OR code LIKE ? ORDER BY id DESC LIMIT 1');
+    $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' ORDER BY id DESC LIMIT 1");
     $ed->execute([$code, '%'.$code]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
@@ -59,7 +58,7 @@ class EditionController {
 
   public function downloadById($id){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT * FROM editions WHERE id=?');
+    $ed = $pdo->prepare("SELECT * FROM editions WHERE id=? AND status='Publicada'");
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) { http_response_code(404); echo 'Not found'; return; }
@@ -91,7 +90,7 @@ class EditionController {
 
   public function downloadByCode($code){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT id FROM editions WHERE code=?');
+    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada'");
     $ed->execute([$code]);
     $id = (int)($ed->fetchColumn() ?: 0);
     if (!$id) { http_response_code(404); echo 'Not found'; return; }
@@ -202,7 +201,7 @@ class EditionController {
     if (!is_array($ids)) $ids = [];
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
-    $ins = $pdo->prepare('INSERT OR IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
+    $ins = $pdo->prepare('INSERT IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
     foreach ($ids as $oid) { $ins->execute([$id,(int)$oid]); }
     // Do NOT mark orders as Publicada here; only mark them when the edition is formally published
     $cnt = (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE edition_id='.(int)$id)->fetchColumn();
@@ -227,7 +226,7 @@ class EditionController {
     
     $pdo->beginTransaction();
     $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
-    $ins = $pdo->prepare('INSERT OR IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
+    $ins = $pdo->prepare('INSERT IGNORE INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
     foreach ($orderIds as $oid) { $ins->execute([$id, $oid]); }
     $cnt = count($orderIds);
     $pdo->prepare('UPDATE editions SET orders_count=? WHERE id=?')->execute([$cnt, $id]);
@@ -242,24 +241,55 @@ class EditionController {
     
     $pdo->beginTransaction();
     try {
-        // 1. Get the edition date (do NOT overwrite it with today)
-        $edStmt = $pdo->prepare('SELECT date FROM editions WHERE id=?');
+        // Validación 1: Debe estar en Borrador
+        $edStmt = $pdo->prepare('SELECT date, status, file_id, orders_count FROM editions WHERE id=? FOR UPDATE');
         $edStmt->execute([$id]);
-        $editionDate = $edStmt->fetchColumn() ?: $now;
+        $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
         
-        // 2. Update Edition Status to Publicada (keep existing date)
-        $pdo->prepare("UPDATE editions SET status='Publicada' WHERE id=?")->execute([$id]);
+        if (!$edition || $edition['status'] !== 'Borrador') {
+            throw new Exception("La edición debe estar en estado Borrador para ser publicada.");
+        }
         
-        // 3. Update all associated Legal Requests: status='Publicada' AND publish_date=edition date
+        // Validación 2: Debe tener PDF
+        if (empty($edition['file_id'])) {
+            throw new Exception("Debe subir el PDF definitivo antes de publicar la edición.");
+        }
+
+        // Validación 3: Debe tener al menos una orden
+        if ((int)$edition['orders_count'] <= 0) {
+            throw new Exception("La edición debe tener al menos una solicitud asociada.");
+        }
+
+        $editionDate = $edition['date'] ?: $now;
+        
+        // Validación 4: Fecha debe ser mayor a la última edición publicada
+        $lastEdStmt = $pdo->query("SELECT MAX(date) FROM editions WHERE status='Publicada'");
+        $lastEdDate = $lastEdStmt->fetchColumn();
+        if ($lastEdDate && $editionDate <= $lastEdDate) {
+            throw new Exception("La fecha de esta edición ($editionDate) debe ser posterior a la última edición publicada ($lastEdDate).");
+        }
+        
+        // Obtener órdenes
         $stmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
         $stmt->execute([$id]);
         $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
         
         if ($orderIds) {
+            // Validación 5: Todas las órdenes deben estar En trámite
             $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
+            $statusStmt = $pdo->prepare("SELECT COUNT(*) FROM legal_requests WHERE id IN ($inQuery) AND status != 'En trámite'");
+            $statusStmt->execute($orderIds);
+            if ((int)$statusStmt->fetchColumn() > 0) {
+                throw new Exception("Todas las solicitudes seleccionadas deben estar 'En trámite'.");
+            }
+            
+            // Actualizar órdenes
             $params = array_merge([$editionDate], $orderIds);
             $pdo->prepare("UPDATE legal_requests SET status='Publicada', publish_date=? WHERE id IN ($inQuery)")->execute($params);
         }
+        
+        // Actualizar edición
+        $pdo->prepare("UPDATE editions SET status='Publicada' WHERE id=?")->execute([$id]);
         
         $pdo->commit();
         Response::json(['ok'=>true]);

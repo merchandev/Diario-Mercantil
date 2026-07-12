@@ -41,9 +41,34 @@ class PublicationService {
     public function createLegalRequest(array $userData, int $folios, ?int $existingRequestId = null): int {
         $now = gmdate('c');
         if ($existingRequestId > 0) {
-            $this->pdo->prepare("UPDATE legal_requests SET folios=? WHERE id=?")->execute([$folios, $existingRequestId]);
-            $this->pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind='document_pdf'")->execute([$existingRequestId]);
-            return $existingRequestId;
+            $this->pdo->beginTransaction();
+            try {
+                $role = strtolower($userData['role'] ?? '');
+                $isAdmin = in_array($role, ['admin','staff','manager']);
+                
+                $sql = "UPDATE legal_requests SET folios=?, updated_at=? WHERE id=?";
+                $params = [$folios, $now, $existingRequestId];
+                
+                if (!$isAdmin) {
+                    $sql .= " AND user_id=?";
+                    $params[] = $userData['id'];
+                }
+                
+                $stmt = $this->pdo->prepare($sql);
+                $stmt->execute($params);
+                
+                if ($stmt->rowCount() === 0) {
+                    throw new Exception("Solicitud no encontrada o acceso denegado");
+                }
+                
+                $this->pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind='document_pdf'")->execute([$existingRequestId]);
+                
+                $this->pdo->commit();
+                return $existingRequestId;
+            } catch (Exception $e) {
+                $this->pdo->rollBack();
+                throw $e;
+            }
         }
         
         $stmt = $this->pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");

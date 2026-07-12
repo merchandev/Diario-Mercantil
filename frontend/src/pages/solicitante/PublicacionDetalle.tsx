@@ -5,6 +5,7 @@ import ProtectedPdfViewer from '../../components/ProtectedPdfViewer'
 import { IconArrowLeft, IconDownload, IconCheck } from '../../components/icons'
 import QRCode from 'qrcode.react'
 import AlertDialog from '../../components/AlertDialog'
+import LegalRequestDetails from '../../components/LegalRequestDetails'
 
 export default function PublicacionDetalleSolicitante() {
   const { id } = useParams<{ id: string }>()
@@ -117,145 +118,7 @@ export default function PublicacionDetalleSolicitante() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Columna principal */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Información básica */}
-          <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4 text-brand-800">Información de la Orden</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">N° de Orden</label>
-                <div className="font-mono font-semibold text-brand-700">{req.order_no || String(req.id).padStart(8, '0')}</div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">Estado</label>
-                <span className={`pill ${req.status === 'Publicada' ? 'bg-green-100 text-green-700' :
-                  req.status === 'En trámite' ? 'bg-blue-100 text-blue-700' :
-                    req.status === 'Por verificar' ? 'bg-yellow-100 text-yellow-700' :
-                      req.status === 'Rechazado' ? 'bg-red-100 text-red-700' :
-                        'bg-slate-100 text-slate-700'
-                  }`}>
-                  {req.status}
-                </span>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">Fecha de Solicitud</label>
-                <div className="font-medium">{fechaSolicitud}</div>
-              </div>
-              {/* Only show publish_date when actually published */}
-              {isPublicada && req.publish_date && (
-                <div>
-                  <label className="block text-sm text-slate-600 mb-1">Fecha de Publicación</label>
-                  <div className="font-medium">{req.publish_date}</div>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">Tipo de Publicación</label>
-                <div className="font-medium">{req.pub_type || 'Documento'}</div>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 mb-1">N° de Folios</label>
-                <div className="font-medium">{req.folios || 1}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Datos Registrales del Documento (obs. 5 & 6) */}
-          {Object.keys(meta).length > 0 && (
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold mb-4 text-brand-800">Datos Registrales del Documento</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {meta.tipo_sociedad && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tipo de Sociedad</label>
-                    <div className="font-medium">{meta.tipo_sociedad}</div>
-                  </div>
-                )}
-                {meta.tipo_acto && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tipo de Acto Inscrito</label>
-                    <div className="font-medium">{meta.tipo_acto}</div>
-                  </div>
-                )}
-                {meta.tipo_convocatoria && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tipo de Convocatoria</label>
-                    <div className="font-medium">{meta.tipo_convocatoria}</div>
-                  </div>
-                )}
-                {(meta.razon_denominacion_social || meta.razon_social) && (
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm text-slate-600 mb-1">Razón / Denominación Social</label>
-                    <div className="font-medium">{meta.razon_denominacion_social || meta.razon_social}</div>
-                  </div>
-                )}
-                {meta.estado && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Estado</label>
-                    <div className="font-medium">{meta.estado}</div>
-                  </div>
-                )}
-                {meta.oficina && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Oficina de Registro Mercantil</label>
-                    <div className="font-medium">{meta.oficina}</div>
-                  </div>
-                )}
-                {meta.registrador && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Nombre del Registrador(a)</label>
-                    <div className="font-medium">{meta.registrador}</div>
-                  </div>
-                )}
-                {meta.tipo_registrador && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tipo de Registrador(a)</label>
-                    <div className="font-medium">{meta.tipo_registrador}</div>
-                  </div>
-                )}
-                {meta.tomo && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Tomo</label>
-                    <div className="font-medium">{meta.tomo}</div>
-                  </div>
-                )}
-                {meta.letra && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Letra</label>
-                    <div className="font-medium">{meta.letra}</div>
-                  </div>
-                )}
-                {meta.numero && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Número</label>
-                    <div className="font-medium">{meta.numero}</div>
-                  </div>
-                )}
-                {meta.año && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Año</label>
-                    <div className="font-medium">{meta.año}</div>
-                  </div>
-                )}
-                {meta.expediente && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Número de Expediente</label>
-                    <div className="font-medium">{meta.expediente}</div>
-                  </div>
-                )}
-                {meta.fecha_registro && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Fecha del Registro</label>
-                    <div className="font-medium">{meta.fecha_registro}</div>
-                  </div>
-                )}
-                {meta.planilla && (
-                  <div>
-                    <label className="block text-sm text-slate-600 mb-1">Número de Planilla</label>
-                    <div className="font-medium">{meta.planilla}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <LegalRequestDetails item={req} meta={meta} />
 
           {/* Historial de pagos (obs. 8 — added phone column) */}
           <div className="card p-6">
@@ -283,7 +146,7 @@ export default function PublicacionDetalleSolicitante() {
                           <td className="py-2 font-mono text-xs">{p.ref || '-'}</td>
                           <td className="py-2">{p.type}</td>
                           <td className="py-2">{p.bank || '-'}</td>
-                          <td className="py-2">{(p as any).phone || '-'}</td>
+                          <td className="py-2">{(p as any).mobile_phone || '-'}</td>
                           <td className="py-2">{p.date}</td>
                           <td className="py-2 text-right font-semibold">{Number(p.amount_bs || 0).toFixed(2)}</td>
                           <td className="py-2 text-center">

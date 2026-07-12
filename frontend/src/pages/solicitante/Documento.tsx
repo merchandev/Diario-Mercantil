@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken, listPayments, type PaymentMethod } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken, listPayments, type PaymentMethod, submitLegal } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 
@@ -819,8 +819,7 @@ export default function Documento() {
         phone: pay.phone,
         email: pay.email,
         address: pay.address,
-        folios: pdfAnalysis.folios,
-        status: 'Por verificar'
+        folios: pdfAnalysis.folios
       })
       await addLegalPayment(req.id, {
         type: pay.type === 'pago_movil' ? 'Pago móvil' : 'Transferencia',
@@ -831,6 +830,7 @@ export default function Documento() {
         status: 'Por verificar',
         mobile_phone: pay.type === 'pago_movil' ? pay.mobile_phone : undefined
       })
+      await submitLegal(req.id)
       setLoading(false)
       setAlertDialog({ isOpen: true, title: 'Éxito', message: '¡Solicitud enviada exitosamente! Su documento será verificado y publicado en la próxima edición.', variant: 'success' })
       // Redirigir a Mis Publicaciones
@@ -999,7 +999,11 @@ export default function Documento() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente *</span>
-            <input className="input w-full" placeholder="391-456987" value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
+            <input className="input w-full" placeholder="391-456987" 
+                   maxLength={12} 
+                   pattern="^\d{3}-\d{1,8}$" 
+                   title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" 
+                   value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
             <p className="text-[10px] text-brand-600 mt-1">Debe permitir solo números. La nomenclatura es 3 dígitos seguido de un guion y luego permitir hasta 8 dígitos</p>
           </label>
           <label className="block">
@@ -1015,7 +1019,11 @@ export default function Documento() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla **</span>
-            <input className="input w-full" placeholder="391.2024.4.4388" value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: e.target.value.toUpperCase() })} />
+            <input className="input w-full" placeholder="391.2024.4.4388" 
+                   maxLength={17} 
+                   pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" 
+                   title="Formato: 000.0000.0.000000" 
+                   value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: e.target.value.toUpperCase() })} />
             <p className="text-[10px] text-brand-600 mt-1">** Debe admitir solo números. La nomenclatura es 3 dígitos seguido de un punto, 4 dígitos, punto, 1 dígito, punto y luego permitir hasta 6 dígitos</p>
           </label>
           <div className="md:col-span-2 flex gap-3 pt-4">
