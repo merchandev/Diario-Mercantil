@@ -2,6 +2,9 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/AuthController.php';
+require_once __DIR__.'/Services/BcvService.php';
+require_once __DIR__.'/Services/PublicationService.php';
+require_once __DIR__.'/Services/PdfGenerationService.php';
 
 class LegalController {
   
@@ -51,57 +54,20 @@ class LegalController {
     // Check if we should attach to existing draft
     $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
     
-    if ($reqId > 0) {
-        // Update existing request
-        $pdo->prepare("UPDATE legal_requests SET folios=? WHERE id=?")->execute([$folios, $reqId]);
-        
-        // Remove previous document_pdf files to ensure only one exists
-        $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind='document_pdf'")->execute([$reqId]);
-    } else {
-        // Crear solicitud nueva (fallback)
-        $stmt = $pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");
-        $stmt->execute(['Borrador',$u['name'],$u['document'],gmdate('Y-m-d'),$folios,'Documento', $u['id'], $now]);
-        $reqId = (int)$pdo->lastInsertId();
-    }
-
-    $pdo->prepare('INSERT INTO legal_files(legal_request_id,kind,file_id,created_at) VALUES(?,?,?,?)')
-        ->execute([$reqId,'document_pdf',$fileId,$now]);
-
-    // Get live BCV rate from settings
-    $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
-    $stmt->execute(['bcv_rate']);
-    $bcvRaw = $stmt->fetchColumn();
-    $bcv = is_numeric($bcvRaw) ? (float)$bcvRaw : 370.0; // fallback if not found
+    $bcvService = new BcvService($pdo);
+    $publicationService = new PublicationService($pdo, $bcvService);
     
-    // Get Price Per Folio
-    $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
-    $stmt->execute(['price_per_folio_usd']);
-    $priceRaw = $stmt->fetchColumn();
-    $pricePerFolioUsd = is_numeric($priceRaw) ? (float)$priceRaw : 1.5; // fallback
+    $reqId = $publicationService->createLegalRequest($u, $folios, $reqId);
+    $publicationService->attachFileToRequest($reqId, $fileId);
     
-    // $pricePerFolioUsd = 1.5; // Removed hardcoded val
-    $ivaPercent = 16;
-    
-    // Calculate pricing: (folios × $1.5 × bcv_rate) + IVA
-    $priceUsd = $folios * $pricePerFolioUsd;
-    $subtotalBs = round($priceUsd * $bcv, 2);
-    $ivaBs = round($subtotalBs * ($ivaPercent / 100), 2);
-    $totalBs = round($subtotalBs + $ivaBs, 2);
+    $pricing = $publicationService->calculatePricing($folios);
       
     return Response::json([
         'ok'=>true, 
         'id'=>$reqId, 
         'file_id'=>$fileId, 
         'folios'=>$folios,
-        'pricing'=>[
-            'price_per_folio_usd' => $pricePerFolioUsd,
-            'price_usd' => $priceUsd,
-            'bcv_rate' => $bcv,
-            'subtotal_bs' => $subtotalBs,
-            'iva_percent' => $ivaPercent,
-            'iva_bs' => $ivaBs,
-            'total_bs' => $totalBs
-        ]
+        'pricing'=>$pricing
     ]);
   }
 
@@ -326,101 +292,11 @@ class LegalController {
       $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
       $pay = $p->fetchAll(PDO::FETCH_ASSOC);
       
-      require_once __DIR__.'/OrderPdf.php';
+      $bcvService = new BcvService($pdo);
+      $publicationService = new PublicationService($pdo, $bcvService);
+      $pdfGenerationService = new PdfGenerationService($pdo, $bcvService, $publicationService);
       
-      $pdf = new OrderPdf();
-      $pdf->AliasNbPages();
-      $pdf->orderInfo = $r;
-      $pdf->AddPage();
-      
-      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
-      $stmt->execute(['price_per_folio_usd']);
-      $pricePerFolio = (float)$stmt->fetchColumn() ?: 1.5;
-
-      // Get BCV Rate
-      $stmt = $pdo->prepare('SELECT value FROM settings WHERE `key`=?');
-      $stmt->execute(['bcv_rate']);
-      $bcv = (float)$stmt->fetchColumn() ?: 0.0;
-
-      $totalUsd = $r['folios'] * $pricePerFolio;
-      $subtotalBs = $totalUsd * $bcv;
-
-      $clientData = [
-          'Cliente:' => $r['name'],
-          'Documento:' => $r['document'],
-          'Email:' => $r['email'] ?? '---',
-          'Telefono:' => $r['phone'] ?? '---'
-      ];
-      
-      $orderDetails = [
-          'Estado:' => $r['status'],
-          'Tipo:' => $r['pub_type'] ?? 'Documento',
-          'Folios:' => $r['folios'],
-          'Tasa BCV:' => number_format($bcv, 2)
-      ];
-
-      $pdf->InfoSection($clientData, $orderDetails);
-      
-      // Totals section (moved from bottom of order details to here or after table?)
-      // Use clean layout.
-
-      
-      $totalUsd = $r['folios'] * $pricePerFolio;
-      $subtotalBs = $totalUsd * $bcv;
-      $ivaBs = $subtotalBs * 0.16;
-      $totalBs = $subtotalBs + $ivaBs;
-
-      
-      $pdf->SetFont('Arial', 'B', 10);
-      $pdf->Cell(50, 6, 'Total Estimado (Bs):', 0, 0);
-      $pdf->SetTextColor(143, 25, 32); // Brand color
-      $pdf->Cell(0, 6, number_format($totalBs, 2).' Bs', 0, 1);
-      $pdf->SetTextColor(0); // Reset
-      $pdf->Ln(5);
-
-      // -- PAGOS REGISTRADOS --
-      $pdf->SectionHeader('PAGOS REGISTRADOS');
-      
-      // Table Header
-      $pdf->SetFont('Arial', 'B', 9);
-      $pdf->SetTextColor(143, 25, 32); // Brand color for headers
-      // $pdf->SetFillColor(220, 220, 220); // Removed fill
-      $pdf->Cell(30, 8, 'Fecha', 'B', 0, 'C', false);
-      $pdf->Cell(40, 8, 'Referencia', 'B', 0, 'C', false);
-      $pdf->Cell(40, 8, 'Banco', 'B', 0, 'C', false);
-      $pdf->Cell(30, 8, 'Monto (Bs)', 'B', 0, 'C', false);
-      $pdf->Cell(30, 8, 'Estado', 'B', 1, 'C', false);
-      
-      $pdf->SetFont('Arial', '', 9);
-      $pdf->SetTextColor(0);
-      $totalPaid = 0;
-      
-      foreach($pay as $py) {
-        $amount = isset($py['amount_bs']) ? (float)$py['amount_bs'] : 0.0;
-        if($py['status'] == 'Aprobado') $totalPaid += $amount;
-        
-        $pdf->Cell(30, 8, substr($py['date'], 0, 10), 'B', 0, 'C');
-        $pdf->Cell(40, 8, $py['ref'], 'B', 0, 'C');
-        $pdf->Cell(40, 8, $py['bank'], 'B', 0, 'C');
-        $pdf->Cell(30, 8, number_format($amount, 2), 'B', 0, 'R');
-        $pdf->Cell(30, 8, $py['status'], 'B', 1, 'C');
-      }
-      
-      if(empty($pay)) {
-          $pdf->Cell(170, 7, 'No hay pagos registrados', 1, 1, 'C');
-      }
-      
-      $pdf->Ln(2);
-      $pdf->SetFont('Arial', 'B', 10);
-      $pdf->Cell(110, 7, '', 0, 0);
-      $pdf->Cell(30, 7, 'Total Pagado:', 0, 0, 'R');
-      $pdf->Cell(30, 7, number_format($totalPaid, 2).' Bs', 0, 1, 'R');
-
-      $pdf->Ln(15);
-      $pdf->SetFont('Arial', '', 10);
-      $pdf->SetTextColor(100, 100, 100);
-      $pdf->Cell(0, 5, 'Fecha de Emision: ' . ($r['date'] ?? date('Y-m-d')), 0, 1, 'R');
-      $output = $pdf->Output('S');
+      $output = $pdfGenerationService->generateOrderPdf($r, $pay);
       
       // Clean previous output to prevent PDF corruption
       // if (ob_get_length()) ob_end_clean();

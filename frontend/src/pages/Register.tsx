@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone, IconMap } from '../components/icons'
 import { ESTADOS_VENEZUELA, MUNICIPIOS_VENEZUELA } from '../lib/constants'
+import { useAuth } from '../hooks/useAuth'
 
 export default function Register() {
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
   const [formData, setFormData] = useState({
     document: '',
     name: '',
@@ -87,6 +89,12 @@ export default function Register() {
       // Auto-login después de registro exitoso
       if (data.token) {
         localStorage.setItem('token', data.token)
+        if (data.user) {
+          localStorage.setItem('user_name', data.user.name || '')
+          localStorage.setItem('user_role', data.user.role || '')
+          localStorage.setItem('user_doc', data.user.document || '')
+        }
+        await refreshUser()
         navigate('/solicitante/historial')
       } else {
         // Si no retorna token, redirigir a login
