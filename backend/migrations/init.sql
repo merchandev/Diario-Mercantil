@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS files (
   version INT DEFAULT 1,
   status VARCHAR(50) NOT NULL,
   owner VARCHAR(255),
+  deleted_at DATETIME,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL
 );
@@ -35,7 +36,11 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(50),
   email VARCHAR(255),
   person_type VARCHAR(50) DEFAULT 'natural',
+  state VARCHAR(100),
+  municipality VARCHAR(100),
+  address TEXT,
   avatar_url VARCHAR(255),
+  avatar_updated_at DATETIME,
   status VARCHAR(50) DEFAULT 'active',
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL
@@ -79,10 +84,18 @@ CREATE TABLE IF NOT EXISTS legal_requests (
   user_id INT,
   pub_type VARCHAR(50) DEFAULT 'Documento',
   meta TEXT,
+  precio_unitario_usd DECIMAL(15,4),
+  subtotal_usd DECIMAL(15,4),
+  porcentaje_iva DECIMAL(5,2),
+  iva_usd DECIMAL(15,4),
+  tasa_bcv DECIMAL(15,4),
+  fecha_tasa DATETIME,
+  total_bs DECIMAL(15,2),
   deleted_at DATETIME,
   created_at DATETIME NOT NULL,
   submitted_at DATETIME NULL,
   verification_date DATETIME NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
   UNIQUE KEY uq_legal_order_no (order_no)
 );
 
@@ -185,10 +198,8 @@ CREATE TABLE IF NOT EXISTS pages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   slug VARCHAR(255) NOT NULL UNIQUE,
   title VARCHAR(255) NOT NULL,
-  header_html TEXT,
-  body_json LONGTEXT,
-  footer_html TEXT,
-  status VARCHAR(50) NOT NULL DEFAULT 'published',
+  content LONGTEXT,
+  published TINYINT(1) DEFAULT 1,
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL
 );

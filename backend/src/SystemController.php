@@ -91,8 +91,8 @@ class SystemController {
         $in = $this->json();
         $pdo = Database::pdo();
         foreach($in as $k=>$v){
-            $pdo->prepare("INSERT INTO settings(`key`, `value`) VALUES(?,?) ON DUPLICATE KEY UPDATE `value`=?")
-                ->execute([$k, $v, $v]);
+            $pdo->prepare('INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, NOW()) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()')
+                ->execute([$k, $v]);
         }
         Response::json(["ok"=>true]);
     }

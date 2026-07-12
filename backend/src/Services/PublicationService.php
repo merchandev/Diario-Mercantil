@@ -14,13 +14,23 @@ class PublicationService {
         $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key`=?');
         $stmt->execute(['price_per_folio_usd']);
         $priceRaw = $stmt->fetchColumn();
-        return is_numeric($priceRaw) ? (float)$priceRaw : 1.5;
+        if (!is_numeric($priceRaw) || (float)$priceRaw <= 0) {
+            throw new Exception("El precio por folio no está configurado en el sistema.");
+        }
+        return (float)$priceRaw;
     }
     
     public function calculatePricing(int $folios): array {
         $pricePerFolioUsd = $this->getPricePerFolio();
         $bcv = $this->bcvService->getRate();
-        $ivaPercent = 16.0;
+        
+        $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key`=?');
+        $stmt->execute(['iva_percent']);
+        $ivaRaw = $stmt->fetchColumn();
+        if (!is_numeric($ivaRaw) || (float)$ivaRaw < 0) {
+            throw new Exception("El porcentaje de IVA no está configurado en el sistema.");
+        }
+        $ivaPercent = (float)$ivaRaw;
         
         $priceUsd = $folios * $pricePerFolioUsd;
         $subtotalBs = round($priceUsd * $bcv, 2);
@@ -46,8 +56,10 @@ class PublicationService {
                 $role = strtolower($userData['role'] ?? '');
                 $isAdmin = in_array($role, ['admin','staff','manager']);
                 
-                $sql = "UPDATE legal_requests SET folios=?, updated_at=? WHERE id=? AND status='Borrador'";
-                $params = [$folios, $now, $existingRequestId];
+                $price = $this->calculatePricing($folios);
+                
+                $sql = "UPDATE legal_requests SET folios=?, precio_unitario_usd=?, subtotal_usd=?, porcentaje_iva=?, iva_usd=?, tasa_bcv=?, fecha_tasa=?, total_bs=?, updated_at=? WHERE id=? AND status='Borrador'";
+                $params = [$folios, $price['price_per_folio_usd'], $price['price_usd'], $price['iva_percent'], $price['iva_bs'] / $price['bcv_rate'], $price['bcv_rate'], $now, $price['total_bs'], $now, $existingRequestId];
                 
                 if (!$isAdmin) {
                     $sql .= " AND user_id=?";
@@ -71,8 +83,9 @@ class PublicationService {
             }
         }
         
-        $stmt = $this->pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,created_at) VALUES(?,?,?,?,?,?,?,?)");
-        $stmt->execute(['Borrador', $userData['name'], $userData['document'], gmdate('Y-m-d'), $folios, 'Documento', $userData['id'], $now]);
+        $price = $this->calculatePricing($folios);
+        $stmt = $this->pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,precio_unitario_usd,subtotal_usd,porcentaje_iva,iva_usd,tasa_bcv,fecha_tasa,total_bs,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+        $stmt->execute(['Borrador', $userData['name'], $userData['document'], gmdate('Y-m-d'), $folios, 'Documento', $userData['id'], $price['price_per_folio_usd'], $price['price_usd'], $price['iva_percent'], $price['iva_bs'] / $price['bcv_rate'], $price['bcv_rate'], $now, $price['total_bs'], $now]);
         return (int)$this->pdo->lastInsertId();
     }
     
