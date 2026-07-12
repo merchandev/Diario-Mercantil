@@ -6,8 +6,17 @@ require_once __DIR__."/AuthController.php";
 class SystemController {
     private function json(){ return json_decode(file_get_contents("php://input"), true) ?: []; }
 
+    private function requireAdmin() {
+        $u = AuthController::requireAuth();
+        if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+            Response::json(["error"=>"forbidden", "details"=>"No autorizado"], 403);
+            exit;
+        }
+        return $u;
+    }
+
     public function getStats(){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $pdo = Database::pdo();
         
         $stats = [
@@ -78,7 +87,7 @@ class SystemController {
     }
     
     public function saveSettings(){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $in = $this->json();
         $pdo = Database::pdo();
         foreach($in as $k=>$v){
@@ -127,14 +136,14 @@ class SystemController {
 
     // --- ADMIN PAGES (Publications) ---
     public function listPages(){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $pdo = Database::pdo();
         $stmt = $pdo->query("SELECT * FROM pages ORDER BY created_at DESC");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 
     public function createPage(){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $in = $this->json();
         $pdo = Database::pdo();
         
@@ -161,7 +170,7 @@ class SystemController {
     }
 
     public function updatePage($id){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $in = $this->json();
         $pdo = Database::pdo();
 
@@ -185,7 +194,7 @@ class SystemController {
     }
 
     public function deletePage($id){
-        AuthController::requireAuth();
+        $this->requireAdmin();
         $pdo = Database::pdo();
         $pdo->prepare("DELETE FROM pages WHERE id=?")->execute([$id]);
         Response::json(['ok'=>true]);

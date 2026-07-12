@@ -101,9 +101,9 @@ class LegalController {
   // == CRUD Methods que faltaban ==
 
   public function list(){
+    $u = AuthController::requireAuth();
     $pdo = Database::pdo();
-    $u = AuthController::userFromToken(AuthController::bearerToken());
-    $uid = $u ? (int)$u['id'] : null;
+    $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
     $sql = "SELECT * FROM legal_requests WHERE deleted_at IS NULL";
@@ -132,13 +132,13 @@ class LegalController {
 
     $req_from = $_GET['req_from'] ?? '';
     if ($req_from !== '') {
-        $sql .= " AND DATE(created_at) >= ?";
+        $sql .= " AND DATE(submitted_at) >= ?";
         $params[] = $req_from;
     }
 
     $req_to = $_GET['req_to'] ?? '';
     if ($req_to !== '') {
-        $sql .= " AND DATE(created_at) <= ?";
+        $sql .= " AND DATE(submitted_at) <= ?";
         $params[] = $req_to;
     }
 
@@ -184,8 +184,8 @@ class LegalController {
       $u = AuthController::requireAuth();
       $pdo = Database::pdo();
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
-      // Default to 'Por verificar' regardless of input
-      $status = 'Por verificar';
+      // Default to 'Borrador' always
+      $status = 'Borrador';
       $uid = (int)$u['id'];
       $now = gmdate('c');
       
@@ -268,19 +268,14 @@ class LegalController {
      $this->checkAccess($id, $u);
      $pdo = Database::pdo();
      
-     $s = $pdo->prepare('SELECT status, created_at FROM legal_requests WHERE id=?'); $s->execute([$id]);
-     $req = $s->fetch(PDO::FETCH_ASSOC);
-     if (!$req) return Response::json(['error'=>'Not found'], 404);
-     if ($req['status'] !== 'Borrador' && $req['status'] !== 'Rechazado') {
-         return Response::json(['error'=>'La solicitud ya fue formalizada anteriormente.'], 400);
+     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
+     $machine = new LegalRequestStateMachine($pdo);
+     try {
+         $orderNo = $machine->submit($id);
+         Response::json(['ok'=>true, 'order_no' => $orderNo]);
+     } catch (Exception $e) {
+         Response::json(['error'=>$e->getMessage()], 400);
      }
-     
-     $now = gmdate('Y-m-d H:i:s');
-     $year = substr($req['created_at'], 0, 4) ?: gmdate('Y');
-     $orderNo = "ORD-{$year}-" . str_pad($id, 6, "0", STR_PAD_LEFT);
-     
-     $pdo->prepare("UPDATE legal_requests SET status='Por verificar', submitted_at=?, order_no=? WHERE id=?")->execute([$now, $orderNo, $id]);
-     Response::json(['ok'=>true, 'order_no' => $orderNo]);
   }
 
   public function verify($id){
@@ -288,14 +283,14 @@ class LegalController {
      $this->requireAdmin($u);
      $pdo = Database::pdo();
      
-     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
-     if ($s->fetchColumn() !== 'Por verificar') {
-         return Response::json(['error'=>'La solicitud no está en estado Por verificar.'], 400);
+     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
+     $machine = new LegalRequestStateMachine($pdo);
+     try {
+         $machine->verify($id);
+         Response::json(['ok'=>true]);
+     } catch (Exception $e) {
+         Response::json(['error'=>$e->getMessage()], 400);
      }
-     
-     $now = gmdate('Y-m-d H:i:s');
-     $pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")->execute([$now, $id]);
-     Response::json(['ok'=>true]);
   }
 
   public function returnToDraft($id){
@@ -303,9 +298,14 @@ class LegalController {
      $this->requireAdmin($u);
      $pdo = Database::pdo();
      
-     $pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")
-         ->execute(['Devuelto a borrador por administrador.', $id]);
-     Response::json(['ok'=>true]);
+     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
+     $machine = new LegalRequestStateMachine($pdo);
+     try {
+         $machine->returnToDraft($id);
+         Response::json(['ok'=>true]);
+     } catch (Exception $e) {
+         Response::json(['error'=>$e->getMessage()], 400);
+     }
   }
 
   public function reject($id){
@@ -313,8 +313,15 @@ class LegalController {
      $this->requireAdmin($u);
      $pdo = Database::pdo();
      $in = json_decode(file_get_contents('php://input'), true) ?: [];
-     $pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")->execute([$in['reason']??'',$id]);
-     Response::json(['ok'=>true]);
+     
+     require_once __DIR__.'/Services/LegalRequestStateMachine.php';
+     $machine = new LegalRequestStateMachine($pdo);
+     try {
+         $machine->reject($id, $in['reason']??'');
+         Response::json(['ok'=>true]);
+     } catch (Exception $e) {
+         Response::json(['error'=>$e->getMessage()], 400);
+     }
   }
 
   // == Trash & Actions ==
@@ -374,7 +381,7 @@ class LegalController {
       }
 
       $pdo = Database::pdo();
-      $status = isset($in['status']) ? $in['status'] : 'Pendiente';
+      $status = 'Pendiente'; // El cliente no dicta el estado
       $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
       $pdo->prepare('INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone,created_at) VALUES(?,?,?,?,?,?,?,?,NOW())')
           ->execute([$id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $in['amount_bs'], $status, $mobile_phone]);
@@ -384,7 +391,7 @@ class LegalController {
   public function deletePayment($id,$pid){
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
-      Database::pdo()->prepare('DELETE FROM legal_payments WHERE id=?')->execute([$pid]);
+      Database::pdo()->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
       Response::json(['ok'=>true]);
   }
 

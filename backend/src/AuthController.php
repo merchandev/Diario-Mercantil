@@ -77,7 +77,7 @@ class AuthController {
             $token = trim($h);
         }
     } else {
-        $token = $_GET["token"] ?? null;
+        $token = null; // Tokens in URL disabled for security
     }
     
     // Safety check for "null" string literal coming from buggy clients
@@ -92,14 +92,7 @@ class AuthController {
     $token = self::bearerToken();
     if (!$token) { 
         http_response_code(401); 
-        $debug = ["msg"=>"Header missing and no query param"];
-        if (function_exists("getallheaders")) { 
-            $h = getallheaders();
-            $debug["headers"] = array_keys($h);
-            $debug["auth_header_value"] = $h["Authorization"] ?? $h["authorization"] ?? null; 
-        }
-        $debug["server_keys"] = array_keys($_SERVER);
-        echo json_encode(["error"=>"unauthorized_no_token_found", "debug"=>$debug]); 
+        echo json_encode(["error"=>"unauthorized", "message"=>"Sesión inválida o vencida"]); 
         exit; 
     }
     
@@ -150,7 +143,7 @@ class AuthController {
 
     // If neither
     http_response_code(401); 
-    echo json_encode(["error"=>"unauthorized_invalid_token", "received_token_preview" => substr($token,0,5)."..."]);
+    echo json_encode(["error"=>"unauthorized", "message"=>"Sesión inválida o vencida"]);
     exit;
   }
   
@@ -174,11 +167,6 @@ class AuthController {
         
         // Rate limiting: Simple implementation using filesystem
         $this->checkRateLimit($doc);
-        
-        // ADMIN OVERRIDE: Prevent conflicts. "merchandev" is always "merchandev" regardless of prefix (V, E, J...)
-        if (stripos($doc, 'merchandev') !== false) {
-            $doc = 'merchandev';
-        }
         
         // Try multiple document formats for flexible login
         $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active'");
@@ -246,7 +234,15 @@ class AuthController {
     ]]);
   }
 
-  public function logout(){ Response::json(["ok"=>true]); }
+  public function logout(){ 
+      $token = self::bearerToken();
+      if ($token) {
+          $pdo = Database::pdo();
+          $pdo->prepare("DELETE FROM auth_tokens WHERE token=?")->execute([$token]);
+          $pdo->prepare("DELETE FROM superadmin_tokens WHERE token=?")->execute([$token]);
+      }
+      Response::json(["ok"=>true]); 
+  }
   
   public function register(){
     try {

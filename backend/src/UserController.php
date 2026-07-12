@@ -7,7 +7,10 @@ class UserController {
   private function json(){ $raw = file_get_contents("php://input"); return json_decode($raw, true) ?: []; }
 
   public function list(){
-    AuthController::requireAuth(); 
+    $u = AuthController::requireAuth(); 
+    if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+        Response::json(["error"=>"forbidden", "details"=>"No autorizado"], 403);
+    }
     $pdo = Database::pdo();
     $q = trim($_GET["q"] ?? "");
     $sql = "SELECT id, document, name, role, email, phone, status, person_type FROM users";

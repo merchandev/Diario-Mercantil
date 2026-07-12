@@ -4,7 +4,18 @@ require_once __DIR__.'/Database.php';
 require_once __DIR__.'/UploadController.php';
 
 class FileController {
+  private function requireAdmin() {
+      require_once __DIR__.'/AuthController.php';
+      $u = AuthController::requireAuth();
+      if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+          Response::json(["error"=>"forbidden", "details"=>"No autorizado"], 403);
+          exit;
+      }
+      return $u;
+  }
+
   public function list() {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $q = $_GET['q'] ?? '';
     $status = $_GET['status'] ?? '';
@@ -30,6 +41,7 @@ class FileController {
   }
 
   public function get($id) {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $f = $pdo->prepare('SELECT * FROM files WHERE id=?');
     $f->execute([$id]);
@@ -44,6 +56,7 @@ class FileController {
   }
 
   public function retry($id) {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $f = $pdo->prepare('SELECT * FROM files WHERE id=?');
     $f->execute([$id]);
@@ -59,12 +72,14 @@ class FileController {
   }
 
   public function softDelete($id) {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $pdo->prepare('UPDATE files SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
   }
 
   public function listTrashed() {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     // Use try-catch or ensure the column exists, falling back to empty if it fails.
     try {
@@ -78,12 +93,14 @@ class FileController {
   }
 
   public function restore($id) {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $pdo->prepare("UPDATE files SET deleted_at = NULL WHERE id=?")->execute([$id]);
     Response::json(['ok'=>true]);
   }
 
   public function permanentDelete($id) {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $f = $pdo->prepare('SELECT path FROM files WHERE id=?');
     $f->execute([$id]);
@@ -100,6 +117,7 @@ class FileController {
   }
 
   public function emptyTrash() {
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $stmt = $pdo->query("SELECT id, path FROM files WHERE deleted_at IS NOT NULL");
     $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -162,8 +180,31 @@ class FileController {
 
     if (!$file) {
         http_response_code(404);
-        error_log("File not found in database: ID $id");
-        die(json_encode(['error' => 'File not found in database', 'id' => $id]));
+        die(json_encode(['error' => 'Archivo no encontrado']));
+    }
+    
+    // Authorization check
+    $ed = $pdo->prepare("SELECT status FROM editions WHERE file_id=?");
+    $ed->execute([$id]);
+    $editionStatus = $ed->fetchColumn();
+    
+    if ($editionStatus !== 'Publicada') {
+        require_once __DIR__.'/AuthController.php';
+        $u = AuthController::userFromToken(AuthController::bearerToken());
+        if (!$u) {
+            http_response_code(403);
+            die(json_encode(['error'=>'Acceso denegado. Se requiere autenticacion.']));
+        }
+        $role = strtolower($u['role'] ?? '');
+        if (!in_array($role, ['admin', 'superadmin', 'staff', 'manager'])) {
+            $check = $pdo->prepare("SELECT lr.user_id FROM legal_files lf JOIN legal_requests lr ON lr.id = lf.legal_request_id WHERE lf.file_id = ?");
+            $check->execute([$id]);
+            $ownerId = $check->fetchColumn();
+            if ($ownerId != $u['id']) {
+                http_response_code(403);
+                die(json_encode(['error'=>'No tienes permiso para ver este archivo']));
+            }
+        }
     }
 
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
@@ -183,16 +224,8 @@ class FileController {
     
     if (!$filePath || !file_exists($filePath)) {
         http_response_code(404);
-        $debugInfo = [
-            'error' => 'File content not found on server',
-            'file_id' => $id,
-            'expected_path' => $path,
-            'upload_dir' => $uploadDir,
-            'full_path_attempted' => $filePath,
-            'files_in_dir' => @scandir($uploadDir)
-        ];
-        error_log("File not found on disk: " . json_encode($debugInfo));
-        die(json_encode($debugInfo));
+        error_log("File not found on disk: ID $id");
+        die(json_encode(['error' => 'El archivo no existe en el disco']));
     }
 
     // Serve with proper CORS headers

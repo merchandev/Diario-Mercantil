@@ -3,6 +3,16 @@ require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 
 class EditionController {
+  private function requireAdmin() {
+      require_once __DIR__.'/AuthController.php';
+      $u = AuthController::requireAuth();
+      if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+          Response::json(["error"=>"forbidden", "details"=>"No autorizado"], 403);
+          exit;
+      }
+      return $u;
+  }
+
   private function locateUploadedFile(?int $fileId, ?string $originalName): ?string {
     $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     if (!$uploadDir || !is_dir($uploadDir)) return null;
@@ -98,6 +108,7 @@ class EditionController {
   }
 
   public function list(){
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $stmt = $pdo->query('SELECT * FROM editions ORDER BY id DESC LIMIT 200');
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -108,6 +119,7 @@ class EditionController {
   }
 
   public function get($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $ed = $pdo->prepare('SELECT * FROM editions WHERE id=?');
     $ed->execute([$id]);
@@ -120,9 +132,10 @@ class EditionController {
   }
 
   public function create(){
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
-    $status = trim($input['status'] ?? 'Borrador');
+    $status = 'Borrador'; // Forzar creación como borrador
     $date = trim($input['date'] ?? gmdate('Y-m-d'));
     $edition_no = (int)($input['edition_no'] ?? 1);
     $orders = $input['orders'] ?? [];
@@ -176,18 +189,36 @@ class EditionController {
   }
 
   public function delete($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
+    
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
+    if ($s->fetchColumn() === 'Publicada') {
+        Response::json(['error'=>'No se puede eliminar una edición publicada'], 403);
+        exit;
+    }
+    
+    $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
     $pdo->prepare('DELETE FROM editions WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
   }
 
   public function update($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
+    
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
+    if ($s->fetchColumn() === 'Publicada') {
+        Response::json(['error'=>'No se puede modificar una edición publicada'], 403);
+        exit;
+    }
+    
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
-    $fields = ['code','status','date','edition_no','file_id','file_name'];
+    // Only safe fields (exclude status, code, file_id, file_name)
+    $fields = ['date','edition_no'];
     $set=[]; $vals=[];
     foreach ($fields as $f) if (isset($in[$f])) { $set[]="$f=?"; $vals[]=$in[$f]; }
-    if (!$set) Response::json(['ok'=>true]);
+    if (!$set) return Response::json(['ok'=>true]);
     $sql = 'UPDATE editions SET '.implode(',', $set).' WHERE id=?';
     $vals[] = $id;
     $pdo->prepare($sql)->execute($vals);
@@ -195,7 +226,15 @@ class EditionController {
   }
 
   public function setOrders($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
+    
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
+    if ($s->fetchColumn() !== 'Borrador') {
+        Response::json(['error'=>'Solo se pueden modificar las órdenes de una edición en Borrador'], 403);
+        exit;
+    }
+
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $ids = $in['order_ids'] ?? isset($in['orders']) ? ($in['orders'] ?? []) : [];
     if (!is_array($ids)) $ids = [];
@@ -211,7 +250,14 @@ class EditionController {
   }
   
   public function autoSelectOrders($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
+    
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
+    if ($s->fetchColumn() !== 'Borrador') {
+        Response::json(['error'=>'Solo se pueden modificar las órdenes de una edición en Borrador'], 403);
+        exit;
+    }
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $limit = (int)($in['limit'] ?? 10);
     
@@ -236,6 +282,7 @@ class EditionController {
   }
   
   public function publish($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $now = gmdate('Y-m-d');
     
@@ -300,6 +347,7 @@ class EditionController {
   }
 
   public function uploadPdf($id){
+    $this->requireAdmin();
     $pdo = Database::pdo();
     $ed = $pdo->prepare('SELECT * FROM editions WHERE id=?');
     $ed->execute([$id]);

@@ -1,9 +1,19 @@
 <?php
-header("Access-Control-Allow-Origin: *");
+$allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com'];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins) || getenv('APP_ENV') === 'development') {
+    header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
+} else {
+    // Si no está permitido, no enviamos la cabecera CORS (bloqueando el acceso desde el navegador)
+    header("Access-Control-Allow-Origin: null"); 
+}
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") exit(0);
-
+header("Access-Control-Allow-Credentials: true");
+if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
+    http_response_code(204);
+    exit(0);
+}
 // Disable display_errors to prevent HTML leakage into JSON responses
 ini_set('display_errors', 0);
 ini_set('display_startup_errors', 0);
