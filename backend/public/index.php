@@ -94,7 +94,6 @@ elseif ($uri === "/api/settings" && $method === "GET") { (new SystemController()
 elseif ($uri === "/api/settings" && $method === "POST") { (new SystemController())->saveSettings(); }
 elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController())->listPayments(); }
 elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
-elseif ($uri === "/api/system/fix" && $method === "GET") { (new SystemController())->emergencyFix(); }
 
 // --- EDITIONS ---
 elseif ($uri === "/api/editions" && $method === "GET") { (new EditionController())->list(); }

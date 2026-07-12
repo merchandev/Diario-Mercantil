@@ -100,8 +100,8 @@ services:
     environment:
       PMA_HOST: db
       UPLOAD_LIMIT: 64M
-    ports:
-      - "8080:80"
+    # ports:
+    #   - "8080:80" # Eliminado por seguridad (Acceso P0)
     depends_on:
       db:
         condition: service_healthy
