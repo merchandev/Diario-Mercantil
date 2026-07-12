@@ -50,8 +50,8 @@ final class LegalRequestStateMachine {
         $stmt->execute([$id]);
         $status = $stmt->fetchColumn();
 
-        if ($status === 'Publicada') {
-            throw new Exception("No se puede rechazar una solicitud que ya está publicada.");
+        if ($status !== 'Por verificar') {
+            throw new Exception("Solo se puede rechazar una solicitud que está 'Por verificar'. Estado actual: $status");
         }
 
         $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")
@@ -63,8 +63,8 @@ final class LegalRequestStateMachine {
         $stmt->execute([$id]);
         $status = $stmt->fetchColumn();
 
-        if ($status === 'Publicada') {
-            throw new Exception("No se puede devolver a borrador una solicitud que ya está publicada.");
+        if ($status !== 'Por verificar' && $status !== 'En trámite') {
+            throw new Exception("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'. Estado actual: $status");
         }
 
         $this->pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")

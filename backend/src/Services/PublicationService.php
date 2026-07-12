@@ -14,7 +14,7 @@ class PublicationService {
         $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key`=?');
         $stmt->execute(['price_per_folio_usd']);
         $priceRaw = $stmt->fetchColumn();
-        if (!is_numeric($priceRaw) || (float)$priceRaw <= 0) {
+        if ($priceRaw === false || !is_numeric($priceRaw) || (float)$priceRaw <= 0) {
             throw new Exception("El precio por folio no está configurado en el sistema.");
         }
         return (float)$priceRaw;
@@ -27,7 +27,7 @@ class PublicationService {
         $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key`=?');
         $stmt->execute(['iva_percent']);
         $ivaRaw = $stmt->fetchColumn();
-        if (!is_numeric($ivaRaw) || (float)$ivaRaw < 0) {
+        if ($ivaRaw === false || !is_numeric($ivaRaw) || (float)$ivaRaw < 0) {
             throw new Exception("El porcentaje de IVA no está configurado en el sistema.");
         }
         $ivaPercent = (float)$ivaRaw;

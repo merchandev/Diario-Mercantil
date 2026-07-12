@@ -1,0 +1,44 @@
+openapi: 3.0.0
+info:
+  title: 'Diario Mercantil API'
+  description: 'Documentación de la API de Diario Mercantil para gestión de usuarios, publicaciones, archivos y salud.'
+  version: 1.0.0
+servers:
+  -
+    url: 'https://diariomercantil.com/api'
+    description: 'Servidor de Producción'
+  -
+    url: 'http://localhost/api'
+    description: 'Servidor de Desarrollo'
+paths:
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: 'Liveness Check'
+      operationId: acac1c254320a41fa414a031ad1006b7
+      responses:
+        '200':
+          description: 'Indica si el sistema está ejecutándose (vivo)'
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: 'Readiness Check'
+      operationId: 95ebfe20aac736a4520f9648a4793f3a
+      responses:
+        '200':
+          description: 'Indica si el sistema está listo para recibir tráfico, comprobando DB, Disco, etc.'
+        '503':
+          description: 'El sistema no está listo (fallos en BD, Disco u otro)'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      description: 'Token de autenticación proveído tras el login en el header Authorization (Bearer <token>)'
+      bearerFormat: JWT
+      scheme: bearer
+tags:
+  -
+    name: Health
+    description: Health

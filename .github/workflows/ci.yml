@@ -22,6 +22,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './frontend/package-lock.json'
       - run: npm ci
+      - run: npm run typecheck
       - run: npm run test -- --run
       - run: npm run build
 
@@ -31,6 +32,20 @@ jobs:
     defaults:
       run:
         working-directory: ./backend
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: dm_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -u root -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - uses: actions/checkout@v4
       - name: Setup PHP
@@ -39,7 +54,42 @@ jobs:
           php-version: '8.4'
           extensions: pdo, pdo_mysql, sqlite3
           tools: composer:v2
-      - run: composer install --prefer-dist --no-progress
-      - run: php -r "require 'vendor/autoload.php'; \$openapi = \OpenApi\Generator::scan([__DIR__ . '/src']); file_put_contents('openapi.yaml', \$openapi->toYaml());"
-      - run: php -l public/index.php
-      - run: vendor/bin/phpunit
+
+      - name: Validate Composer
+        run: composer validate --strict
+
+      - name: Install Dependencies
+        run: composer install --prefer-dist --no-progress
+
+      - name: Check platform requirements
+        run: composer check-platform-reqs
+
+      - name: Composer security audit
+        run: composer audit
+
+      - name: Generate OpenAPI
+        run: |
+          php -r "require 'vendor/autoload.php'; \$openapi = \OpenApi\Generator::scan([__DIR__ . '/src']); file_put_contents('openapi.yaml', \$openapi->toYaml());"
+
+      - name: Verify generated specification
+        run: test -s openapi.yaml
+
+      - name: PHP syntax check
+        shell: bash
+        run: |
+          set -o pipefail
+          find src public tests bin -type f -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      - name: Setup Database Schema
+        run: |
+          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/init.sql
+          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/02_audit_schema.sql
+          mysql -h 127.0.0.1 -u root -proot dm_test -e "INSERT INTO settings(\`key\`, \`value\`) VALUES ('price_per_folio_usd', '1.5'), ('iva_percent', '16.0');"
+
+      - name: Run backend tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: dm_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: vendor/bin/phpunit --testdox
