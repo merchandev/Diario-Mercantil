@@ -265,6 +265,12 @@ class AuthController {
 
         if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
         
+        if (strlen($password) < 6) Response::json(["error"=>"La contraseña debe tener al menos 6 caracteres"], 400);
+        
+        if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) Response::json(["error"=>"Formato de correo electrónico inválido"], 400);
+        
+        $document = strtoupper(preg_replace('/[^A-Z0-9-]/i', '', $document));
+        
         $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
         $check->execute([$document]);
         if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);

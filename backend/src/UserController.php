@@ -22,6 +22,11 @@ class UserController {
 
   public function create(){
     try {
+        $u = AuthController::requireAuth();
+        if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+            Response::json(["error"=>"forbidden", "details"=>"Only admins can create users manually."], 403);
+        }
+        
         $pdo = Database::pdo();
         $in = $this->json();
         
@@ -72,18 +77,29 @@ class UserController {
     }
 
   public function update($id){
-    AuthController::requireAuth();
+    $u = AuthController::requireAuth();
+    if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin' && $u['id'] != $id) {
+        Response::json(["error"=>"forbidden", "details"=>"You can only edit your own profile."], 403);
+    }
+    
     $pdo = Database::pdo();
     $in = $this->json();
     
     $name = trim($in["name"] ?? "");
-    $role = $in["role"] ?? "";
+    
+    if ($u['role'] === 'admin' || $u['role'] === 'superadmin') {
+        $role = $in["role"] ?? "";
+        $status = $in["status"] ?? "";
+    } else {
+        $role = "";
+        $status = "";
+    }
+    
     $email = trim($in["email"] ?? "");
     $phone = trim($in["phone"] ?? "");
     $state = trim($in["state"] ?? "");
     $municipality = trim($in["municipality"] ?? "");
     $address = trim($in["address"] ?? "");
-    $status = $in["status"] ?? "";
     $password = (string)($in["password"] ?? "");
     
     $set = ["updated_at=NOW()"];
@@ -122,7 +138,11 @@ class UserController {
   }
   
   public function delete($id){
-    AuthController::requireAuth();
+    $u = AuthController::requireAuth();
+    if ($u['role'] !== 'admin' && $u['role'] !== 'superadmin') {
+        Response::json(["error"=>"forbidden"], 403);
+    }
+    
     $pdo = Database::pdo();
     $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
     Response::json(["ok"=>true]);
@@ -162,24 +182,25 @@ class UserController {
             Response::json(["error"=>"La imagen debe ser menor a 10MB."], 400);
         }
         
-        $allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-        if (!in_array($file['type'], $allowedTypes)) {
-            Response::json(["error"=>"Solo se permiten imágenes (JPG, PNG, GIF, WEBP)."], 400);
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        $allowedMimes = [
+            'image/jpeg' => 'jpg',
+            'image/png'  => 'png',
+            'image/gif'  => 'gif',
+            'image/webp' => 'webp'
+        ];
+        
+        if (!array_key_exists($mime, $allowedMimes)) {
+            Response::json(["error"=>"Archivo inválido. Solo se permiten imágenes válidas (JPG, PNG, GIF, WEBP)."], 400);
         }
         
         $baseUploadDir = realpath(__DIR__.'/..').'/storage/avatars';
         if (!is_dir($baseUploadDir)) mkdir($baseUploadDir, 0777, true);
         
-        $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
-        if (!$ext) {
-            switch($file['type']) {
-                case 'image/jpeg': $ext = 'jpg'; break;
-                case 'image/png': $ext = 'png'; break;
-                case 'image/gif': $ext = 'gif'; break;
-                case 'image/webp': $ext = 'webp'; break;
-                default: $ext = 'jpg';
-            }
-        }
+        $ext = $allowedMimes[$mime];
         
         $uniqueName = 'avatar_' . $user['id'] . '_' . time() . '.' . $ext;
         $dest = $baseUploadDir . '/' . $uniqueName;
