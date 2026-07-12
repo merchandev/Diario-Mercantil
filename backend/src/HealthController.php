@@ -1,7 +1,11 @@
 <?php
 
+use OpenApi\Attributes as OA;
+
 class HealthController
 {
+    #[OA\Get(path: "/health/live", summary: "Liveness Check", tags: ["Health"])]
+    #[OA\Response(response: 200, description: "Indica si el sistema está ejecutándose (vivo)")]
     public function live(): void
     {
         Response::json([
@@ -10,6 +14,9 @@ class HealthController
         ]);
     }
 
+    #[OA\Get(path: "/health/ready", summary: "Readiness Check", tags: ["Health"])]
+    #[OA\Response(response: 200, description: "Indica si el sistema está listo para recibir tráfico, comprobando DB, Disco, etc.")]
+    #[OA\Response(response: 503, description: "El sistema no está listo (fallos en BD, Disco u otro)")]
     public function ready(): void
     {
         $checks = [

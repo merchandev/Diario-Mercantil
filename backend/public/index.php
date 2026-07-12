@@ -142,6 +142,15 @@ elseif ($uri === "/api/directory/colleges" && $method === "GET") { Response::jso
 elseif ($uri === "/api/health/live" && $method === "GET") { (new HealthController())->live(); }
 elseif ($uri === "/api/health/ready" && $method === "GET") { (new HealthController())->ready(); }
 
+// OpenAPI Docs
+elseif ($uri === "/api/docs/openapi.yaml" && $method === "GET") {
+    require __DIR__ . '/../vendor/autoload.php';
+    $openapi = \OpenApi\Generator::scan([__DIR__ . '/../src']);
+    header('Content-Type: application/x-yaml');
+    echo $openapi->toYaml();
+    exit;
+}
+
 // Fallback
 else {
   http_response_code(404);

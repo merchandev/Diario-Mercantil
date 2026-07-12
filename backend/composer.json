@@ -1,5 +1,8 @@
 {
     "name": "diario/backend",
+    "require": {
+        "zircote/swagger-php": "^4.8"
+    },
     "autoload": {
         "classmap": ["src/"]
     },

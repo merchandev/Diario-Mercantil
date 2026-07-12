@@ -40,5 +40,6 @@ jobs:
           extensions: pdo, pdo_mysql, sqlite3
           tools: composer:v2
       - run: composer install --prefer-dist --no-progress
+      - run: php -r "require 'vendor/autoload.php'; \$openapi = \OpenApi\Generator::scan([__DIR__ . '/src']); file_put_contents('openapi.yaml', \$openapi->toYaml());"
       - run: php -l public/index.php
       - run: vendor/bin/phpunit
