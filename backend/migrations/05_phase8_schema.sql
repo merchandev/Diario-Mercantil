@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
+    user_id INT NOT NULL,
     idempotency_key VARCHAR(100) NOT NULL,
     route VARCHAR(150) NOT NULL,
     request_hash CHAR(64) NOT NULL,

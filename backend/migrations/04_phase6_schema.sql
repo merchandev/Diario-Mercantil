@@ -4,7 +4,7 @@
 -- 1. Tabla de Sesiones Unificadas (Reemplaza a personal_access_tokens y superadmin_tokens)
 CREATE TABLE IF NOT EXISTS sessions (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT UNSIGNED NOT NULL,
+    user_id INT NOT NULL,
     token_hash CHAR(64) NOT NULL COLLATE utf8mb4_bin,
     ip_hash CHAR(64) NOT NULL,
     user_agent_hash CHAR(64) NOT NULL,
