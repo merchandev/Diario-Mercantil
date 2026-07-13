@@ -1,23 +1,32 @@
 <?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../src/Http/RequestContext.php';
+require_once __DIR__ . '/../src/Exceptions/HttpException.php';
+require_once __DIR__ . '/../src/Http/ErrorHandler.php';
+
+$context = new RequestContext();
+set_exception_handler(fn(Throwable $e) => ErrorHandler::handle($e, $context));
+
 $allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com'];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins) || getenv('APP_ENV') === 'development') {
     header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
 } else {
-    // Si no está permitido, no enviamos la cabecera CORS (bloqueando el acceso desde el navegador)
     header("Access-Control-Allow-Origin: null"); 
 }
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Credentials: true");
+header("Strict-Transport-Security: max-age=31536000; includeSubDomains; preload");
 if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
     http_response_code(204);
     exit(0);
 }
-// Disable display_errors to prevent HTML leakage into JSON responses
-ini_set('display_errors', 0);
-ini_set('display_startup_errors', 0);
-error_reporting(E_ALL); // Log errors but don't show them
+
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(E_ALL);
 
 require_once __DIR__."/../src/AuthController.php";
 require_once __DIR__."/../src/UserController.php";
@@ -25,140 +34,130 @@ require_once __DIR__."/../src/LegalController.php";
 require_once __DIR__."/../src/SystemController.php";
 require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/RateController.php";
-require_once __DIR__."/../src/SuperAdminController.php";
 require_once __DIR__."/../src/PagesController.php";
 require_once __DIR__."/../src/FileController.php";
 require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
 require_once __DIR__."/../src/MetricsController.php";
+require_once __DIR__."/../src/UploadController.php";
+require_once __DIR__."/../src/Http/Router.php";
+require_once __DIR__."/../src/Http/Middleware.php";
+
+$router = new Router();
+$auth = [Middleware::requireSession()];
+$csrf = [Middleware::requireSession(), Middleware::requireCsrf()];
+$admin = [Middleware::requireSession(), Middleware::requireRole('admin', 'superadmin', 'manager', 'staff')];
+$adminCsrf = array_merge($admin, [Middleware::requireCsrf()]);
+
+// AUTH
+$router->post('/api/auth/login', [AuthController::class, 'login']);
+$router->post('/api/auth/register', [AuthController::class, 'register']);
+$router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
+$router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
+
+// USERS (Admin)
+$router->get('/api/users', [UserController::class, 'list'], $admin);
+$router->post('/api/users', [UserController::class, 'create'], $adminCsrf);
+$router->put('/api/users/{id}', [UserController::class, 'update'], $csrf);
+$router->delete('/api/users/{id}', [UserController::class, 'delete'], $adminCsrf);
+$router->post('/api/admin/users/{id}/suspend', [UserController::class, 'suspend'], $adminCsrf);
+$router->post('/api/admin/users/{id}/restore', [UserController::class, 'restore'], $adminCsrf);
+$router->post('/api/admin/users/{id}/role', [UserController::class, 'changeRole'], $adminCsrf);
+$router->post('/api/admin/users/{id}/reset-password', [UserController::class, 'resetPassword'], $adminCsrf);
+
+// PROFILE
+class ProfileProxy { 
+    public function update() { $u = AuthController::requireAuth(); (new UserController())->update($u['id']); }
+}
+$router->put('/api/user/profile', [ProfileProxy::class, 'update'], $csrf);
+$router->post('/api/user/avatar', [UserController::class, 'uploadAvatar'], $csrf);
+
+// LEGAL
+$router->post('/api/legal/upload-pdf', [LegalController::class, 'uploadPdf'], $csrf);
+$router->get('/api/legal/trash', [LegalController::class, 'listTrashed'], $auth);
+$router->delete('/api/legal/trash', [LegalController::class, 'emptyTrash'], $csrf);
+$router->delete('/api/legal/trash/{id}', [LegalController::class, 'permanentDelete'], $csrf);
+$router->get('/api/legal', [LegalController::class, 'list'], $auth);
+$router->post('/api/legal', [LegalController::class, 'create'], $csrf);
+$router->get('/api/legal/{id}', [LegalController::class, 'get'], $auth);
+$router->put('/api/legal/{id}', [LegalController::class, 'update'], $csrf);
+$router->delete('/api/legal/{id}', [LegalController::class, 'softDelete'], $csrf);
+$router->post('/api/legal/{id}/restore', [LegalController::class, 'restore'], $csrf);
+$router->post('/api/legal/{id}/reject', [LegalController::class, 'reject'], $adminCsrf);
+$router->post('/api/legal/{id}/submit', [LegalController::class, 'submit'], $csrf);
+$router->post('/api/legal/{id}/verify', [LegalController::class, 'verify'], $adminCsrf);
+$router->post('/api/legal/{id}/return-to-draft', [LegalController::class, 'returnToDraft'], $adminCsrf);
+$router->get('/api/legal/{id}/download', [LegalController::class, 'download'], $auth);
+$router->get('/api/legal/{id}/files', [LegalController::class, 'listFiles'], $auth);
+$router->post('/api/legal/{id}/payments', [LegalController::class, 'addPayment'], $csrf);
+$router->delete('/api/legal/{id}/payments/{pid}', [LegalController::class, 'deletePayment'], $csrf);
+$router->get('/api/legal/public/check', [LegalController::class, 'getPublic']);
+$router->get('/api/legal/public/{id}', [LegalController::class, 'getPublic']);
+
+// FILES
+$router->get('/api/uploads/avatars/{id}', [FileController::class, 'serveAvatar']);
+$router->get('/api/uploads/{id}', [FileController::class, 'serve']);
+$router->get('/api/files/trash', [FileController::class, 'listTrashed'], $admin);
+$router->delete('/api/files/trash', [FileController::class, 'emptyTrash'], $adminCsrf);
+$router->delete('/api/files/trash/{id}', [FileController::class, 'permanentDelete'], $adminCsrf);
+$router->post('/api/files/{id}/restore', [FileController::class, 'restore'], $adminCsrf);
+$router->get('/api/files/{id}', [FileController::class, 'get'], $auth);
+$router->delete('/api/files/{id}', [FileController::class, 'softDelete'], $adminCsrf);
+$router->get('/api/files', [FileController::class, 'list'], $admin);
+$router->post('/api/files', [UploadController::class, 'upload'], $csrf);
+
+// EDITIONS
+$router->get('/api/editions', [EditionController::class, 'list'], $admin);
+$router->post('/api/editions', [EditionController::class, 'create'], $adminCsrf);
+$router->get('/api/editions/{id}', [EditionController::class, 'get'], $admin);
+$router->put('/api/editions/{id}', [EditionController::class, 'update'], $adminCsrf);
+$router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adminCsrf);
+$router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
+$router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
+$router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
+$router->get('/api/e/{id}/download', [EditionController::class, 'downloadById'], $auth);
+$router->get('/api/e/{code}/download', [EditionController::class, 'downloadByCode'], $auth);
+$router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
+
+// SYSTEM & PAGES
+$router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
+$router->get('/api/rate/bcv', [RateController::class, 'bcv']);
+$router->get('/api/settings', [SystemController::class, 'getSettings'], $admin);
+$router->post('/api/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
+$router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
+$router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
+$router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
+$router->get('/api/publications', [SystemController::class, 'listPages'], $admin);
+$router->post('/api/publications', [SystemController::class, 'createPage'], $adminCsrf);
+$router->put('/api/publications/{id}', [SystemController::class, 'updatePage'], $adminCsrf);
+$router->delete('/api/publications/{id}', [SystemController::class, 'deletePage'], $adminCsrf);
+$router->get('/api/directory/profile', [SystemController::class, 'getDirectoryProfile']);
+
+// STUBS
+class StubController {
+    public function emptyList() { Response::json(['items'=>[]]); }
+}
+$router->get('/api/directory/areas', [StubController::class, 'emptyList']);
+$router->get('/api/directory/colleges', [StubController::class, 'emptyList']);
+
+// HEALTH
+$router->get('/api/health/live', [HealthController::class, 'live']);
+$router->get('/api/health/ready', [HealthController::class, 'ready']);
+// METRICS (Note: We'll protect this with Nginx in phase 9)
+$router->get('/metrics', [MetricsController::class, 'prometheus']);
+
+// OPENAPI
+class OpenApiController {
+    public function yaml() {
+        require __DIR__ . '/../vendor/autoload.php';
+        $openapi = \OpenApi\Generator::scan([__DIR__ . '/../src']);
+        header('Content-Type: application/x-yaml');
+        echo $openapi->toYaml();
+        exit;
+    }
+}
+$router->get('/api/docs/openapi.yaml', [OpenApiController::class, 'yaml']);
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];
-
-// --- SUPERADMIN (Secret routes for /lotus/) ---
-if ($uri === "/api/superadmin/login" && $method === "POST") { (new SuperAdminController())->login(); }
-elseif ($uri === "/api/superadmin/verify" && $method === "GET") { (new SuperAdminController())->verify(); }
-elseif ($uri === "/api/superadmin/logout" && $method === "POST") { (new SuperAdminController())->logout(); }
-
-// --- 1. AUTH ---
-elseif ($uri === "/api/auth/login" && $method === "POST") { (new AuthController())->login(); }
-elseif ($uri === "/api/auth/me") { (new AuthController())->me(); }
-elseif ($uri === "/api/auth/logout" && $method === "POST") { (new AuthController())->logout(); }
-elseif ($uri === "/api/auth/register" && $method === "POST") { (new AuthController())->register(); }
-
-// --- 2. USERS ---
-elseif ($uri === "/api/users" && $method === "GET") { (new UserController())->list(); }
-elseif ($uri === "/api/users" && $method === "POST") { (new UserController())->create(); }
-elseif (preg_match("#^/api/users/(\d+)$#", $uri, $m)) {
-    if ($method === "PUT") (new UserController())->update($m[1]);
-    if ($method === "DELETE") (new UserController())->delete($m[1]);
-}
-elseif (preg_match("#^/api/admin/users/(\d+)/suspend$#", $uri, $m) && $method === "POST") { (new UserController())->suspend($m[1]); }
-elseif (preg_match("#^/api/admin/users/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new UserController())->restore($m[1]); }
-elseif (preg_match("#^/api/admin/users/(\d+)/role$#", $uri, $m) && $method === "POST") { (new UserController())->changeRole($m[1]); }
-elseif (preg_match("#^/api/admin/users/(\d+)/reset-password$#", $uri, $m) && $method === "POST") { (new UserController())->resetPassword($m[1]); }
-// Profile specific
-elseif ($uri === "/api/user/profile" && $method === "PUT") { 
-    $u = AuthController::requireAuth(); 
-    (new UserController())->update($u['id']); 
-}
-elseif ($uri === "/api/user/avatar" && $method === "POST") { (new UserController())->uploadAvatar(); }
-
-// --- 3. LEGAL (Requests) ---
-elseif ($uri === "/api/legal/upload-pdf" && $method === "POST") { (new LegalController())->uploadPdf(); }
-elseif ($uri === "/api/legal/trash" && $method === "GET") { (new LegalController())->listTrashed(); }
-elseif ($uri === "/api/legal/trash" && $method === "DELETE") { (new LegalController())->emptyTrash(); }
-elseif (preg_match("#^/api/legal/trash/(\d+)$#", $uri, $m) && $method === "DELETE") { (new LegalController())->permanentDelete($m[1]); }
-elseif ($uri === "/api/legal" && $method === "GET") { (new LegalController())->list(); }
-elseif ($uri === "/api/legal" && $method === "POST") { (new LegalController())->create(); }
-
-elseif (preg_match("#^/api/legal/(\d+)$#", $uri, $m)) {
-    if ($method === "GET") (new LegalController())->get($m[1]);
-    if ($method === "PUT") (new LegalController())->update($m[1]);
-    if ($method === "DELETE") (new LegalController())->softDelete($m[1]);
-}
-// Actions
-elseif (preg_match("#^/api/legal/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new LegalController())->restore($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/reject$#", $uri, $m) && $method === "POST") { (new LegalController())->reject($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/submit$#", $uri, $m) && $method === "POST") { (new LegalController())->submit($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/verify$#", $uri, $m) && $method === "POST") { (new LegalController())->verify($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/return-to-draft$#", $uri, $m) && $method === "POST") { (new LegalController())->returnToDraft($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/download$#", $uri, $m) && $method === "GET") { (new LegalController())->download($m[1]); }
-// Files
-elseif (preg_match("#^/api/uploads/avatars/(.+)$#", $uri, $m)) { (new FileController())->serveAvatar($m[1]); }
-elseif (preg_match("#^/api/uploads/(\d+)$#", $uri, $m)) { (new FileController())->serve($m[1]); }
-elseif ($uri === "/api/files/trash" && $method === "GET") { (new FileController())->listTrashed(); }
-elseif ($uri === "/api/files/trash" && $method === "DELETE") { (new FileController())->emptyTrash(); }
-elseif (preg_match("#^/api/files/trash/(\d+)$#", $uri, $m) && $method === "DELETE") { (new FileController())->permanentDelete($m[1]); }
-elseif (preg_match("#^/api/files/(\d+)/restore$#", $uri, $m) && $method === "POST") { (new FileController())->restore($m[1]); }
-elseif (preg_match("#^/api/files/(\d+)$#", $uri, $m)) {
-    if ($method === "GET") (new FileController())->get($m[1]);
-    if ($method === "DELETE") (new FileController())->softDelete($m[1]);
-}
-elseif ($uri === "/api/files" && $method === "GET") { (new FileController())->list(); }
-elseif ($uri === "/api/files" && $method === "POST") { (new UploadController())->upload(); }
-elseif (preg_match("#^/api/legal/(\d+)/files$#", $uri, $m)) {
-    if ($method === "GET") (new LegalController())->listFiles($m[1]); // Ensure method exists in LegalController or Stub
-}
-// Payments sub-resource
-elseif (preg_match("#^/api/legal/(\d+)/payments$#", $uri, $m) && $method === "POST") { (new LegalController())->addPayment($m[1]); }
-elseif (preg_match("#^/api/legal/(\d+)/payments/(\d+)$#", $uri, $m) && $method === "DELETE") { (new LegalController())->deletePayment($m[1], $m[2]); }
-elseif ($uri === "/api/legal/public/check" || preg_match("#^/api/legal/public/(.+)$#", $uri, $m) && $method === "GET") { (new LegalController())->getPublic($m[1]); }
-
-// --- 4. SYSTEM / AUXILIARY (Fixed 404s) ---
-elseif ($uri === "/api/stats" && $method === "GET") { (new SystemController())->getStats(); }
-elseif ($uri === "/api/rate/bcv" && $method === "GET") { (new RateController())->bcv(); }
-elseif ($uri === "/api/settings" && $method === "GET") { (new SystemController())->getSettings(); }
-elseif ($uri === "/api/settings" && $method === "POST") { (new SystemController())->saveSettings(); }
-elseif ($uri === "/api/payments" && $method === "GET") { (new SystemController())->listPayments(); }
-elseif ($uri === "/api/public/pages" && $method === "GET") { (new SystemController())->listPagesPublic(); }
-
-// --- EDITIONS ---
-elseif ($uri === "/api/editions" && $method === "GET") { (new EditionController())->list(); }
-elseif ($uri === "/api/editions" && $method === "POST") { (new EditionController())->create(); }
-elseif (preg_match("#^/api/editions/(\d+)$#", $uri, $m)) {
-    if ($method === "GET") (new EditionController())->get($m[1]);
-    if ($method === "PUT") (new EditionController())->update($m[1]);
-    if ($method === "DELETE") (new EditionController())->delete($m[1]);
-}
-elseif (preg_match("#^/api/editions/(\d+)/orders$#", $uri, $m) && $method === "POST") { (new EditionController())->setOrders($m[1]); }
-elseif (preg_match("#^/api/editions/(\d+)/publish$#", $uri, $m) && $method === "POST") { (new EditionController())->publish($m[1]); }
-elseif (preg_match("#^/api/editions/(\d+)/pdf$#", $uri, $m) && $method === "POST") { (new EditionController())->uploadPdf($m[1]); }
-elseif (preg_match("#^/api/e/(\d+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadById($m[1]); }
-elseif (preg_match("#^/api/e/([^/]+)/download$#", $uri, $m) && $method === "GET") { (new EditionController())->downloadByCode($m[1]); }
-elseif (preg_match("#^/api/dm/e-([^/]+)$#", $uri, $m) && $method === "GET") { (new EditionController())->publicByCode($m[1]); }
-
-
-// --- 5. PUBLICATIONS & PAGES (Public) ---
-elseif (preg_match("#^/api/page/(.+)$#", $uri, $m) && $method === "GET") { (new PagesController())->publicGet($m[1]); }
-elseif ($uri === "/api/publications" && $method === "GET") { (new SystemController())->listPages(); }
-elseif ($uri === "/api/publications" && $method === "POST") { (new SystemController())->createPage(); }
-elseif (preg_match("#^/api/publications/(\d+)$#", $uri, $m)) {
-    if ($method === "PUT") (new SystemController())->updatePage($m[1]);
-    if ($method === "DELETE") (new SystemController())->deletePage($m[1]);
-}
-
-// Directory
-elseif ($uri === "/api/directory/profile" && $method === "GET") { (new SystemController())->getDirectoryProfile(); }
-elseif ($uri === "/api/directory/areas" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
-elseif ($uri === "/api/directory/colleges" && $method === "GET") { Response::json(["items"=>[]]); } // Stub
-
-// Health Checks & Metrics
-elseif ($uri === "/api/health/live" && $method === "GET") { (new HealthController())->live(); }
-elseif ($uri === "/api/health/ready" && $method === "GET") { (new HealthController())->ready(); }
-elseif ($uri === "/metrics" && $method === "GET") { (new MetricsController())->prometheus(); }
-
-// OpenAPI Docs
-elseif ($uri === "/api/docs/openapi.yaml" && $method === "GET") {
-    require __DIR__ . '/../vendor/autoload.php';
-    $openapi = \OpenApi\Generator::scan([__DIR__ . '/../src']);
-    header('Content-Type: application/x-yaml');
-    echo $openapi->toYaml();
-    exit;
-}
-
-// Fallback
-else {
-  http_response_code(404);
-  echo json_encode(["error"=>"Route not found: $method $uri"]);
-}
+$router->dispatch($method, $uri);

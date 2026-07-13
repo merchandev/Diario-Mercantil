@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
+require_once __DIR__.'/Http/StoragePath.php';
 
 class EditionController {
   private function requireAdmin() {
@@ -14,17 +15,17 @@ class EditionController {
       return $u;
   }
 
-  private function locateUploadedFile(?int $fileId, ?string $originalName): ?string {
-    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-    if (!$uploadDir || !is_dir($uploadDir)) return null;
-
-    if ($fileId) {
-        $pdo = Database::pdo();
-        $stmt = $pdo->prepare('SELECT path FROM files WHERE id=?');
-        $stmt->execute([$fileId]);
-        $path = $stmt->fetchColumn();
-        if ($path && file_exists($uploadDir.'/'.$path)) {
-            return $uploadDir.'/'.$path;
+  private function locateUploadedFile(?int $fileId): ?string {
+    if (!$fileId) return null;
+    $pdo = Database::pdo();
+    $stmt = $pdo->prepare('SELECT path FROM files WHERE id=?');
+    $stmt->execute([$fileId]);
+    $path = $stmt->fetchColumn();
+    if ($path) {
+        try {
+            return StoragePath::getFile($path);
+        } catch (RuntimeException $e) {
+            return null;
         }
     }
     return null;
@@ -76,7 +77,7 @@ class EditionController {
     $f->execute([$fileId]);
     $originalName = $f->fetchColumn() ?: '';
 
-    $path = $this->locateUploadedFile($fileId, $originalName);
+    $path = $this->locateUploadedFile($fileId);
     if (!$path || !file_exists($path)) {
       http_response_code(404);
       echo 'Archivo PDF no encontrado en el servidor';

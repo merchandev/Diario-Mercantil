@@ -2,6 +2,7 @@
 require_once __DIR__."/Response.php";
 require_once __DIR__."/Database.php";
 require_once __DIR__."/AuthController.php";
+require_once __DIR__."/Http/SettingSchema.php";
 
 class SystemController {
     private function json(){ return json_decode(file_get_contents("php://input"), true) ?: []; }
@@ -87,12 +88,12 @@ class SystemController {
     }
     
     public function saveSettings(){
-        $this->requireAdmin();
-        $in = $this->json();
+        $in = json_decode(file_get_contents('php://input'), true);
         $pdo = Database::pdo();
         foreach($in as $k=>$v){
+            $validatedValue = SettingSchema::validate((string)$k, $v);
             $pdo->prepare('INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, NOW()) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()')
-                ->execute([$k, $v]);
+                ->execute([$k, $validatedValue]);
         }
         Response::json(["ok"=>true]);
     }

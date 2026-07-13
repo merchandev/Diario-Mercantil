@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/UploadController.php';
+require_once __DIR__."/Http/StoragePath.php";
 
 class FileController {
   private function requireAdmin() {
@@ -105,10 +106,13 @@ class FileController {
     $f = $pdo->prepare('SELECT path FROM files WHERE id=?');
     $f->execute([$id]);
     $file = $f->fetch(PDO::FETCH_ASSOC);
-    if ($file && $file['path']) {
-        $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-        $fullPath = $uploadDir . '/' . $file['path'];
-        if (file_exists($fullPath)) @unlink($fullPath);
+    if ($file) {
+        if ($file['path']) {
+            try {
+                $fullPath = StoragePath::getFile($file['path']);
+                @unlink($fullPath);
+            } catch (RuntimeException $e) {}
+        }
     }
     
     $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$id]);
@@ -122,12 +126,13 @@ class FileController {
     $stmt = $pdo->query("SELECT id, path FROM files WHERE deleted_at IS NOT NULL");
     $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
     $count = 0;
     foreach ($files as $f) {
         if ($f['path']) {
-            $fullPath = $uploadDir . '/' . $f['path'];
-            if (file_exists($fullPath)) @unlink($fullPath);
+            try {
+                $fullPath = StoragePath::getFile($f['path']);
+                @unlink($fullPath);
+            } catch (RuntimeException $e) {}
         }
         $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$f['id']]);
         $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$f['id']]);
@@ -207,19 +212,9 @@ class FileController {
         }
     }
 
-    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-    $path = $file['path'] ?? null;
-    $filePath = '';
-
-    // Strategy: 
-    // 1. Try 'path' column (new uploads)
-    // 2. Fallback to searching by name pattern
-    
-    if ($path && file_exists($uploadDir.'/'.$path)) {
-        $filePath = $uploadDir.'/'.$path;
-    }
-    
-    if (!$filePath || !file_exists($filePath)) {
+    try {
+        $filePath = StoragePath::getFile($file['path']);
+    } catch (RuntimeException $e) {
         http_response_code(404);
         die(json_encode(['error' => 'Archivo no encontrado']));
     }
@@ -249,10 +244,9 @@ class FileController {
     header('Access-Control-Allow-Methods: GET, OPTIONS');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
-    $uploadDir = realpath(__DIR__.'/..').'/storage/avatars';
-    $filePath = $uploadDir . '/' . basename($filename);
-
-    if (!file_exists($filePath)) {
+    try {
+        $filePath = StoragePath::getAvatar($filename);
+    } catch (RuntimeException $e) {
         http_response_code(404);
         die(json_encode(['error' => 'Avatar not found']));
     }

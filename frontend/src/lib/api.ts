@@ -33,17 +33,28 @@ export function getToken() {
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
   const token = getToken()
   const headers = new Headers(init?.headers || {})
+  
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
-    headers.set('X-Auth-Token', token) // Backup for aggressive proxies
-    console.log('📤 [fetchAuth] Sending Authorization header:', `Bearer ${token.substring(0, 20)}...`)
-  } else {
-    console.warn('⚠️ [fetchAuth] NO TOKEN FOUND - Request will be unauthenticated')
+    headers.set('X-Auth-Token', token)
   }
+
+  // Add CSRF token from cookies if available
+  if (typeof document !== 'undefined') {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; dm_csrf=`);
+    if (parts.length === 2) {
+      const csrf = parts.pop()?.split(';').shift();
+      if (csrf) headers.set('X-CSRF-Token', csrf);
+    }
+  }
+
   const url = typeof input === 'string' ? getUrl(input) : input;
-  console.log('📤 [fetchAuth] Request to:', typeof url === 'string' ? url : url.toString())
-  const res = await fetch(url, { ...init, headers })
-  console.log('📥 [fetchAuth] Response status:', res.status, res.statusText)
+  
+  // Add credentials to allow sending cookies (HttpOnly and others)
+  const reqInit = { ...init, headers, credentials: 'include' as RequestCredentials };
+  
+  const res = await fetch(url, reqInit)
   if (res.status === 401) {
     let serverError = 'unauthorized';
     try {
@@ -100,7 +111,8 @@ export async function login(body: { document: string; password: string }) {
   const res = await fetch(getUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    credentials: 'include'
   })
   if (!res.ok) {
     let errorMsg = 'invalid_credentials';
@@ -127,7 +139,8 @@ export async function superadminLogin(body: { username: string; password: string
   const res = await fetch(getUrl('/api/superadmin/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    credentials: 'include'
   })
   if (!res.ok) {
     const json = await res.json().catch(() => ({}))
@@ -141,7 +154,8 @@ export async function verifySuperAdmin() {
   if (!token) throw new Error('No token')
 
   const res = await fetch(getUrl('/api/superadmin/verify'), {
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { 'Authorization': `Bearer ${token}` },
+    credentials: 'include'
   })
   if (!res.ok) throw new Error('Unauthorized')
   return res.json() as Promise<{ valid: boolean; superadmin: { id: number; username: string } }>
@@ -153,7 +167,8 @@ export async function superadminLogout() {
 
   await fetch(getUrl('/api/superadmin/logout'), {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
+    headers: { 'Authorization': `Bearer ${token}` },
+    credentials: 'include'
   })
 }
 

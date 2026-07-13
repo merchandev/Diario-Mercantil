@@ -17,13 +17,13 @@ class PdfGenerationService {
         
         // Extract snapshot fields safely
         // If not available (historical orphans), mark as N/A or 0.0
-        $pricePerFolio = isset($requestData['precio_unitario_usd']) ? (float)$requestData['precio_unitario_usd'] : 0.0;
-        $bcv = isset($requestData['tasa_bcv']) ? (float)$requestData['tasa_bcv'] : 0.0;
-        $ivaPercent = isset($requestData['porcentaje_iva']) ? (float)$requestData['porcentaje_iva'] : 0.0;
+        $pricePerFolio = isset($requestData['precio_unitario_usd']) ? (string)$requestData['precio_unitario_usd'] : '0.00';
+        $bcv = isset($requestData['tasa_bcv']) ? (string)$requestData['tasa_bcv'] : '0.00';
+        $ivaPercent = isset($requestData['porcentaje_iva']) ? (string)$requestData['porcentaje_iva'] : '0.00';
         
-        $folios = (int)($requestData['folios'] ?? 1);
-        $totalUsd = $folios * $pricePerFolio;
-        $subtotalBs = $totalUsd * $bcv;
+        $folios = (string)($requestData['folios'] ?? '1');
+        $totalUsd = bcmul($folios, $pricePerFolio, 2);
+        $subtotalBs = bcmul($totalUsd, $bcv, 2);
         
         $clientData = [
             'Cliente:' => $requestData['name'] ?? '---',
@@ -35,20 +35,23 @@ class PdfGenerationService {
         $orderDetails = [
             'Estado:' => $requestData['status'] ?? '---',
             'Tipo:' => $requestData['pub_type'] ?? 'Documento',
-            'Folios:' => (string)$folios,
-            'Tasa BCV:' => $bcv > 0 ? number_format($bcv, 2) : 'No disponible'
+            'Folios:' => $folios,
+            'Tasa BCV:' => $bcv > 0 ? number_format((float)$bcv, 2) : 'No disponible'
         ];
 
         $pdf->InfoSection($clientData, $orderDetails);
         
-        $ivaBs = $subtotalBs * ($ivaPercent / 100);
+        $ivaMultiplier = bcdiv($ivaPercent, '100.00', 4);
+        $ivaBs = bcmul($subtotalBs, $ivaMultiplier, 2);
         
-        // If snapshot has total_bs use it directly to avoid floating point drift, else calculate
-        if (isset($requestData['total_bs']) && $requestData['total_bs'] > 0) {
-            $totalBs = (float)$requestData['total_bs'];
-        } else {
-            $totalBs = $subtotalBs + $ivaBs;
-        }
+        $totalBs = bcadd($subtotalBs, $ivaBs, 2);
+        
+        $pdf->Totals([
+            ['Subtotal USD', '$ ' . number_format((float)$totalUsd, 2)],
+            ['Subtotal BS', 'Bs ' . number_format((float)$subtotalBs, 2)],
+            ['IVA (' . number_format((float)$ivaPercent, 1) . '%)', 'Bs ' . number_format((float)$ivaBs, 2)],
+            ['TOTAL BS', 'Bs ' . number_format((float)$totalBs, 2)]
+        ]);
 
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->Cell(50, 6, 'Total Estimado (Bs):', 0, 0);
@@ -57,7 +60,7 @@ class PdfGenerationService {
         if ($bcv <= 0) {
             $pdf->Cell(0, 6, 'Cálculo histórico no disponible', 0, 1);
         } else {
-            $pdf->Cell(0, 6, number_format($totalBs, 2).' Bs', 0, 1);
+            $pdf->Cell(0, 6, number_format((float)$totalBs, 2).' Bs', 0, 1);
         }
         
         $pdf->SetTextColor(0); 
@@ -76,16 +79,16 @@ class PdfGenerationService {
         
         $pdf->SetFont('Arial', '', 9);
         $pdf->SetTextColor(0);
-        $totalPaid = 0;
+        $totalPaid = '0.00';
         
         foreach($payments as $py) {
-            $amount = isset($py['amount_bs']) ? (float)$py['amount_bs'] : 0.0;
-            if($py['status'] == 'Aprobado') $totalPaid += $amount;
+            $amount = isset($py['amount_bs']) ? (string)$py['amount_bs'] : '0.00';
+            if($py['status'] == 'Aprobado') $totalPaid = bcadd($totalPaid, $amount, 2);
             
             $pdf->Cell(30, 8, substr($py['date'] ?? '', 0, 10), 'B', 0, 'C');
             $pdf->Cell(40, 8, $py['ref'] ?? '', 'B', 0, 'C');
             $pdf->Cell(40, 8, $py['bank'] ?? '', 'B', 0, 'C');
-            $pdf->Cell(30, 8, number_format($amount, 2), 'B', 0, 'R');
+            $pdf->Cell(30, 8, number_format((float)$amount, 2), 'B', 0, 'R');
             $pdf->Cell(30, 8, $py['status'] ?? '', 'B', 1, 'C');
         }
         
@@ -97,7 +100,7 @@ class PdfGenerationService {
         $pdf->SetFont('Arial', 'B', 10);
         $pdf->Cell(110, 7, '', 0, 0);
         $pdf->Cell(30, 7, 'Total Pagado:', 0, 0, 'R');
-        $pdf->Cell(30, 7, number_format($totalPaid, 2).' Bs', 0, 1, 'R');
+        $pdf->Cell(30, 7, number_format((float)$totalPaid, 2).' Bs', 0, 1, 'R');
 
         $pdf->Ln(15);
         $pdf->SetFont('Arial', '', 10);

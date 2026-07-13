@@ -2,6 +2,7 @@
 require_once __DIR__."/Response.php";
 require_once __DIR__."/Database.php";
 require_once __DIR__."/AuthController.php";
+require_once __DIR__."/Role.php";
 require_once __DIR__."/RolePolicy.php";
 
 class UserController {
@@ -166,7 +167,7 @@ class UserController {
           
           $pdo->beginTransaction();
           $pdo->prepare("UPDATE users SET status='suspended', updated_at=NOW() WHERE id=?")->execute([$id]);
-          $pdo->prepare("DELETE FROM personal_access_tokens WHERE tokenable_id=?")->execute([$id]); // Revoke tokens
+          $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]); // Revoke tokens
           $this->audit($pdo, $u['id'], 'suspend', 'user', $id, ['status'=>$target['status']], ['status'=>'suspended']);
           $pdo->commit();
           
@@ -239,7 +240,7 @@ class UserController {
           
           $pdo->beginTransaction();
           $pdo->prepare("UPDATE users SET password_hash=?, updated_at=NOW() WHERE id=?")->execute([$hash, $id]);
-          $pdo->prepare("DELETE FROM personal_access_tokens WHERE tokenable_id=?")->execute([$id]); // Revoke sessions
+          $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]); // Revoke sessions
           $this->audit($pdo, $u['id'], 'reset_password', 'user', $id, null, null);
           $pdo->commit();
           
@@ -270,7 +271,7 @@ class UserController {
         $pdo->beginTransaction();
         $pdo->prepare("UPDATE users SET deleted_at=NOW(), deleted_by=?, deletion_reason=?, updated_at=NOW() WHERE id=?")
             ->execute([$u['id'], 'Eliminación lógica API', $id]);
-        $pdo->prepare("DELETE FROM personal_access_tokens WHERE tokenable_id=?")->execute([$id]);
+        $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
         $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['deleted_at'=>'NOW()']);
         $pdo->commit();
         

@@ -6,6 +6,9 @@ require_once __DIR__.'/Services/BcvService.php';
 require_once __DIR__.'/Services/PublicationService.php';
 require_once __DIR__.'/Services/PdfGenerationService.php';
 require_once __DIR__.'/Services/LegalRequestStateMachine.php';
+require_once __DIR__.'/PublicLegalRequestView.php';
+require_once __DIR__.'/Http/IdempotencyService.php';
+require_once __DIR__.'/Services/PdfInspector.php';
 
 class LegalController {
   
@@ -79,9 +82,7 @@ class LegalController {
     $stmt->execute([$name,$storageName,$file['size'],'pdf','uploaded',$now,$now]);
     $fileId = (int)$pdo->lastInsertId();
 
-    $folios = 1;
-    $content = @file_get_contents($dest);
-    if(preg_match_all('/\/Type\s*\/Page[\s\/>]/', $content, $m)) $folios = count($m[0]);
+    $folios = (new PdfInspector())->pageCount($dest);
 
     $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
     
@@ -391,6 +392,17 @@ class LegalController {
       }
       
       $in = json_decode(file_get_contents('php://input'),true);
+      $idemKey = $_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? null;
+      if ($idemKey) {
+          $hash = hash('sha256', json_encode($in));
+          $cached = IdempotencyService::check($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash);
+          if ($cached) {
+              http_response_code($cached['status']);
+              Response::json($cached['body']);
+              return;
+          }
+      }
+
       if (!preg_match('/^\d{4}$/', $in['ref'] ?? '')) {
           return Response::json(['error'=>'La referencia debe tener exactamente 4 dígitos'], 400);
       }
@@ -410,6 +422,9 @@ class LegalController {
       $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
           ->execute([$u['id'], 'add_payment', 'legal_request', $id]);
           
+      if (isset($idemKey)) {
+          IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', hash('sha256', json_encode($in)), 200, ['ok'=>true]);
+      }
       Response::json(['ok'=>true]);
   }
   
@@ -480,9 +495,7 @@ class LegalController {
   
   public function getPublic($order){ 
     $pdo = Database::pdo();
-    $r = $pdo->prepare("SELECT * FROM legal_requests WHERE (order_no=? OR id=?) AND status='Publicada'");
-    $r->execute([$order, $order]);
-    $item = $r->fetch(PDO::FETCH_ASSOC);
+    $item = PublicLegalRequestView::fetch($pdo, (string)$order);
     if (!$item) return Response::json(['error'=>'Not found'], 404);
     Response::json(['item'=>$item]);
   }
