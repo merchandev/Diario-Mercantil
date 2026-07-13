@@ -195,7 +195,7 @@ class FileController {
     
     if ($editionStatus !== 'Publicada') {
         require_once __DIR__.'/AuthController.php';
-        $u = AuthController::userFromToken(AuthController::bearerToken());
+        $u = AuthController::userFromToken();
         if (!$u) {
             http_response_code(403);
             die(json_encode(['error'=>'Acceso denegado. Se requiere autenticacion.']));

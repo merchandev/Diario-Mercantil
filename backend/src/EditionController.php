@@ -59,12 +59,25 @@ class EditionController {
     return Response::json(['edition'=>$edition,'orders'=>$ord->fetchAll(PDO::FETCH_ASSOC)]);
   }
 
-  public function downloadById($id){
+  public function downloadById($idOrCode){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare("SELECT * FROM editions WHERE id=? AND status='Publicada'");
-    $ed->execute([$id]);
+    if (is_numeric($idOrCode)) {
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE id=?");
+        $ed->execute([$idOrCode]);
+    } else {
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE code=?");
+        $ed->execute([$idOrCode]);
+    }
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) { http_response_code(404); echo 'Not found'; return; }
+
+    if ($edition['status'] !== 'Publicada') {
+        require_once __DIR__.'/AuthController.php';
+        $u = AuthController::userFromToken();
+        if (!$u || ($u['role'] !== 'admin' && $u['role'] !== 'superadmin')) {
+            http_response_code(403); echo 'Acceso denegado'; return;
+        }
+    }
 
     $fileId = (int)($edition['file_id'] ?? 0);
     if (!$fileId) {
