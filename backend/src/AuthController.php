@@ -55,7 +55,7 @@ final class AuthController {
     public static function requireAuth(): array {
         $token = self::sessionToken();
         if (!$token) { 
-            throw new RuntimeException('unauthorized', 401);
+            throw new HttpException(401, 'unauthorized', 'No autenticado');
         }
         
         $pdo = Database::pdo();
@@ -77,7 +77,7 @@ final class AuthController {
         
         if (!$user) {
             self::clearCookies();
-            throw new RuntimeException('unauthorized', 401);
+            throw new HttpException(401, 'unauthorized', 'No autenticado');
         }
 
         return $user;
