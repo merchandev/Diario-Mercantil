@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card'
 import { apiRequest } from '../lib/api'
 
 export default function ForgotPassword() {
@@ -29,27 +28,27 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen grid place-items-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold tracking-tight">Recuperar contraseña</CardTitle>
-          <CardDescription>
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100 p-6 md:p-8">
+        <div className="space-y-1 mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-800">Recuperar contraseña</h2>
+          <p className="text-slate-500 text-sm">
             Ingresa tu correo electrónico y te enviaremos un enlace para restablecer tu contraseña.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {success ? (
             <div className="space-y-4">
               <div className="bg-green-50 text-green-800 p-4 rounded-md border border-green-200">
                 Si el correo está registrado, recibirás un enlace de recuperación pronto. Revisa tu bandeja de entrada o spam.
               </div>
-              <Link to="/login" className="block text-center text-sm text-red-600 hover:text-red-700 font-medium">
+              <Link to="/login" className="block text-center text-sm text-brand-600 hover:text-brand-700 font-medium">
                 Volver al inicio de sesión
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
+                <label className="text-sm font-medium leading-none text-slate-700" htmlFor="email">
                   Correo electrónico
                 </label>
                 <input
@@ -58,7 +57,7 @@ export default function ForgotPassword() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
                   placeholder="ejemplo@correo.com"
                   disabled={loading}
                 />
@@ -69,20 +68,20 @@ export default function ForgotPassword() {
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-600 disabled:opacity-50 disabled:pointer-events-none bg-red-600 text-white hover:bg-red-700 h-10 px-4 py-2 w-full"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 disabled:opacity-50 disabled:pointer-events-none bg-brand-600 text-white hover:bg-brand-700 h-10 px-4 py-2 w-full"
               >
                 {loading ? 'Enviando...' : 'Enviar enlace'}
               </button>
 
-              <div className="text-center text-sm">
-                <Link to="/login" className="text-red-600 hover:text-red-700 font-medium">
+              <div className="text-center text-sm mt-4">
+                <Link to="/login" className="text-brand-600 hover:text-brand-700 font-medium">
                   Volver al inicio de sesión
                 </Link>
               </div>
             </form>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

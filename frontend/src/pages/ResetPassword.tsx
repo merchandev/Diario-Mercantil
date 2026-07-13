@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card'
 import { apiRequest } from '../lib/api'
 
 export default function ResetPassword() {
@@ -44,10 +43,10 @@ export default function ResetPassword() {
       })
       setSuccess(true)
       setTimeout(() => {
-        navigate('/login', { state: { message: 'Contraseña actualizada exitosamente. Por favor inicia sesión.' } })
+        navigate('/login')
       }, 3000)
     } catch (err: any) {
-      setError(err.message || 'Error al restablecer la contraseña. El enlace puede haber expirado.')
+      setError(err.message || 'Error al restablecer la contraseña')
     } finally {
       setLoading(false)
     }
@@ -56,31 +55,31 @@ export default function ResetPassword() {
   if (!token) {
     return (
       <div className="min-h-screen grid place-items-center bg-slate-50 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-xl text-red-600">Enlace inválido</CardTitle>
-            <CardDescription>
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100 p-6 md:p-8">
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-red-600">Enlace inválido</h2>
+            <p className="text-sm text-slate-500 mt-2">
               El enlace de recuperación está incompleto o es inválido. Por favor solicita uno nuevo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link to="/olvide-password" className="text-red-600 hover:underline">Volver a intentar</Link>
-          </CardContent>
-        </Card>
+            </p>
+          </div>
+          <div>
+            <Link to="/olvide-password" className="text-sm text-red-600 hover:underline">Volver a intentar</Link>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="min-h-screen grid place-items-center bg-slate-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold tracking-tight">Restablecer contraseña</CardTitle>
-          <CardDescription>
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-100 p-6 md:p-8">
+        <div className="space-y-1 mb-6">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-800">Restablecer contraseña</h2>
+          <p className="text-slate-500 text-sm">
             Ingresa tu nueva contraseña a continuación.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+          </p>
+        </div>
+        <div>
           {success ? (
             <div className="space-y-4">
               <div className="bg-green-50 text-green-800 p-4 rounded-md border border-green-200">
@@ -90,28 +89,28 @@ export default function ResetPassword() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="password">Nueva contraseña</label>
+                <label className="text-sm font-medium text-slate-700" htmlFor="password">Nueva contraseña</label>
                 <input
                   id="password"
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:opacity-50"
                   placeholder="******"
                   disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="confirmPassword">Confirmar nueva contraseña</label>
+                <label className="text-sm font-medium text-slate-700" htmlFor="confirmPassword">Confirmar nueva contraseña</label>
                 <input
                   id="confirmPassword"
                   type="password"
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent disabled:opacity-50"
+                  className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:opacity-50"
                   placeholder="******"
                   disabled={loading}
                 />
@@ -122,14 +121,14 @@ export default function ResetPassword() {
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 h-10 px-4 py-2 w-full disabled:opacity-50"
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 h-10 px-4 py-2 w-full disabled:opacity-50"
               >
                 {loading ? 'Guardando...' : 'Restablecer contraseña'}
               </button>
             </form>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
