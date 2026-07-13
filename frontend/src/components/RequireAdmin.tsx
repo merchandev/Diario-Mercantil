@@ -10,6 +10,11 @@ export default function RequireAdmin({ children }: { children: JSX.Element }) {
     return <div className="min-h-screen grid place-items-center text-slate-600">Verificando acceso...</div>
   }
 
+  if (!user) {
+    console.log('🔄 [RequireAdmin] No autenticado. Redirigiendo a login')
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
   if (!isAdminRole(user?.role)) {
     console.warn('⚠️ [RequireAdmin] Acceso denegado. Rol:', user?.role, 'Redirigiendo a /solicitante/historial')
     return <Navigate to="/solicitante/historial" state={{ from: location }} replace />

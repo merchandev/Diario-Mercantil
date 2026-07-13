@@ -174,7 +174,7 @@ export async function superadminLogout() {
 
 
 export async function me() {
-  const res = await fetchAuth('/api/auth/me')
+  const res = await fetchAuth('/api/auth/me', undefined, true)
   return res.json() as Promise<{ user: { id: number; document: string; name: string; role: string; avatar_url?: string | null } }>
 }
 

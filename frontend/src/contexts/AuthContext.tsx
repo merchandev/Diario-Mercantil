@@ -36,13 +36,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [error, setError] = useState<string | null>(null)
 
     const refreshUser = async () => {
-        const token = getToken()
-        if (!token) {
-            console.log('🔐 [AuthProvider] No token found, skipping user fetch')
-            setUser(null)
-            setLoading(false)
-            return
-        }
+        // Removed token check since we use HttpOnly cookies
+
 
         try {
             console.log('🔐 [AuthProvider] Fetching user data...')

@@ -106,12 +106,13 @@ export default function App() {
 
     const resetTimer = () => {
       clearTimeout(timer)
-      const token = localStorage.getItem('token') || sessionStorage.getItem('token')
-      if (token) {
+      const role = localStorage.getItem('user_role') || sessionStorage.getItem('user_role') || localStorage.getItem('token')
+      if (role) {
         timer = setTimeout(() => {
           console.warn('⏰ Inactivity timeout - logging out')
           localStorage.removeItem('token')
           sessionStorage.removeItem('token')
+          localStorage.removeItem('user_role')
           window.location.href = '/login'
         }, TIMEOUT)
       }

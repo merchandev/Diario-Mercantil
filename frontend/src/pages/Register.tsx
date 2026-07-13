@@ -87,17 +87,14 @@ export default function Register() {
       const data = await res.json()
 
       // Auto-login después de registro exitoso
-      if (data.token) {
-        localStorage.setItem('token', data.token)
-        if (data.user) {
-          localStorage.setItem('user_name', data.user.name || '')
-          localStorage.setItem('user_role', data.user.role || '')
-          localStorage.setItem('user_doc', data.user.document || '')
-        }
+      if (data.user) {
+        localStorage.setItem('user_name', data.user.name || '')
+        localStorage.setItem('user_role', data.user.role || '')
+        localStorage.setItem('user_doc', data.user.document || '')
         await refreshUser()
         navigate('/solicitante/historial')
       } else {
-        // Si no retorna token, redirigir a login
+        // Si no retorna user, redirigir a login
         navigate('/login', { state: { message: 'Cuenta creada exitosamente. Por favor inicie sesión.' } })
       }
     } catch (err: any) {

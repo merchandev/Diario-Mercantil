@@ -23,18 +23,17 @@ export default function Login() {
       const raw = (docNumber || '').trim()
       const document = /[^0-9]/.test(raw) ? raw : `${docPrefix}${raw}`
       const { token, user } = await apiLogin({ document, password })
-      console.log('🔐 Login exitoso:', { user: user.name, role: user.role, token: token.substring(0, 20) + '...' })
+      console.log('🔐 Login exitoso:', { user: user.name, role: user.role, token: token ? token.substring(0, 20) + '...' : 'HTTPOnly' })
 
       if (remember) {
-        localStorage.setItem('token', token)
+        if (token) localStorage.setItem('token', token)
         localStorage.setItem('user_name', user.name || '')
         localStorage.setItem('user_role', user.role || '')
         localStorage.setItem('user_doc', user.document || '')
-        console.log('💾 Token guardado en localStorage:', token.substring(0, 20) + '...')
-        console.log('💾 Verificando localStorage.token:', localStorage.getItem('token')?.substring(0, 20) + '...')
+        console.log('💾 Token guardado en localStorage:', token ? token.substring(0, 20) + '...' : 'HTTPOnly')
       } else {
         // Always use localStorage for persistence across tabs
-        localStorage.setItem('token', token)
+        if (token) localStorage.setItem('token', token)
         localStorage.setItem('user_name', user.name || '')
         localStorage.setItem('user_role', user.role || '')
         localStorage.setItem('user_doc', user.document || '')
@@ -42,7 +41,7 @@ export default function Login() {
         // Remove from sessionStorage just in case
         sessionStorage.removeItem('token')
 
-        console.log('💾 Token guardado en localStorage:', token.substring(0, 20) + '...')
+        console.log('💾 Token guardado en localStorage:', token ? token.substring(0, 20) + '...' : 'HTTPOnly')
       }
 
       // Refresh auth context with user data

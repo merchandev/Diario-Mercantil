@@ -10,6 +10,11 @@ export default function RequireSolicitante({ children }: { children: JSX.Element
     return <div className="min-h-screen grid place-items-center text-slate-600">Cargando...</div>
   }
 
+  if (!user) {
+    console.log('🔄 [RequireSolicitante] No autenticado. Redirigiendo a login')
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
   if (isAdminRole(user?.role)) {
     console.log('🔄 [RequireSolicitante] Usuario admin detectado. Redirigiendo a dashboard')
     return <Navigate to="/dashboard" state={{ from: location }} replace />
