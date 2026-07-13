@@ -55,17 +55,17 @@ export default function ForgotPassword() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none text-slate-700" htmlFor="email">
-                  Correo electrónico
+                  Correo electrónico, Cédula o Nombre
                 </label>
                 <input
                   id="email"
-                  type="email"
-                  required
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="flex h-10 w-full rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent disabled:cursor-not-allowed disabled:opacity-50"
-                  placeholder="ejemplo@correo.com"
+                  placeholder="Ej: tu@correo.com, V-12345678, Juan Perez"
                   disabled={loading}
+                  required
                 />
               </div>
 
