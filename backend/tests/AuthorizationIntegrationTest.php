@@ -27,13 +27,15 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
         
+        $now = time();
+        
         // Admin
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(1, 'admin', 'Admin', 'V123', 'admin@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('admin_session_test', 1, strftime('%s', 'now'))")->execute();
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('admin_session_test', 1, $now)")->execute();
         
         // User
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(2, 'solicitante', 'User', 'V456', 'user@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('user_session_test', 2, strftime('%s', 'now'))")->execute();
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('user_session_test', 2, $now)")->execute();
     }
     
     public static function tearDownAfterClass(): void {

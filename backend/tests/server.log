@@ -1,0 +1,5 @@
+[Sun Jul 12 20:41:10 2026] PHP 8.4.14 Development Server (http://127.0.0.1:8080) started
+[Sun Jul 12 20:41:12 2026] 127.0.0.1:57738 Accepted
+[Sun Jul 12 20:41:12 2026] {"request_id":"047ab701925436e50b41137da09b9c65","type":"RuntimeException","message":"unauthorized","trace":"#0 C:\\Users\\merch\\OneDrive\\Escritorio\\Diario-Mercantil-main\\backend\\src\\Http\\Middleware.php(9): AuthController::requireAuth()\n#1 C:\\Users\\merch\\OneDrive\\Escritorio\\Diario-Mercantil-main\\backend\\src\\Http\\Router.php(53): Middleware::{closure:Middleware::requireSession():8}()\n#2 C:\\Users\\merch\\OneDrive\\Escritorio\\Diario-Mercantil-main\\backend\\public\\index.php(163): Router->dispatch()\n#3 {main}"}
+[Sun Jul 12 20:41:12 2026] 127.0.0.1:57738 [500]: GET /api/users
+[Sun Jul 12 20:41:12 2026] 127.0.0.1:57738 Closing
