@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { apiRequest } from '../lib/api'
+import { fetchAuth } from '../lib/api'
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams()
@@ -36,11 +36,17 @@ export default function ResetPassword() {
     setLoading(true)
     setError('')
     try {
-      await apiRequest('/api/auth/reset-password', {
+      const res = await fetchAuth('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password })
       })
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Error al restablecer la contraseña')
+      }
+      
       setSuccess(true)
       setTimeout(() => {
         navigate('/login')

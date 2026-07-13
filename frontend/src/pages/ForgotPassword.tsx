@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { apiRequest } from '../lib/api'
+import { fetchAuth } from '../lib/api'
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
@@ -13,11 +13,17 @@ export default function ForgotPassword() {
     setLoading(true)
     setError('')
     try {
-      await apiRequest('/api/auth/forgot-password', {
+      const res = await fetchAuth('/api/auth/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
+      
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Error al enviar la solicitud')
+      }
+      
       setSuccess(true)
     } catch (err: any) {
       setError(err.message || 'Error al enviar la solicitud')
