@@ -68,7 +68,6 @@ final class AuthController {
              WHERE s.token_hash = ?
                AND s.revoked_at IS NULL
                AND s.expires_at > NOW()
-               AND u.deleted_at IS NULL
                AND u.status = "active"
              LIMIT 1'
         );
@@ -141,8 +140,7 @@ final class AuthController {
             }
             
             $this->checkRateLimit($doc);
-            
-            $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active' AND deleted_at IS NULL");
+            $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active'");
             $u->execute([$doc]);
             $user = $u->fetch(PDO::FETCH_ASSOC);
 
