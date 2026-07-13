@@ -122,6 +122,32 @@ class EditionPublicationService {
             $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
                  ->execute([$actorId, 'publish_edition', 'edition', $id]);
                  
+            // Send publication emails
+            try {
+                $edStmt2 = $this->pdo->prepare("SELECT code FROM editions WHERE id=?");
+                $edStmt2->execute([$id]);
+                $edCode = $edStmt2->fetchColumn() ?: "DM-$id";
+                
+                $ownersStmt = $this->pdo->prepare("SELECT u.email, u.name, l.order_no FROM legal_requests l JOIN users u ON l.user_id = u.id WHERE l.id IN ($inQuery)");
+                $ownersStmt->execute($orderIds);
+                $owners = $ownersStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                if (count($owners) > 0) {
+                    require_once __DIR__ . '/EmailService.php';
+                    foreach ($owners as $owner) {
+                        if ($owner['email']) {
+                            try {
+                                EmailService::sendPublished($owner['email'], $owner['name'], $owner['order_no'] ?? 'N/A', $edCode);
+                            } catch (Throwable $e) {
+                                error_log("Failed to send published email to {$owner['email']}: " . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            } catch (Throwable $e) {
+                error_log("Failed to process publication emails: " . $e->getMessage());
+            }
+
             if ($ownsTransaction) {
                 $this->pdo->commit();
             }

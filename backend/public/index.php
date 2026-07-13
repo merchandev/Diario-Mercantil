@@ -52,6 +52,8 @@ $adminCsrf = array_merge($admin, [Middleware::requireCsrf()]);
 // AUTH
 $router->post('/api/auth/login', [AuthController::class, 'login']);
 $router->post('/api/auth/register', [AuthController::class, 'register']);
+$router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPassword']);
+$router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
 $router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
 $router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
 

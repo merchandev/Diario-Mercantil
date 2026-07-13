@@ -63,6 +63,8 @@ const PublicacionPublic = lazyImport(() => import('./pages/PublicacionPublic'))
 const Contacto = lazyImport(() => import('./pages/Contacto'))
 const VisorEspressivoPDF = lazyImport(() => import('./pages/VisorEspressivoPDF'))
 const PublicLegalRequest = lazyImport(() => import('./pages/PublicLegalRequest'))
+const ForgotPassword = lazyImport(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazyImport(() => import('./pages/ResetPassword'))
 
 // Solicitante pages - lazy loaded
 const HistorialSolicitante = lazyImport(() => import('./pages/solicitante/Historial'))
@@ -158,6 +160,8 @@ export default function App() {
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/olvide-password" element={<LazyRoute><ForgotPassword /></LazyRoute>} />
+        <Route path="/reset-password" element={<LazyRoute><ResetPassword /></LazyRoute>} />
 
         {/* Solicitante area */}
         <Route path="/solicitante/*" element={<RequireSolicitante><ApplicantLayout /></RequireSolicitante>}>

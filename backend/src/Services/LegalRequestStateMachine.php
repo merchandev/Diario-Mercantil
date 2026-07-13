@@ -61,6 +61,18 @@ final class LegalRequestStateMachine {
             $update = $this->pdo->prepare("UPDATE legal_requests SET status='Por verificar', submitted_at=?, order_no=? WHERE id=?");
             $update->execute([$now, $orderNo, $id]);
             
+            try {
+                $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
+                $userStmt->execute([$id]);
+                $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
+                if ($owner && $owner['email']) {
+                    require_once __DIR__ . '/EmailService.php';
+                    EmailService::sendPendingPayment($owner['email'], $owner['name'], $orderNo);
+                }
+            } catch (Throwable $e) {
+                error_log("Failed to send pending payment email: " . $e->getMessage());
+            }
+
             return $orderNo;
         });
     }
@@ -74,6 +86,19 @@ final class LegalRequestStateMachine {
             $now = gmdate('Y-m-d H:i:s');
             $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")
                  ->execute([$now, $id]);
+            
+            try {
+                $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
+                $userStmt->execute([$id]);
+                $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
+                if ($owner && $owner['email']) {
+                    require_once __DIR__ . '/EmailService.php';
+                    EmailService::sendInReview($owner['email'], $owner['name'], $req['order_no'] ?? "ORD-UNKNOWN");
+                }
+            } catch (Throwable $e) {
+                error_log("Failed to send verify email: " . $e->getMessage());
+            }
+
             return true;
         });
     }
@@ -86,6 +111,19 @@ final class LegalRequestStateMachine {
 
             $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")
                  ->execute([$reason, $id]);
+            
+            try {
+                $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
+                $userStmt->execute([$id]);
+                $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
+                if ($owner && $owner['email']) {
+                    require_once __DIR__ . '/EmailService.php';
+                    EmailService::sendRejected($owner['email'], $owner['name'], $req['order_no'] ?? "ORD-UNKNOWN", $reason);
+                }
+            } catch (Throwable $e) {
+                error_log("Failed to send reject email: " . $e->getMessage());
+            }
+
             return true;
         });
     }

@@ -126,7 +126,7 @@ export default function Login() {
                 <label className="inline-flex items-center gap-2 select-none">
                   <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Recuérdame
                 </label>
-                <button type="button" className="text-slate-500 hover:text-slate-700 transition">¿Olvidé mi contraseña?</button>
+                <Link to="/olvide-password" className="text-slate-500 hover:text-slate-700 transition">¿Olvidé mi contraseña?</Link>
               </div>
               {error && <div className="text-rose-600 text-sm">{error}</div>}
               <button disabled={loading} className="relative btn btn-primary w-full overflow-hidden">

@@ -2,7 +2,8 @@
     "name": "diario/backend",
     "require": {
         "php": "^8.4",
-        "zircote/swagger-php": "^4.8"
+        "zircote/swagger-php": "^4.8",
+        "phpmailer/phpmailer": "^6.9"
     },
     "autoload": {
         "classmap": ["src/"]

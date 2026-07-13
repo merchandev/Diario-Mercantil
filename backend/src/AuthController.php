@@ -262,6 +262,17 @@ final class AuthController {
 
             self::setSessionCookies($plainToken);
 
+            // Send Welcome Email
+            if ($email !== "") {
+                try {
+                    require_once __DIR__ . '/Services/EmailService.php';
+                    EmailService::sendWelcome($email, $name);
+                } catch (Throwable $mailEx) {
+                    // Ignore email error to not break registration
+                    error_log("Failed to send welcome email: " . $mailEx->getMessage());
+                }
+            }
+
             Response::json([
                 "user" => [ 
                     "id" => (int)$uid, 
@@ -273,6 +284,103 @@ final class AuthController {
         } catch (Throwable $e) {
             http_response_code(500);
             echo json_encode(["error" => "server_error", "message" => "Error interno al registrar usuario"]);
+            exit;
+        }
+    }
+
+    public function forgotPassword(): void {
+        try {
+            $in = $this->jsonInput();
+            $email = trim($in["email"] ?? "");
+            if ($email === "" || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                Response::json(["error" => "Correo electrónico inválido"], 400);
+            }
+
+            $pdo = Database::pdo();
+            $stmt = $pdo->prepare("SELECT id, name FROM users WHERE email=? AND status='active' AND deleted_at IS NULL");
+            $stmt->execute([$email]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user) {
+                // Generate token
+                $plainToken = bin2hex(random_bytes(32));
+                $tokenHash = hash('sha256', $plainToken);
+                $expiresAt = date("Y-m-d H:i:s", time() + 3600); // 1 hour
+
+                $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)")
+                    ->execute([$email, $tokenHash, $expiresAt]);
+
+                try {
+                    require_once __DIR__ . '/Services/EmailService.php';
+                    EmailService::sendPasswordReset($email, $user['name'], $plainToken);
+                } catch (Throwable $mailEx) {
+                    error_log("Failed to send password reset email: " . $mailEx->getMessage());
+                    Response::json(["error" => "Error al enviar el correo de recuperación"], 500);
+                }
+            }
+
+            // Always return OK to prevent email enumeration
+            Response::json(["ok" => true]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(["error" => "server_error", "message" => "Error interno"]);
+            exit;
+        }
+    }
+
+    public function resetPassword(): void {
+        try {
+            $in = $this->jsonInput();
+            $token = trim($in["token"] ?? "");
+            $password = (string)($in["password"] ?? "");
+
+            if ($token === "" || $password === "") {
+                Response::json(["error" => "Datos incompletos"], 400);
+            }
+            if (strlen($password) < 6) {
+                Response::json(["error" => "La contraseña debe tener al menos 6 caracteres"], 400);
+            }
+
+            $pdo = Database::pdo();
+            $tokenHash = hash('sha256', $token);
+            $now = date("Y-m-d H:i:s");
+
+            $stmt = $pdo->prepare("SELECT email FROM password_resets WHERE token=? AND expires_at > ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$tokenHash, $now]);
+            $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$reset) {
+                Response::json(["error" => "Enlace inválido o expirado"], 400);
+            }
+
+            $email = $reset['email'];
+            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
+
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE email=? AND status='active' AND deleted_at IS NULL")
+                    ->execute([$passwordHash, $now, $email]);
+                
+                // Invalidate all tokens for this email
+                $pdo->prepare("DELETE FROM password_resets WHERE email=?")->execute([$email]);
+                
+                // Also revoke all sessions for security
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE email=?");
+                $stmt->execute([$email]);
+                $uid = $stmt->fetchColumn();
+                if ($uid) {
+                    $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$uid]);
+                }
+
+                $pdo->commit();
+                Response::json(["ok" => true]);
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(["error" => "server_error", "message" => "Error interno"]);
             exit;
         }
     }
