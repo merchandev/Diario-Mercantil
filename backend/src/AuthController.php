@@ -297,7 +297,7 @@ final class AuthController {
             }
 
             $pdo = Database::pdo();
-            $stmt = $pdo->prepare("SELECT id, name FROM users WHERE email=? AND status='active' AND deleted_at IS NULL");
+            $stmt = $pdo->prepare("SELECT id, name FROM users WHERE email=? AND status='active'");
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -358,7 +358,7 @@ final class AuthController {
 
             $pdo->beginTransaction();
             try {
-                $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE email=? AND status='active' AND deleted_at IS NULL")
+                $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE email=? AND status='active'")
                     ->execute([$passwordHash, $now, $email]);
                 
                 // Invalidate all tokens for this email
