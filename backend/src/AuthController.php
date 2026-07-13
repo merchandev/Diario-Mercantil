@@ -291,17 +291,19 @@ final class AuthController {
     public function forgotPassword(): void {
         try {
             $in = $this->jsonInput();
-            $email = trim($in["email"] ?? "");
-            if ($email === "" || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                Response::json(["error" => "Correo electrónico inválido"], 400);
+            // frontend might send it as 'email' or 'identifier'
+            $identifier = trim($in["identifier"] ?? $in["email"] ?? "");
+            if ($identifier === "") {
+                Response::json(["error" => "Debes ingresar tu correo, documento o nombre"], 400);
             }
 
             $pdo = Database::pdo();
-            $stmt = $pdo->prepare("SELECT id, name FROM users WHERE email=? AND status='active'");
-            $stmt->execute([$email]);
+            $stmt = $pdo->prepare("SELECT id, name, email FROM users WHERE (email=? OR document=? OR name=?) AND status='active'");
+            $stmt->execute([$identifier, $identifier, $identifier]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($user) {
+            if ($user && !empty($user['email'])) {
+                $email = $user['email'];
                 // Generate token
                 $plainToken = bin2hex(random_bytes(32));
                 $tokenHash = hash('sha256', $plainToken);
@@ -315,7 +317,7 @@ final class AuthController {
                     EmailService::sendPasswordReset($email, $user['name'], $plainToken);
                 } catch (Throwable $mailEx) {
                     error_log("Failed to send password reset email: " . $mailEx->getMessage());
-                    Response::json(["error" => "Error al enviar el correo de recuperación"], 500);
+                    Response::json(["error" => "Error de correo: " . $mailEx->getMessage()], 500);
                 }
             }
 
