@@ -384,4 +384,48 @@ final class AuthController {
             exit;
         }
     }
+
+    public function superadminLogin(): void {
+        try {
+            $pdo = Database::pdo();
+            $in = $this->jsonInput();
+            $username = trim($in["username"] ?? "");
+            $pass = (string)($in["password"] ?? "");
+            
+            if (empty($username) || empty($pass)) {
+                Response::json(["error"=>"invalid_credentials"], 401);
+            }
+            
+            $this->checkRateLimit("sa_" . $username);
+            $stmt = $pdo->prepare("SELECT * FROM superadmins WHERE username=?");
+            $stmt->execute([$username]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user || !password_verify($pass, $user["password_hash"])) {
+                $this->recordFailedAttempt("sa_" . $username);
+                Response::json(["error"=>"invalid_credentials"], 401);
+            }
+
+            $plainToken = bin2hex(random_bytes(32));
+            $tokenHash = hash('sha256', $plainToken);
+            $expiresAt = date("Y-m-d H:i:s", time() + 604800);
+            
+            $pdo->prepare("INSERT INTO superadmin_tokens (superadmin_id, token, expires_at, created_at) VALUES (?, ?, ?, NOW())")
+                ->execute([$user["id"], $tokenHash, $expiresAt]);
+
+            self::setSessionCookies($plainToken);
+
+            Response::json([
+                "token" => $plainToken,
+                "superadmin" => [ 
+                    "id" => (int)$user["id"], 
+                    "username" => $user["username"]
+                ]
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode(["error" => "server_error", "message" => "Error interno"]);
+            exit;
+        }
+    }
 }

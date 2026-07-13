@@ -56,6 +56,7 @@ $router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPasswo
 $router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
 $router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
 $router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
+$router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);
