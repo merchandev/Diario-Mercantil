@@ -167,7 +167,7 @@ require_once __DIR__."/../src/Exceptions/HttpException.php";
 try {
     $router->dispatch($method, $uri);
 } catch (HttpException $e) {
-    Response::json(['error' => $e->getCodeStr(), 'message' => $e->getMessage()], $e->getHttpCode());
+    Response::json(['error' => $e->errorCode, 'message' => $e->getMessage()], $e->status);
 } catch (Throwable $e) {
     error_log((string)$e);
     Response::json(['error' => 'server_error', 'message' => 'Error interno del servidor'], 500);
