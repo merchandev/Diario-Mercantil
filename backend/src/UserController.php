@@ -23,12 +23,12 @@ class UserController {
     }
     $pdo = Database::pdo();
     $q = trim($_GET["q"] ?? "");
-    $sql = "SELECT id, document, name, role, email, phone, status, person_type, deleted_at FROM users";
+    $sql = "SELECT id, document, name, role, email, phone, status, person_type FROM users";
     if ($q !== "") {
-      $stmt = $pdo->prepare($sql." WHERE (document LIKE ? OR name LIKE ?) AND deleted_at IS NULL ORDER BY id DESC LIMIT 500");
+      $stmt = $pdo->prepare($sql." WHERE (document LIKE ? OR name LIKE ?) ORDER BY id DESC LIMIT 500");
       $stmt->execute(["%".$q."%","%".$q."%"]);
     } else {
-      $stmt = $pdo->query($sql." WHERE deleted_at IS NULL ORDER BY id DESC LIMIT 500");
+      $stmt = $pdo->query($sql." ORDER BY id DESC LIMIT 500");
     }
     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
@@ -159,7 +159,7 @@ class UserController {
           if (!RolePolicy::canModifyUser($u, $target)) { Response::json(["error"=>"forbidden", "message"=>"No tienes jerarquía para suspender este usuario."], 403); exit; }
           
           if ($target['role'] === RolePolicy::SUPERADMIN) {
-              $cnt = $pdo->query("SELECT COUNT(*) FROM users WHERE role='superadmin' AND status='active' AND deleted_at IS NULL")->fetchColumn();
+              $cnt = $pdo->query("SELECT COUNT(*) FROM users WHERE role='superadmin' AND status='active'")->fetchColumn();
               if ($cnt <= 1) {
                   Response::json(["error"=>"conflict", "message"=>"No se puede suspender al último superadministrador activo."], 409); exit;
               }
@@ -188,8 +188,8 @@ class UserController {
           if (!RolePolicy::canModifyUser($u, $target)) { Response::json(["error"=>"forbidden"], 403); exit; }
           
           $pdo->beginTransaction();
-          $pdo->prepare("UPDATE users SET status='active', deleted_at=NULL, updated_at=NOW() WHERE id=?")->execute([$id]);
-          $this->audit($pdo, $u['id'], 'restore', 'user', $id, ['status'=>$target['status'], 'deleted_at'=>$target['deleted_at']], ['status'=>'active', 'deleted_at'=>null]);
+          $pdo->prepare("UPDATE users SET status='active', updated_at=NOW() WHERE id=?")->execute([$id]);
+          $this->audit($pdo, $u['id'], 'restore', 'user', $id, ['status'=>$target['status']], ['status'=>'active']);
           $pdo->commit();
           
           Response::json(["ok"=>true]);
@@ -262,17 +262,17 @@ class UserController {
         if (!RolePolicy::canDeleteUser($u, $target)) { Response::json(["error"=>"forbidden", "message"=>"Jerarquía insuficiente."], 403); exit; }
         
         if ($target['role'] === RolePolicy::SUPERADMIN) {
-            $cnt = $pdo->query("SELECT COUNT(*) FROM users WHERE role='superadmin' AND status='active' AND deleted_at IS NULL")->fetchColumn();
+            $cnt = $pdo->query("SELECT COUNT(*) FROM users WHERE role='superadmin' AND status='active'")->fetchColumn();
             if ($cnt <= 1) {
                 Response::json(["error"=>"conflict", "message"=>"No se puede eliminar al último superadministrador activo."], 409); exit;
             }
         }
         
         $pdo->beginTransaction();
-        $pdo->prepare("UPDATE users SET deleted_at=NOW(), deleted_by=?, deletion_reason=?, updated_at=NOW() WHERE id=?")
-            ->execute([$u['id'], 'Eliminación lógica API', $id]);
+        $pdo->prepare("UPDATE users SET status='deleted', updated_at=NOW() WHERE id=?")
+            ->execute([$id]);
         $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
-        $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['deleted_at'=>'NOW()']);
+        $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['status'=>'deleted']);
         $pdo->commit();
         
         Response::json(["ok"=>true]);
