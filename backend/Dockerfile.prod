@@ -23,7 +23,7 @@ COPY php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 # Install dependencies
-RUN composer install --no-dev --optimize-autoloader
+RUN composer update --no-dev --optimize-autoloader
 
 # Create storage directories with correct permissions
 RUN mkdir -p storage/uploads storage/results && \
