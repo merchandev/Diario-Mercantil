@@ -428,4 +428,28 @@ final class AuthController {
             exit;
         }
     }
+
+    public function verifySuperAdmin(): void {
+        try {
+            $token = self::sessionToken() ?? str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            if (!$token) throw new Exception();
+
+            $pdo = Database::pdo();
+            $tokenHash = hash('sha256', $token);
+            $stmt = $pdo->prepare("
+                SELECT u.id, u.username 
+                FROM superadmin_tokens t
+                JOIN superadmins u ON u.id = t.superadmin_id
+                WHERE t.token = ? AND t.expires_at > NOW()
+            ");
+            $stmt->execute([$tokenHash]);
+            $sa = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$sa) throw new Exception();
+            Response::json(["ok" => true, "superadmin" => $sa]);
+        } catch (Throwable $e) {
+            Response::json(["error" => "unauthorized"], 401);
+        }
+    }
 }
+
