@@ -195,9 +195,9 @@ final class AuthController {
                 "role" => $u["role"], 
                 "email" => $u["email"],
                 "phone" => $u["phone"],
-                "state" => $u["state"],
-                "municipality" => $u["municipality"],
-                "address" => $u["address"],
+                "state" => $u["state"] ?? '',
+                "municipality" => $u["municipality"] ?? '',
+                "address" => $u["address"] ?? '',
                 "person_type" => $u["person_type"],
                 "avatar_url" => $u["avatar_url"] ?? null
             ]]);
