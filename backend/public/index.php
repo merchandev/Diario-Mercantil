@@ -126,7 +126,7 @@ $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 // SYSTEM & PAGES
 $router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
 $router->get('/api/rate/bcv', [RateController::class, 'bcv']);
-$router->get('/api/settings', [SystemController::class, 'getSettings'], $admin);
+$router->get('/api/settings', [SystemController::class, 'getSettings']);
 $router->post('/api/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
 $router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
