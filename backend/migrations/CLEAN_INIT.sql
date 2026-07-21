@@ -53,6 +53,9 @@ CREATE TABLE users (
   phone VARCHAR(50),
   email VARCHAR(255),
   person_type VARCHAR(50) DEFAULT 'natural',
+  state VARCHAR(100) DEFAULT '',
+  municipality VARCHAR(100) DEFAULT '',
+  address TEXT,
   avatar_url VARCHAR(255),
   status VARCHAR(50) DEFAULT 'active',
   created_at DATETIME NOT NULL,
@@ -222,10 +225,12 @@ CREATE TABLE directory_colleges (
 -- ============================================
 CREATE TABLE pages (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  slug VARCHAR(255) NOT NULL UNIQUE,
+  slug VARCHAR(100) NOT NULL UNIQUE,
   title VARCHAR(255) NOT NULL,
-  content TEXT,
-  published TINYINT(1) DEFAULT 1,
+  header_html TEXT,
+  body_json TEXT,
+  footer_html TEXT,
+  status VARCHAR(50) DEFAULT 'published',
   created_at DATETIME NOT NULL,
   updated_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
