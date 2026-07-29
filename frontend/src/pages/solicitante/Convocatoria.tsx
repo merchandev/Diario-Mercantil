@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPayments, type PaymentMethod, submitLegal } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal } from '../../lib/api'
 import YearPicker from '../../components/YearPicker'
 
 type ConvocatoriaPaymentForm = {
@@ -27,7 +27,7 @@ export default function Convocatoria() {
   const [user, setUser] = useState<any>({})
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
 
-  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPayments().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
+  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPaymentMethods().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setUser(u); setPay(p => ({ ...p, document: p.document || u.document || '', mobile_phone: p.mobile_phone || u.phone || '', })); } catch { } })(); }, [])
 
   useEffect(() => {

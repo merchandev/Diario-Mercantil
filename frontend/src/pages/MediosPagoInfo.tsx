@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { listPayments, type PaymentMethod } from '../lib/api'
+import { listPaymentMethods, type PaymentMethod } from '../lib/api'
 
 export default function MediosPagoInfo(){
   const [items, setItems] = useState<PaymentMethod[]>([])
-  useEffect(()=>{ listPayments().then(r=>setItems(r.items)).catch(()=>setItems([])) },[])
+  useEffect(()=>{ listPaymentMethods().then(r=>setItems(r.items)).catch(()=>setItems([])) },[])
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Medios de pago</h1>
