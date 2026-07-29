@@ -121,8 +121,9 @@ final class BcvScraper
         }
         libxml_use_internal_errors(true);
         $dom = new \DOMDocument();
-        $htmlEnc = mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8');
-        if (!$dom->loadHTML($htmlEnc)) {
+        // Inyectar declaración de charset para que DOMDocument interprete UTF-8 correctamente.
+        // Reemplaza mb_convert_encoding('HTML-ENTITIES') que está deprecado en PHP 8.3.
+        if (!$dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD | LIBXML_NOERROR)) {
             throw new \RuntimeException('BCV HTML parse failed');
         }
         libxml_clear_errors();

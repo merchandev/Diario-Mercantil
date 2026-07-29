@@ -13,21 +13,13 @@ export function getToken() {
   // If we are in the superadmin section, prefer superadmin token
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/lotus/')) {
     const t = localStorage.getItem('superadmin_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
-    const token = (t && t !== 'null' && t !== 'undefined') ? t : '';
-    console.log('🔑 [getToken] Lotus mode - Token:', token ? token.substring(0, 20) + '...' : 'NULL');
-    return token;
+    return (t && t !== 'null' && t !== 'undefined') ? t : '';
   }
   const localToken = localStorage.getItem('token');
   const superToken = localStorage.getItem('superadmin_token');
   const sessionToken = sessionStorage.getItem('token');
-
-  console.log('🔑 [getToken] localStorage.token:', localToken ? localToken.substring(0, 20) + '...' : 'NULL');
-  console.log('🔑 [getToken] sessionStorage.token:', sessionToken ? sessionToken.substring(0, 20) + '...' : 'NULL');
-
   const t = localToken || superToken || sessionToken;
-  const token = (t && t !== 'null' && t !== 'undefined') ? t : '';
-  console.log('🔑 [getToken] Final token:', token ? token.substring(0, 20) + '...' : 'NULL');
-  return token;
+  return (t && t !== 'null' && t !== 'undefined') ? t : '';
 }
 
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
@@ -334,6 +326,11 @@ export async function deleteEdition(id: number) {
 
 // Payment methods
 export type PaymentMethod = { id: number; type: string; bank: string; account: string; holder: string; rif: string; phone: string }
+
+/**
+ * Para el panel de administración (requiere rol admin).
+ * Incluye creación, edición y eliminación.
+ */
 export async function listPayments() {
   const res = await fetchAuth('/api/payments')
   return res.json() as Promise<{ items: PaymentMethod[] }>
@@ -345,6 +342,15 @@ export async function createPayment(body: Partial<PaymentMethod>) {
 export async function deletePayment(id: number) {
   const res = await fetchAuth(`/api/payments/${id}`, { method: 'DELETE' })
   return res.json()
+}
+
+/**
+ * Disponible para cualquier usuario autenticado (solicitante o admin).
+ * Solo lectura — usar en el formulario de pago del solicitante.
+ */
+export async function listPaymentMethods() {
+  const res = await fetchAuth('/api/payment-methods')
+  return res.json() as Promise<{ items: PaymentMethod[] }>
 }
 
 // Legal requests
@@ -523,8 +529,13 @@ export async function updateUser(id: number, body: { name?: string; role?: strin
   return res.json()
 }
 export async function setUserPassword(id: number, password: string) {
-  const res = await fetchAuth(`/api/users/${id}/password`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })
-  return res.json()
+  // Ruta correcta del backend: /api/admin/users/{id}/reset-password
+  const res = await fetchAuth(`/api/admin/users/${id}/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  return res.json() as Promise<{ ok: true }>
 }
 export async function deleteUser(id: number) {
   const res = await fetchAuth(`/api/users/${id}`, { method: 'DELETE' })

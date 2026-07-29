@@ -314,8 +314,12 @@ final class AuthController {
                     require_once __DIR__ . '/Services/EmailService.php';
                     EmailService::sendPasswordReset($email, $user['name'], $plainToken);
                 } catch (Throwable $mailEx) {
+                    // Registrar internamente sin exponer detalles SMTP al cliente
                     error_log("Failed to send password reset email: " . $mailEx->getMessage());
-                    Response::json(["error" => "Error de correo: " . $mailEx->getMessage()], 500);
+                    Response::json([
+                        "error"   => "mail_unavailable",
+                        "message" => "No fue posible enviar el correo en este momento. Contacta al administrador."
+                    ], 503);
                 }
             }
 

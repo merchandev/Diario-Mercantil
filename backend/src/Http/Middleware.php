@@ -30,6 +30,17 @@ final class Middleware
             
             $cookie = $_COOKIE['dm_csrf'] ?? '';
             $header = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+
+            // Log de diagnóstico CSRF — solo presencia, nunca valores (Fix #6)
+            error_log(json_encode([
+                'event'                  => 'csrf_check',
+                'path'                   => $_SERVER['REQUEST_URI'] ?? '',
+                'method'                 => $_SERVER['REQUEST_METHOD'] ?? '',
+                'session_cookie_present' => isset($_COOKIE['dm_session']),
+                'csrf_cookie_present'    => (bool)$cookie,
+                'csrf_header_present'    => (bool)$header,
+                'match'                  => ($cookie && $header) ? hash_equals($cookie, $header) : false,
+            ]));
             
             if (!$cookie || !$header || !hash_equals($cookie, $header)) {
                 throw new HttpException(403, 'csrf_invalid', 'Token CSRF inválido o ausente');
