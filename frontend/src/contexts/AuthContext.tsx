@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react'
-import { me as apiMe, getToken } from '../lib/api'
+import { me as apiMe } from '../lib/api'
 
 export interface User {
     id: number

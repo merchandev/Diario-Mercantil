@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, getToken, listPaymentMethods, type PaymentMethod, submitLegal } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 

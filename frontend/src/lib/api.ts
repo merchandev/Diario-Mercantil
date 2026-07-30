@@ -9,27 +9,8 @@ export type FileRow = {
 }
 
 // Auth helpers
-export function getToken() {
-  // If we are in the superadmin section, prefer superadmin token
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/lotus/')) {
-    const t = localStorage.getItem('superadmin_token') || localStorage.getItem('token') || sessionStorage.getItem('token');
-    return (t && t !== 'null' && t !== 'undefined') ? t : '';
-  }
-  const localToken = localStorage.getItem('token');
-  const superToken = localStorage.getItem('superadmin_token');
-  const sessionToken = sessionStorage.getItem('token');
-  const t = localToken || superToken || sessionToken;
-  return (t && t !== 'null' && t !== 'undefined') ? t : '';
-}
-
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
-  const token = getToken()
   const headers = new Headers(init?.headers || {})
-  
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-    headers.set('X-Auth-Token', token)
-  }
 
   // Add CSRF token from cookies if available
   if (typeof document !== 'undefined') {
@@ -499,10 +480,7 @@ export async function uploadLegalPdf(file: File, id?: number) {
   fd.append('file', file)
   if (id) fd.append('legal_request_id', String(id))
 
-  // Use query param token as fallback for aggressive proxies stripping headers
-  const token = getToken();
-  const url = `/api/legal/upload-pdf${token ? '?token=' + encodeURIComponent(token) : ''}`;
-
+  const url = '/api/legal/upload-pdf';
   const res = await fetchAuth(url, { method: 'POST', body: fd })
   return res.json() as Promise<{ ok: true; id: number; file_id: number; folios: number; pricing: { price_per_folio_usd: number; bcv_rate: number; iva_percent: number; unit_bs: number; subtotal_bs: number; iva_bs: number; total_bs: number } }>
 }

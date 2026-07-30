@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { IconSearch, IconTrash, IconDownload, IconClose, IconPlus, IconSave, IconQrCode } from '../components/icons'
-import { listLegal, type LegalRequest, getLegal, updateLegal, rejectLegal, addLegalPayment, deleteLegalPayment, type LegalPayment, downloadLegal, deleteLegal, getToken } from '../lib/api'
+import { listLegal, type LegalRequest, getLegal, updateLegal, rejectLegal, addLegalPayment, deleteLegalPayment, type LegalPayment, downloadLegal, deleteLegal } from '../lib/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QRCodeModal from '../components/QRCodeModal'
 
@@ -28,7 +28,7 @@ export default function Publicaciones() {
   const reload = () => {
     console.log('🔄 [Publicaciones Admin] Recargando lista de publicaciones...')
     console.log('🔍 [Publicaciones Admin] Filtros:', { q, status, reqFrom, reqTo, pubFrom, pubTo })
-    console.log('🔑 [Publicaciones Admin] Token presente:', !!getToken())
+    console.log('🔑 [Publicaciones Admin] Fetching publicaciones...')
     setLoading(true)
     setError(null)
     const filters = {
