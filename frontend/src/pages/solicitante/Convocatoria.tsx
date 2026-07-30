@@ -64,8 +64,8 @@ export default function Convocatoria() {
   const onUpload = async (kind: string, filesList: FileList | null) => {
     if (!filesList) return; const r = await ensureDraft(); const arr = Array.from(filesList) as File[]
     const up = await uploadFiles(arr)
-    const ids = (up.items || up).map((x: any) => x.id)
-    for (const fid of ids) await attachLegalFile(r.id, fid, kind)
+    const fileIds = (up.created || []).map((it: any) => it.fileId)
+    for (const fid of fileIds) await attachLegalFile(r.id, fid, kind)
     const lf = await listLegalFiles(r.id); setFiles(lf.items)
   }
 

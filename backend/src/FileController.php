@@ -193,7 +193,9 @@ class FileController {
     $ed->execute([$id]);
     $editionStatus = $ed->fetchColumn();
     
-    if ($editionStatus !== 'Publicada') {
+    $isPublic = ($editionStatus === 'Publicada');
+    
+    if (!$isPublic) {
         require_once __DIR__.'/AuthController.php';
         $u = AuthController::userFromToken();
         if (!$u) {
@@ -230,8 +232,13 @@ class FileController {
     header('Content-Disposition: inline; filename="' . $downloadName . '"'); // inline to view, attachment to download
     
     // Prevent caching issues
-    header('Cache-Control: public, max-age=3600');
-    header('Pragma: public');
+    if ($isPublic) {
+        header('Cache-Control: public, max-age=3600');
+        header('Pragma: public');
+    } else {
+        header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+    }
     
     readfile($filePath);
     exit;

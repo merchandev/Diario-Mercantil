@@ -9,7 +9,7 @@ class PaymentController {
     Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
   public function create(){
-    $u = AuthController::userFromToken(AuthController::bearerToken());
+    $u = AuthController::requireAuth();
     if (!$u || ($u['role'] ?? '') !== 'admin') {
       return Response::json(['error'=>'forbidden'], 403);
     }
@@ -27,7 +27,7 @@ class PaymentController {
     Response::json(['ok'=>true,'id'=>$pdo->lastInsertId()]);
   }
   public function delete($id){
-    $u = AuthController::userFromToken(AuthController::bearerToken());
+    $u = AuthController::requireAuth();
     if (!$u || ($u['role'] ?? '') !== 'admin') {
       return Response::json(['error'=>'forbidden'], 403);
     }

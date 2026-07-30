@@ -29,7 +29,7 @@ final class LegalRequestStateMachine {
             $result = $logic($req);
 
             // Audit
-            $u = AuthController::userFromToken(AuthController::bearerToken());
+            $u = AuthController::requireAuth();
             $actorId = $u['id'] ?? null;
             $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
                 ->execute([$actorId, $action, 'legal_request', $id]);

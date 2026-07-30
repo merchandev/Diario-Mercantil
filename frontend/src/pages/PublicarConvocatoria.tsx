@@ -100,11 +100,10 @@ export default function PublicarConvocatoria() {
     setBusy(true)
     try {
       const up = await uploadFiles([file])
-      const id = (up.items?.[0]?.id) || (up[0]?.id) || up.id
-      if (id) {
-        await attachLegalFile(requestId, id, kind)
-        setUpState(s => ({ ...s, [kind === 'convocatoria_imagen' ? 'img' : (kind === 'convocatoria_texto' ? 'doc' : 'logo')]: id }))
-      }
+      const fid = up.created?.[0]?.fileId
+      if (!fid) throw new Error('No se recibió el ID del archivo')
+      await attachLegalFile(requestId, fid, kind)
+      setUpState(s => ({ ...s, [kind === 'convocatoria_imagen' ? 'img' : (kind === 'convocatoria_texto' ? 'doc' : 'logo')]: fid }))
     } catch (e: any) {
       alert('Error subiendo archivo: ' + e.message)
     } finally {

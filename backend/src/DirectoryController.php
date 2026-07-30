@@ -4,7 +4,7 @@ require_once __DIR__.'/Database.php';
 require_once __DIR__.'/AuthController.php';
 
 class DirectoryController {
-  private function currentUser(){ return AuthController::userFromToken(AuthController::bearerToken()); }
+  private function currentUser(){ return AuthController::requireAuth(); }
 
   public function getProfile(){
     $pdo = Database::pdo();

@@ -516,6 +516,12 @@ class LegalController {
     $in = json_decode(file_get_contents('php://input'),true);
     $pdo = Database::pdo();
     
+    $s = $pdo->prepare("SELECT COUNT(*) FROM legal_files WHERE file_id=? AND legal_request_id!=?");
+    $s->execute([$in['file_id'], $id]);
+    if ($s->fetchColumn() > 0) {
+        return Response::json(['error'=>'El archivo ya está adjunto a otra solicitud'], 400);
+    }
+    
     $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $in['kind']]);
     
     $pdo->prepare("INSERT INTO legal_files(legal_request_id,file_id,kind,created_at) VALUES(?,?,?,NOW())")
@@ -527,7 +533,7 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $this->ensureMutable($id);
-    Database::pdo()->prepare("DELETE FROM legal_files WHERE id=?")->execute([$fid]);
+    Database::pdo()->prepare("DELETE FROM legal_files WHERE id=? AND legal_request_id=?")->execute([$fid, $id]);
     Response::json(['ok'=>true]);
   }
 }

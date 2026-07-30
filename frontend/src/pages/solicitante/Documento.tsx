@@ -593,12 +593,8 @@ export default function Documento() {
 
       formData.append('file', file)
 
-      const res = await fetch('/api/legal/upload-pdf', {
+      const res = await fetchAuth('/api/legal/upload-pdf', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${getToken()}`,
-          'X-Auth-Token': getToken()
-        },
         body: formData
       })
 
@@ -789,7 +785,7 @@ export default function Documento() {
     const input = e.target; if (!input.files || !req) return
     const arr = Array.from(input.files) as File[]
     const up = await uploadFiles(arr)
-    const fileIds = (up.items || up).map((it: any) => it.id)
+    const fileIds = (up.created || []).map((it: any) => it.fileId)
     for (const fid of fileIds) { await attachLegalFile(req.id, fid, 'document_folio') }
     const lf = await listLegalFiles(req.id); setFiles(lf.items)
   }

@@ -111,9 +111,9 @@ export default function PublicarDocumento() {
     try {
       const arr = Array.from(files)
       const up = await uploadFiles(arr)
-      const ids: number[] = (up.items || up || []).map((x: any) => x.id)
-      for (const id of ids) { await attachLegalFile(requestId, id, 'folio') }
-      setFolios(prev => Math.max(prev, ids.length))
+      const fileIds = (up.created || []).map((it: any) => it.fileId)
+      for (const id of fileIds) { await attachLegalFile(requestId, id, 'folio') }
+      setFolios(prev => Math.max(prev, fileIds.length))
       alert('Folios adjuntados correctamente.')
     } catch (e: any) {
       alert('Error al subir archivos: ' + e.message)

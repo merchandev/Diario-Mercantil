@@ -93,6 +93,8 @@ $router->post('/api/legal/{id}/verify', [LegalController::class, 'verify'], $adm
 $router->post('/api/legal/{id}/return-to-draft', [LegalController::class, 'returnToDraft'], $adminCsrf);
 $router->get('/api/legal/{id}/download', [LegalController::class, 'download'], $auth);
 $router->get('/api/legal/{id}/files', [LegalController::class, 'listFiles'], $auth);
+$router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $csrf);
+$router->delete('/api/legal/{id}/files/{fid}', [LegalController::class, 'detachFile'], $csrf);
 $router->post('/api/legal/{id}/payments', [LegalController::class, 'addPayment'], $csrf);
 $router->delete('/api/legal/{id}/payments/{pid}', [LegalController::class, 'deletePayment'], $csrf);
 $router->get('/api/legal/public/check', [LegalController::class, 'getPublic']);
@@ -119,8 +121,8 @@ $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adm
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
-$router->get('/api/e/{id}/download', [EditionController::class, 'downloadById'], $auth);
-$router->get('/api/e/{code}/download', [EditionController::class, 'downloadByCode'], $auth);
+$router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById'], $auth);
+$router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode'], $auth);
 $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES

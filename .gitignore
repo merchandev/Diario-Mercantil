@@ -19,3 +19,4 @@ backend/storage/uploads/*
 !backend/storage/uploads/.gitignore
 backend/storage/results/*
 !backend/storage/results/.gitignore
+backend/*.sqlite

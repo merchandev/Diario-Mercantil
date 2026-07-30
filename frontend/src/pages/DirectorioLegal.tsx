@@ -23,7 +23,7 @@ export default function DirectorioLegal(){
   const onUpload = async(file: File|null, kind:'profile'|'inpre')=>{
     if (!file) return
     const up = await uploadFiles([file] as any)
-    const id = (up.items?.[0]?.id) || (up[0]?.id) || up.id
+    const id = up.created?.[0]?.fileId
     if (id) {
       try {
         await setDirectoryPhoto(id, kind)
