@@ -68,6 +68,7 @@ $router->post('/api/admin/users/{id}/suspend', [UserController::class, 'suspend'
 $router->post('/api/admin/users/{id}/restore', [UserController::class, 'restore'], $adminCsrf);
 $router->post('/api/admin/users/{id}/role', [UserController::class, 'changeRole'], $adminCsrf);
 $router->post('/api/admin/users/{id}/reset-password', [UserController::class, 'resetPassword'], $adminCsrf);
+$router->post('/api/users/{id}/password', [UserController::class, 'resetPassword'], $adminCsrf); // Alias for backward compatibility
 
 // PROFILE
 class ProfileProxy { 
@@ -128,8 +129,9 @@ $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 // SYSTEM & PAGES
 $router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
 $router->get('/api/rate/bcv', [RateController::class, 'bcv']);
-$router->get('/api/settings', [SystemController::class, 'getSettings']);
-$router->post('/api/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
+$router->get('/api/settings', [SystemController::class, 'getPublicSettings']);
+$router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $admin);
+$router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
@@ -151,8 +153,8 @@ $router->get('/api/directory/colleges', [StubController::class, 'emptyList']);
 // HEALTH
 $router->get('/api/health/live', [HealthController::class, 'live']);
 $router->get('/api/health/ready', [HealthController::class, 'ready']);
-// METRICS (Note: We'll protect this with Nginx in phase 9)
-$router->get('/metrics', [MetricsController::class, 'prometheus']);
+// METRICS (Protected with admin middleware)
+$router->get('/metrics', [MetricsController::class, 'prometheus'], $admin);
 
 // OPENAPI
 class OpenApiController {
@@ -164,7 +166,7 @@ class OpenApiController {
         exit;
     }
 }
-$router->get('/api/docs/openapi.yaml', [OpenApiController::class, 'yaml']);
+$router->get('/api/docs/openapi.yaml', [OpenApiController::class, 'yaml'], $admin);
 
 $uri = parse_url($_SERVER["REQUEST_URI"], PHP_URL_PATH);
 $method = $_SERVER["REQUEST_METHOD"];

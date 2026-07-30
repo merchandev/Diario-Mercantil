@@ -60,8 +60,9 @@ class PagesController {
     // Reserve special slugs managed outside the CMS
     if ($slug==='contacto') return Response::json(['error'=>'slug_reserved','message'=>'El slug "contacto" está reservado'], 400);
     $title = trim((string)($in['title'] ?? 'Nueva página'));
-    $header = (string)($in['header_html'] ?? '');
-    $footer = (string)($in['footer_html'] ?? '');
+    $allowedTags = '<b><i><u><strong><em><a><br><p><ul><li><ol><h1><h2><h3><h4><h5><h6>';
+    $header = strip_tags((string)($in['header_html'] ?? ''), $allowedTags);
+    $footer = strip_tags((string)($in['footer_html'] ?? ''), $allowedTags);
     $blocks = $this->normalizeBlocks($in['body_blocks'] ?? []);
     $now = gmdate('c');
     $stmt = $pdo->prepare('INSERT INTO pages(slug,title,header_html,body_json,footer_html,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
@@ -91,8 +92,9 @@ class PagesController {
     $slug = isset($in['slug']) ? $this->slugify($in['slug']) : $row['slug'];
     if ($slug==='contacto') return Response::json(['error'=>'slug_reserved','message'=>'El slug "contacto" está reservado'], 400);
     $title = isset($in['title']) ? (string)$in['title'] : $row['title'];
-    $header = array_key_exists('header_html',$in) ? (string)$in['header_html'] : ($row['header_html'] ?? '');
-    $footer = array_key_exists('footer_html',$in) ? (string)$in['footer_html'] : ($row['footer_html'] ?? '');
+    $allowedTags = '<b><i><u><strong><em><a><br><p><ul><li><ol><h1><h2><h3><h4><h5><h6>';
+    $header = array_key_exists('header_html',$in) ? strip_tags((string)$in['header_html'], $allowedTags) : ($row['header_html'] ?? '');
+    $footer = array_key_exists('footer_html',$in) ? strip_tags((string)$in['footer_html'], $allowedTags) : ($row['footer_html'] ?? '');
     $status = isset($in['status']) ? (string)$in['status'] : ($row['status'] ?? 'published');
     $blocks = array_key_exists('body_blocks',$in) ? $this->normalizeBlocks($in['body_blocks']) : json_decode($row['body_json'] ?? '[]', true);
     $now = gmdate('c');

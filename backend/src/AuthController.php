@@ -232,7 +232,7 @@ final class AuthController {
             $address = trim($in["address"] ?? "");
 
             if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
-            if (strlen($password) < 6) Response::json(["error"=>"La contraseña debe tener al menos 6 caracteres"], 400);
+            if (strlen($password) < 12) Response::json(["error"=>"La contraseña debe tener al menos 12 caracteres"], 400);
             if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) Response::json(["error"=>"Formato de correo electrónico inválido"], 400);
             
             $document = strtoupper(preg_replace('/[^A-Z0-9-]/i', '', $document));
@@ -289,42 +289,42 @@ final class AuthController {
     public function forgotPassword(): void {
         try {
             $in = $this->jsonInput();
-            // frontend might send it as 'email' or 'identifier'
             $identifier = trim($in["identifier"] ?? $in["email"] ?? "");
             if ($identifier === "") {
-                Response::json(["error" => "Debes ingresar tu correo, documento o nombre"], 400);
+                Response::json(["ok" => true, "message" => "Si la cuenta existe, recibirás instrucciones."], 200);
             }
 
             $pdo = Database::pdo();
-            $stmt = $pdo->prepare("SELECT id, name, email FROM users WHERE (email=? OR document=? OR name=?) AND status='active'");
-            $stmt->execute([$identifier, $identifier, $identifier]);
+            // Secure: only lookup by exact email, not name or document to avoid collisions
+            $stmt = $pdo->prepare("SELECT id, name, email FROM users WHERE email=? AND status='active'");
+            $stmt->execute([$identifier]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user && !empty($user['email'])) {
                 $email = $user['email'];
-                // Generate token
+                $userId = $user['id'];
+                
                 $plainToken = bin2hex(random_bytes(32));
                 $tokenHash = hash('sha256', $plainToken);
                 $expiresAt = date("Y-m-d H:i:s", time() + 3600); // 1 hour
 
-                $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)")
-                    ->execute([$email, $tokenHash, $expiresAt]);
+                // Delete previous tokens
+                $pdo->prepare("DELETE FROM password_resets WHERE user_id=?")->execute([$userId]);
+                
+                $pdo->prepare("INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)")
+                    ->execute([$userId, $tokenHash, $expiresAt]);
 
                 try {
                     require_once __DIR__ . '/Services/EmailService.php';
                     EmailService::sendPasswordReset($email, $user['name'], $plainToken);
                 } catch (Throwable $mailEx) {
-                    // Registrar internamente sin exponer detalles SMTP al cliente
                     error_log("Failed to send password reset email: " . $mailEx->getMessage());
-                    Response::json([
-                        "error"   => "mail_unavailable",
-                        "message" => "No fue posible enviar el correo en este momento. Contacta al administrador."
-                    ], 503);
+                    // Do not leak email failure to the client
                 }
             }
 
             // Always return OK to prevent email enumeration
-            Response::json(["ok" => true]);
+            Response::json(["ok" => true, "message" => "Si la cuenta existe, recibirás instrucciones."]);
         } catch (Throwable $e) {
             http_response_code(500);
             echo json_encode(["error" => "server_error", "message" => "Error interno"]);
@@ -341,15 +341,15 @@ final class AuthController {
             if ($token === "" || $password === "") {
                 Response::json(["error" => "Datos incompletos"], 400);
             }
-            if (strlen($password) < 6) {
-                Response::json(["error" => "La contraseña debe tener al menos 6 caracteres"], 400);
+            if (strlen($password) < 12) {
+                Response::json(["error" => "La contraseña debe tener al menos 12 caracteres"], 400);
             }
 
             $pdo = Database::pdo();
             $tokenHash = hash('sha256', $token);
             $now = date("Y-m-d H:i:s");
 
-            $stmt = $pdo->prepare("SELECT email FROM password_resets WHERE token=? AND expires_at > ? ORDER BY id DESC LIMIT 1");
+            $stmt = $pdo->prepare("SELECT id, user_id FROM password_resets WHERE token=? AND expires_at > ? AND used_at IS NULL ORDER BY id DESC LIMIT 1");
             $stmt->execute([$tokenHash, $now]);
             $reset = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -357,24 +357,23 @@ final class AuthController {
                 Response::json(["error" => "Enlace inválido o expirado"], 400);
             }
 
-            $email = $reset['email'];
+            $userId = $reset['user_id'];
+            $resetId = $reset['id'];
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
             $pdo->beginTransaction();
             try {
-                $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE email=? AND status='active'")
-                    ->execute([$passwordHash, $now, $email]);
+                $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE id=? AND status='active'")
+                    ->execute([$passwordHash, $now, $userId]);
                 
-                // Invalidate all tokens for this email
-                $pdo->prepare("DELETE FROM password_resets WHERE email=?")->execute([$email]);
+                // Mark token as used
+                $pdo->prepare("UPDATE password_resets SET used_at=? WHERE id=?")->execute([$now, $resetId]);
                 
-                // Also revoke all sessions for security
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE email=?");
-                $stmt->execute([$email]);
-                $uid = $stmt->fetchColumn();
-                if ($uid) {
-                    $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$uid]);
-                }
+                // Invalidate all tokens for this user
+                $pdo->prepare("DELETE FROM password_resets WHERE user_id=?")->execute([$userId]);
+                
+                // Revoke all sessions for security
+                $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$userId]);
 
                 $pdo->commit();
                 Response::json(["ok" => true]);

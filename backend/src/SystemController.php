@@ -80,8 +80,17 @@ class SystemController {
 
     // --- SETTINGS (BCV, Prices) ---
     public function getSettings(){
+        $this->requireAdmin();
         $pdo = Database::pdo();
         $stmt = $pdo->query("SELECT `key`, value FROM settings");
+        $settings = [];
+        while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
+        Response::json(["settings"=>$settings]);
+    }
+    
+    public function getPublicSettings(){
+        $pdo = Database::pdo();
+        $stmt = $pdo->query("SELECT `key`, value FROM settings WHERE `key` IN ('bcv_rate', 'price_per_folio_usd', 'convocatoria_usd', 'iva_percent')");
         $settings = [];
         while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
         Response::json(["settings"=>$settings]);

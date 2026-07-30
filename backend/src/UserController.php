@@ -229,6 +229,7 @@ class UserController {
           $in = $this->json();
           $newPass = $in['password'] ?? '';
           if (empty($newPass)) { Response::json(["error"=>"missing_password"], 400); exit; }
+          if (strlen($newPass) < 12) { Response::json(["error" => "La contraseña debe tener al menos 12 caracteres"], 400); exit; }
           
           $pdo = Database::pdo();
           $target = $this->getTargetUser($pdo, $id);
