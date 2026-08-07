@@ -6,17 +6,27 @@ use PHPMailer\PHPMailer\Exception;
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 class EmailService {
+    private static function requiredEnv(string $name): string {
+        $value = getenv($name);
+        if ($value === false || trim((string)$value) === '') {
+            throw new RuntimeException("Variable de entorno requerida no configurada para Email: {$name}");
+        }
+        return (string)$value;
+    }
+
     private static function getMailer(): PHPMailer {
         $mail = new PHPMailer(true);
         $mail->isSMTP();
-        $mail->Host       = getenv('SMTP_HOST') ?: 'smtp.hostinger.com';
+        $mail->Host       = self::requiredEnv('SMTP_HOST');
         $mail->SMTPAuth   = true;
-        $mail->Username   = getenv('SMTP_USER') ?: 'diariomercantil@merchan.cloud';
-        $mail->Password   = getenv('SMTP_PASS') ?: 'GOku*1896';
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port       = getenv('SMTP_PORT') ?: 465;
+        $mail->Username   = self::requiredEnv('SMTP_USER');
+        $mail->Password   = self::requiredEnv('SMTP_PASS');
+        $mail->SMTPSecure = getenv('SMTP_SECURE') ?: PHPMailer::ENCRYPTION_SMTPS;
+        $mail->Port       = (int) (getenv('SMTP_PORT') ?: 465);
         $mail->CharSet    = 'UTF-8';
-        $mail->setFrom($mail->Username, 'Diario Mercantil');
+        $fromEmail = self::requiredEnv('SMTP_FROM');
+        $fromName  = getenv('SMTP_FROM_NAME') ?: 'Diario Mercantil';
+        $mail->setFrom($fromEmail, $fromName);
         $mail->isHTML(true);
         return $mail;
     }

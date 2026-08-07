@@ -1,105 +1,89 @@
 <?php
-class Database {
-  private static ?PDO $pdo = null;
-  
-  public static function pdo(): PDO {
-    if (!self::$pdo) {
-      $connection = getenv("DB_CONNECTION") ?: "sqlite";
-      
-      if ($connection === "mysql") {
-        $host = getenv("DB_HOST") ?: "db";
-        $port = getenv("DB_PORT") ?: "3306";
-        $db   = getenv("DB_DATABASE") ?: "diario_mercantil";
-        $user = getenv("DB_USERNAME") ?: "mercantil_user";
-        $pass = getenv("DB_PASSWORD") ?: "secure_password_2025";
-        $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4";
-        
-        // Retry logic for database connection (useful during container startup)
-        $maxRetries = 5;
-        $retryDelay = 2; // seconds
-        $lastException = null;
-        
-        for ($i = 0; $i < $maxRetries; $i++) {
-          try {
-            self::$pdo = new PDO($dsn, $user, $pass, [
-              PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-              PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-              PDO::ATTR_EMULATE_PREPARES => false,
-              PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
-            ]);
-            
-            // Connection successful, break retry loop
-            error_log("Database connection established successfully");
-            break;
-            
-          } catch (PDOException $e) {
-            $lastException = $e;
-            error_log("Database connection attempt " . ($i + 1) . "/$maxRetries failed: " . $e->getMessage());
-            
-            if ($i < $maxRetries - 1) {
-              sleep($retryDelay);
+
+declare(strict_types=1);
+
+final class Database
+{
+    private static ?PDO $pdo = null;
+
+    public static function pdo(): PDO
+    {
+        if (self::$pdo instanceof PDO) {
+            return self::$pdo;
+        }
+
+        $connection = strtolower((string) (getenv('DB_CONNECTION') ?: 'mysql'));
+        if ($connection === 'sqlite') {
+            return self::$pdo = self::connectSqlite();
+        }
+        if ($connection !== 'mysql') {
+            throw new RuntimeException('DB_CONNECTION no soportado.');
+        }
+
+        $host = (string) (getenv('DB_HOST') ?: 'db');
+        $port = (string) (getenv('DB_PORT') ?: '3306');
+        $database = self::requiredEnv('DB_DATABASE');
+        $username = self::requiredEnv('DB_USERNAME');
+        $password = self::requiredEnv('DB_PASSWORD');
+        $dsn = "mysql:host={$host};port={$port};dbname={$database};charset=utf8mb4";
+
+        $last = null;
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            try {
+                self::$pdo = new PDO($dsn, $username, $password, [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_TIMEOUT => 5,
+                    PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci',
+                ]);
+                return self::$pdo;
+            } catch (PDOException $e) {
+                $last = $e;
+                error_log("[database] intento {$attempt}/5 falló: " . $e->getMessage());
+                if ($attempt < 5) {
+                    sleep(2);
+                }
             }
-          }
         }
-        
-        // If we exhausted all retries, throw detailed error
-        if (!self::$pdo && $lastException) {
-          $errorMsg = "DB Connection failed after $maxRetries attempts. ";
-          $errorMsg .= "Host: $host:$port, Database: $db, User: $user. ";
-          $errorMsg .= "Error: " . $lastException->getMessage();
-          
-          // Log full error server-side
-          error_log($errorMsg);
-          
-          // Throw sanitized error for client
-          throw new Exception("Database connection failed. Please check server configuration.");
-        }
-        
-      } else {
-        // SQLite fallback
-        $dbPath = getenv("DB_PATH") ?: __DIR__."/../storage/database.sqlite";
-        
-        // Ensure directory exists
-        $dir = dirname($dbPath);
-        if (!is_dir($dir)) {
-          mkdir($dir, 0775, true);
-        }
-        
-        // Create file if doesn't exist
-        if (!file_exists($dbPath)) {
-          touch($dbPath);
-          chmod($dbPath, 0664);
-        }
-        
+
+        error_log('[database] conexión MySQL agotó reintentos: ' . ($last?->getMessage() ?? 'unknown'));
+        throw new RuntimeException('Database connection failed.');
+    }
+
+    public static function healthCheck(): bool
+    {
         try {
-          self::$pdo = new PDO("sqlite:$dbPath");
-          self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-          self::$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-          
-          // Enable foreign keys for SQLite
-          self::$pdo->exec("PRAGMA foreign_keys = ON");
-          
-        } catch (PDOException $e) {
-          error_log("SQLite connection failed: " . $e->getMessage());
-          throw new Exception("Database initialization failed");
+            self::pdo()->query('SELECT 1');
+            return true;
+        } catch (Throwable $e) {
+            error_log('[database.health] ' . $e->getMessage());
+            return false;
         }
-      }
     }
-    
-    return self::$pdo;
-  }
-  
-  /**
-   * Test database connection health
-   */
-  public static function healthCheck(): bool {
-    try {
-      $pdo = self::pdo();
-      $pdo->query("SELECT 1");
-      return true;
-    } catch (Throwable $e) {
-      error_log("Database health check failed: " . $e->getMessage());
-      return false;
+
+    private static function connectSqlite(): PDO
+    {
+        $path = (string) (getenv('DB_PATH') ?: dirname(__DIR__) . '/storage/database.sqlite');
+        $dir = dirname($path);
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('No se pudo crear el directorio SQLite.');
+        }
+
+        $pdo = new PDO('sqlite:' . $path, null, null, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+        $pdo->exec('PRAGMA foreign_keys = ON');
+        return $pdo;
     }
-  }
+
+    private static function requiredEnv(string $name): string
+    {
+        $value = getenv($name);
+        if ($value === false || trim((string) $value) === '') {
+            throw new RuntimeException("Variable de entorno requerida no configurada: {$name}");
+        }
+        return (string) $value;
+    }
 }

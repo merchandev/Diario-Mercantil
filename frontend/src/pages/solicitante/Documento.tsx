@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal, fetchAuth, ApiError } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 
@@ -554,7 +554,6 @@ export default function Documento() {
       return
     }
 
-    // Validar tamaño del archivo (máximo 50MB)
     const maxSize = 50 * 1024 * 1024 // 50MB
     if (file.size > maxSize) {
       setAlertDialog({ isOpen: true, title: 'Error', message: 'El archivo es demasiado grande. Tamaño máximo: 50MB', variant: 'error' })
@@ -563,34 +562,11 @@ export default function Documento() {
     }
 
     setUploadingPdf(true)
-    console.log('Analizando PDF del lado del cliente...', { name: file.name, size: file.size })
-
     try {
-      // Paso 1: Analizar PDF localmente para contar páginas
-      const folios = await countPdfPagesClient(file)
-      console.log('Folios detectados (cliente):', folios)
-
-      // Paso 2: Calcular precio localmente
-      const pricePerFolio = Number(settings.price_per_folio_usd || 1.5)
-      const bcvRate = bcv || Number(settings.bcv_rate || 36)
-      const ivaPercent = Number(settings.iva_percent || 16)
-
-      const priceUsd = folios * pricePerFolio
-      const unitBs = pricePerFolio * bcvRate
-      const subtotalBs = folios * unitBs
-      const totalBs = subtotalBs * (1 + ivaPercent / 100)
-      const ivaBs = subtotalBs * (ivaPercent / 100)
-
-      // Paso 3: Subir al servidor
       const formData = new FormData()
-
-      // CRITICAL: Append ID BEFORE file to ensure it's available to PHP immediately
       if (req && req.id) {
         formData.append('legal_request_id', String(req.id))
-      } else {
-        // Consider logging a warning here if it's truly an unexpected scenario
       }
-
       formData.append('file', file)
 
       const res = await fetchAuth('/api/legal/upload-pdf', {
@@ -598,110 +574,40 @@ export default function Documento() {
         body: formData
       })
 
-      if (!res.ok) {
-        const errorText = await res.text()
-        console.error('Error del servidor al subir PDF:', errorText)
-        setAlertDialog({ isOpen: true, title: 'Error', message: `Error al subir el PDF (${res.status}): Por favor intente nuevamente o contacte al administrador.`, variant: 'error' })
-        setUploadingPdf(false)
-        input.value = ''
-        return
-      }
-
       const data = await res.json()
-      if (data.error) {
-        setAlertDialog({ isOpen: true, title: 'Error', message: 'Error al subir el PDF: ' + data.error, variant: 'error' })
-        setUploadingPdf(false)
-        input.value = ''
-        return
-      }
-
-      console.log('Respuesta del servidor:', data)
-
-      // Usar el conteo del servidor si está disponible, sino usar el del cliente
-      const serverFolios = data.folios || folios
+      
+      const serverFolios = data.folios
       const serverPricing = data.pricing || {}
 
-      // Paso 4: Guardar análisis en el estado
       setPdfAnalysis({
         folios: serverFolios,
-        price_usd: serverFolios * pricePerFolio,
-        price_bs: serverPricing.total_bs || totalBs,
-        subtotal_bs: serverPricing.subtotal_bs || subtotalBs,
-        iva_bs: serverPricing.iva_bs || ivaBs,
-        total_bs: serverPricing.total_bs || totalBs
+        price_usd: serverPricing.price_usd || 0,
+        price_bs: serverPricing.total_bs || 0,
+        subtotal_bs: serverPricing.subtotal_bs || 0,
+        iva_bs: serverPricing.iva_bs || 0,
+        total_bs: serverPricing.total_bs || 0
       })
 
-      // Actualizar la solicitud con el ID del servidor y folios
       if (req && req.id) {
-        await updateLegal(req.id, { folios: serverFolios })
         setReq({ ...req, folios: serverFolios })
       } else {
         setReq({ id: data.id, status: 'Borrador', pub_type: 'Documento', folios: serverFolios } as any)
       }
 
       setMeta({ ...meta, folios: serverFolios })
-      setAlertDialog({ isOpen: true, title: 'Éxito', message: `✓ Documento analizado: ${serverFolios} folio${serverFolios !== 1 ? 's' : ''} detectado${serverFolios !== 1 ? 's' : ''}`, variant: 'success' })
-      input.value = '' // Limpiar input
+      setAlertDialog({ isOpen: true, title: 'Éxito', message: `✓ Documento procesado: ${serverFolios} folio${serverFolios !== 1 ? 's' : ''}`, variant: 'success' })
+      input.value = ''
     } catch (err) {
-      console.error('Error al analizar PDF:', err)
-      setAlertDialog({ isOpen: true, title: 'Error', message: 'Error al procesar el PDF. Por favor intente nuevamente.', variant: 'error' })
+      console.error('Error al subir PDF:', err)
+      let msg = 'Error al procesar el PDF. Por favor intente nuevamente.'
+      if (err instanceof ApiError) {
+          msg = err.message
+      }
+      setAlertDialog({ isOpen: true, title: 'Error', message: msg, variant: 'error' })
       input.value = ''
     } finally {
       setUploadingPdf(false)
     }
-  }
-
-  // Función para contar páginas del PDF en el cliente
-  const countPdfPagesClient = async (file: File): Promise<number> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-
-      reader.onload = async (e) => {
-        try {
-          const arrayBuffer = e.target?.result as ArrayBuffer
-          const data = new Uint8Array(arrayBuffer)
-          const text = new TextDecoder('latin1').decode(data)
-
-          // Estrategia 1: Buscar /Type /Page
-          let pages = text.match(/\/Type[\s]*\/Page[^s]/g)
-          if (pages && pages.length > 0) {
-            console.log('Método 1 (Type/Page):', pages.length)
-            resolve(pages.length)
-            return
-          }
-
-          // Estrategia 2: Buscar /Count en el objeto Pages
-          const countMatch = text.match(/\/Pages[\s\S]*?\/Count\s+(\d+)/)
-          if (countMatch && countMatch[1]) {
-            const count = parseInt(countMatch[1])
-            console.log('Método 2 (Count):', count)
-            resolve(count)
-            return
-          }
-
-          // Estrategia 3: Contar delimitadores de página
-          pages = text.match(/\/Page\s*<</g)
-          if (pages && pages.length > 0) {
-            console.log('Método 3 (Page delimiters):', pages.length)
-            resolve(pages.length)
-            return
-          }
-
-          // Si no se detecta ninguna página, asumir 1
-          console.warn('No se pudo detectar páginas, asumiendo 1')
-          resolve(1)
-        } catch (error) {
-          console.error('Error al parsear PDF:', error)
-          reject(error)
-        }
-      }
-
-      reader.onerror = () => {
-        reject(new Error('Error al leer el archivo'))
-      }
-
-      reader.readAsArrayBuffer(file)
-    })
   }
 
   const saveStep1 = async (e: React.FormEvent) => {

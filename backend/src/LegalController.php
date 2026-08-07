@@ -9,6 +9,7 @@ require_once __DIR__.'/Services/LegalRequestStateMachine.php';
 require_once __DIR__.'/PublicLegalRequestView.php';
 require_once __DIR__.'/Http/IdempotencyService.php';
 require_once __DIR__.'/Services/PdfInspector.php';
+require_once __DIR__.'/Services/DocumentUploadService.php';
 
 class LegalController {
   
@@ -46,69 +47,17 @@ class LegalController {
 
   public function uploadPdf(){
     $u = AuthController::requireAuth();
-    if (!isset($_FILES['file'])) return Response::json(['error'=>'No se ha enviado ningún archivo'], 400);
-    $file = $_FILES['file'];
-    $name = $file['name'] ?? '';
-    
-    if ($file['error'] !== UPLOAD_ERR_OK) {
-        return Response::json(['error'=>'Error en la subida del archivo', 'sys_err'=>$file['error']], 400);
-    }
-    
-    // Validate Extension
-    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-    if ($ext !== 'pdf') return Response::json(['error'=>'Solo archivos PDF'], 400);
-    
-    // Validate MIME Type
-    $finfo = finfo_open(FILEINFO_MIME_TYPE);
-    $mime = finfo_file($finfo, $file['tmp_name']);
-    finfo_close($finfo);
-    
-    if ($mime !== 'application/pdf') {
-        return Response::json(['error'=>'El archivo no es un PDF válido (MIME mismatch)'], 400);
-    }
-    
-    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
-    
-    $dest = $uploadDir.'/'.uniqid('doc_', true).'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($name));
-    if (!move_uploaded_file($file['tmp_name'], $dest)) return Response::json(['error'=>'Error moviendo archivo'], 500);
-
     $pdo = Database::pdo();
-    $now = gmdate('c');
+    $service = new DocumentUploadService($pdo);
     
-    $storageName = basename($dest);
-    
-    $stmt = $pdo->prepare('INSERT INTO files(name,path,size,type,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
-    $stmt->execute([$name,$storageName,$file['size'],'pdf','uploaded',$now,$now]);
-    $fileId = (int)$pdo->lastInsertId();
-
-    $folios = (new PdfInspector())->pageCount($dest);
-
     $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
-    
-    if ($reqId > 0) {
-        $this->checkAccess($reqId, $u);
-        $this->ensureMutable($reqId);
-    }
-    
-    $bcvService = new BcvService($pdo);
-    $publicationService = new PublicationService($pdo, $bcvService);
+    $file = $_FILES['file'] ?? [];
     
     try {
-        $reqId = $publicationService->createLegalRequest($u, $folios, $reqId);
-        $publicationService->attachFileToRequest($reqId, $fileId);
-        
-        $pricing = $publicationService->calculatePricing($folios);
-          
-        return Response::json([
-            'ok'=>true, 
-            'id'=>$reqId, 
-            'file_id'=>$fileId, 
-            'folios'=>$folios,
-            'pricing'=>$pricing
-        ]);
-    } catch (Exception $e) {
-        return Response::json(['error'=>$e->getMessage()], 400);
+        $result = $service->upload($u, $file, $reqId);
+        return Response::json($result);
+    } catch (DocumentUploadException $e) {
+        return Response::json(['error'=>$e->getMessage(), 'code'=>$e->errorCode], $e->httpStatus);
     }
   }
 
@@ -516,16 +465,33 @@ class LegalController {
     $in = json_decode(file_get_contents('php://input'),true);
     $pdo = Database::pdo();
     
+    $kind = (string)($in['kind'] ?? '');
+    if ($kind === 'document_pdf') {
+        return Response::json(['error'=>'Usa el flujo de upload_pdf para el documento principal.'], 400);
+    }
+
+    $fileId = (int)($in['file_id'] ?? 0);
+    $checkOwner = $pdo->prepare('SELECT owner FROM files WHERE id=?');
+    $checkOwner->execute([$fileId]);
+    $owner = $checkOwner->fetchColumn();
+    if ($owner === false) {
+        return Response::json(['error'=>'Archivo no encontrado'], 404);
+    }
+    $isAdmin = in_array(strtolower((string)($u['role'] ?? '')), ['admin','staff','manager','superadmin'], true);
+    if (!$isAdmin && (string)$owner !== (string)$u['id']) {
+        return Response::json(['error'=>'El archivo no te pertenece.'], 403);
+    }
+
     $s = $pdo->prepare("SELECT COUNT(*) FROM legal_files WHERE file_id=? AND legal_request_id!=?");
-    $s->execute([$in['file_id'], $id]);
+    $s->execute([$fileId, $id]);
     if ($s->fetchColumn() > 0) {
         return Response::json(['error'=>'El archivo ya está adjunto a otra solicitud'], 400);
     }
     
-    $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $in['kind']]);
+    $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $kind]);
     
     $pdo->prepare("INSERT INTO legal_files(legal_request_id,file_id,kind,created_at) VALUES(?,?,?,NOW())")
-        ->execute([$id, $in['file_id'], $in['kind']]);
+        ->execute([$id, $fileId, $kind]);
     Response::json(['ok'=>true]);
   }
 

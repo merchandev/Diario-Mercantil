@@ -1,37 +1,39 @@
 FROM php:8.4-fpm-alpine
 
-# Install required extensions and tools
 RUN apk add --no-cache \
-    mysql-client \
-    curl-dev \
-    libxml2-dev \
-    oniguruma-dev \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    freetype-dev \
+      curl \
+      curl-dev \
+      freetype-dev \
+      icu-dev \
+      libjpeg-turbo-dev \
+      libpng-dev \
+      libxml2-dev \
+      libzip-dev \
+      mysql-client \
+      oniguruma-dev \
+      poppler-utils \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install pdo pdo_mysql curl mbstring dom xml gd
+    && docker-php-ext-install -j"$(nproc)" pdo_mysql gd zip mbstring curl opcache intl
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy application files
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY composer.json composer.lock ./
+RUN composer install \
+      --no-dev \
+      --prefer-dist \
+      --no-interaction \
+      --no-progress \
+      --classmap-authoritative
+
 COPY . .
-COPY php.ini /usr/local/etc/php/conf.d/custom.ini
+COPY php.ini /usr/local/etc/php/conf.d/99-production.ini
 
-# Install composer
-COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+RUN mkdir -p storage/uploads storage/results \
+    && chown -R www-data:www-data storage \
+    && find storage -type d -exec chmod 0750 {} \; \
+    && find storage -type f -exec chmod 0640 {} \; \
+    && chmod +x /var/www/html/bin/entrypoint.sh
 
-# Install dependencies
-RUN composer update --no-dev --optimize-autoloader
-
-# Create storage directories with correct permissions
-RUN mkdir -p storage/uploads storage/results && \
-    chown -R www-data:www-data storage && \
-    chmod -R 777 storage
-
-# Expose PHP-FPM port
-EXPOSE 9000
-
-# Start PHP-FPM
-CMD ["php-fpm"]
+ENTRYPOINT ["/var/www/html/bin/entrypoint.sh"]
+CMD ["php-fpm", "-F"]

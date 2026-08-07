@@ -8,11 +8,17 @@ export type FileRow = {
   id: number; name: string; size: number; type: string; checksum?: string; status: string; created_at: string; updated_at: string
 }
 
+export class ApiError extends Error {
+  constructor(public message: string, public status: number, public data?: any) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 // Auth helpers
 export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, noRedirect?: boolean) {
   const headers = new Headers(init?.headers || {})
 
-  // Add CSRF token from cookies if available
   if (typeof document !== 'undefined') {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; dm_csrf=`);
@@ -23,52 +29,31 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   }
 
   const url = typeof input === 'string' ? getUrl(input) : input;
-  
-  // Add credentials to allow sending cookies (HttpOnly and others)
   const reqInit = { ...init, headers, credentials: 'include' as RequestCredentials };
   
   const res = await fetch(url, reqInit)
-  if (res.status === 401) {
-    let serverError = 'unauthorized';
-    try {
-      const json = await res.clone().json();
-      if (json.error) serverError = json.error;
-      if (json.debug) console.warn('[Auth Debug]', json);
-      if (json.received_token_preview) console.warn('[Auth Token Rx]', json);
-      console.error('🔴 [fetchAuth] 401 Unauthorized - Server error:', serverError, 'Full response:', json);
-    } catch (e) { /* ignore */ }
-
-    if (!noRedirect) {
-      console.warn('🔴 [fetchAuth] Removing tokens and redirecting to login...');
+  if (res.status === 401 && !noRedirect) {
       try { localStorage.removeItem('token'); } catch { }
       try { localStorage.removeItem('superadmin_token'); } catch { }
       try { sessionStorage.removeItem('token'); } catch { }
-      // Force re-authentication
       if (typeof window !== 'undefined') {
-        if (window.location.pathname.startsWith('/lotus/')) {
-          window.location.href = '/lotus/'
-        } else {
-          window.location.href = '/login'
-        }
+        window.location.href = window.location.pathname.startsWith('/lotus/') ? '/lotus/' : '/login'
       }
-    }
-    console.error(`API 401 Error: ${serverError}`);
-    throw new Error(serverError)
+      throw new ApiError('Sesión expirada', 401);
   }
   if (!res.ok) {
-    let errorMsg = `HTTP ${res.status}`
+    let errorMsg = `Error HTTP ${res.status}`;
+    let data = null;
     try {
-      const contentType = res.headers.get('content-type')
+      const contentType = res.headers.get('content-type');
       if (contentType?.includes('application/json')) {
-        const json = await res.json()
-        errorMsg = json.error || json.message || errorMsg
+        data = await res.json();
+        errorMsg = data.error || data.message || errorMsg;
       } else {
-        const text = await res.text()
-        errorMsg = text || errorMsg
+        errorMsg = await res.text() || errorMsg;
       }
     } catch { }
-    console.error('API error response:', res.status, errorMsg)
-    throw new Error(errorMsg)
+    throw new ApiError(errorMsg, res.status, data);
   }
   return res
 }
