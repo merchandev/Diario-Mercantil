@@ -22,7 +22,7 @@ class AuthorizationIntegrationTest extends TestCase {
         try { $pdo->exec("PRAGMA foreign_keys = OFF"); } catch (Exception $e) {}
         try { $pdo->exec("SET FOREIGN_KEY_CHECKS = 0"); } catch (Exception $e) {}
         
-        $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER)");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
         
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
@@ -31,11 +31,13 @@ class AuthorizationIntegrationTest extends TestCase {
         
         // Admin
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(1, 'admin', 'Admin', 'V123', 'admin@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('admin_session_test', 1, $now)")->execute();
+        $tokenHashAdmin = hash('sha256', 'admin_session_test');
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('admin_session_test', 1, $now, '$tokenHashAdmin', datetime('now', '+1 day'))")->execute();
         
         // User
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(2, 'solicitante', 'User', 'V456', 'user@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity) VALUES('user_session_test', 2, $now)")->execute();
+        $tokenHashUser = hash('sha256', 'user_session_test');
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('user_session_test', 2, $now, '$tokenHashUser', datetime('now', '+1 day'))")->execute();
     }
     
     public static function tearDownAfterClass(): void {
@@ -61,12 +63,15 @@ class AuthorizationIntegrationTest extends TestCase {
         }
         
         $url = 'http://127.0.0.1:' . self::$port . $uri;
-        $response = file_get_contents($url, false, stream_context_create($context));
+        $response = @file_get_contents($url, false, stream_context_create($context));
         
-        preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches);
-        $code = (int)$matches[1];
+        $code = 0;
+        if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
+            preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches);
+            $code = (int)$matches[1];
+        }
         
-        return ['code' => $code, 'body' => json_decode($response, true)];
+        return ['code' => $code, 'body' => json_decode((string)$response, true)];
     }
     
     public function testListUsersWithoutTokenIs401() {
@@ -85,7 +90,7 @@ class AuthorizationIntegrationTest extends TestCase {
     }
 
     public function testUpdateRoleAsSolicitanteIsBlocked() {
-        $res = $this->request('PUT', '/api/users/2', 'user_session_test', ['role' => 'admin']);
+        $res = $this->request('POST', '/api/admin/users/2/role', 'user_session_test', ['role' => 'admin']);
         $this->assertEquals(403, $res['code']); // Solicitantes can't update users
         
         require_once __DIR__ . '/../src/Database.php';

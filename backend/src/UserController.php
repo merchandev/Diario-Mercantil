@@ -112,7 +112,7 @@ class UserController {
         $address = trim($in["address"] ?? "");
         $password = (string)($in["password"] ?? "");
         
-        $set = ["updated_at=NOW()"];
+        $set = ["updated_at=CURRENT_TIMESTAMP"];
         $params = [];
 
         if ($name !== "") { $set[] = "name=?"; $params[] = $name; }
