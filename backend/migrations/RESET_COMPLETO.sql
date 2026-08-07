@@ -66,6 +66,20 @@ CREATE TABLE auth_tokens (
   INDEX idx_token (token)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Logs de Auditoría (Agregado)
+CREATE TABLE audit_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    actor_user_id INT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(100) NOT NULL,
+    resource_id VARCHAR(100) NULL,
+    before_data JSON NULL,
+    after_data JSON NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Métodos de pago
 CREATE TABLE payment_methods (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -136,15 +150,34 @@ CREATE TABLE payments (
   FOREIGN KEY (legal_request_id) REFERENCES legal_requests(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Directorio legal
-CREATE TABLE directory_users (
+-- Archivos legales (Agregado)
+CREATE TABLE legal_files (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  document VARCHAR(50) NOT NULL UNIQUE,
-  phone VARCHAR(50),
+  legal_request_id INT NOT NULL,
+  kind VARCHAR(50) NOT NULL,
+  file_id INT NOT NULL,
+  created_at DATETIME NOT NULL,
+  FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id) ON DELETE CASCADE,
+  FOREIGN KEY(file_id) REFERENCES files(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Directorio legal
+CREATE TABLE directory_profiles (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  full_name VARCHAR(255) NOT NULL,
   email VARCHAR(255),
-  address TEXT,
-  created_at DATETIME NOT NULL
+  phones VARCHAR(255),
+  state VARCHAR(100),
+  areas TEXT,
+  colegio VARCHAR(100),
+  socials TEXT,
+  inpre_photo_file_id INT,
+  profile_photo_file_id INT,
+  status VARCHAR(50) DEFAULT 'pendiente',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Áreas

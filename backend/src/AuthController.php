@@ -75,8 +75,24 @@ final class AuthController {
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$user) {
-            self::clearCookies();
-            throw new HttpException(401, 'unauthorized', 'No autenticado');
+            $saStmt = $pdo->prepare('SELECT u.id, u.username as name FROM superadmin_tokens t JOIN superadmins u ON u.id = t.superadmin_id WHERE t.token = ? AND t.expires_at > NOW() LIMIT 1');
+            $saStmt->execute([$tokenHash]);
+            $saUser = $saStmt->fetch(PDO::FETCH_ASSOC);
+            if ($saUser) {
+                $user = [
+                    'id' => $saUser['id'],
+                    'name' => $saUser['name'],
+                    'document' => 'SUPERADMIN',
+                    'role' => 'superadmin',
+                    'email' => '',
+                    'phone' => '',
+                    'person_type' => 'natural',
+                    'status' => 'active'
+                ];
+            } else {
+                self::clearCookies();
+                throw new HttpException(401, 'unauthorized', 'No autenticado');
+            }
         }
 
         return $user;

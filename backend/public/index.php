@@ -138,6 +138,7 @@ $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], 
 $router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/publications', [SystemController::class, 'listPages'], $admin);
+$router->get('/api/publications/{id}', [SystemController::class, 'getPage'], $admin);
 $router->post('/api/publications', [SystemController::class, 'createPage'], $adminCsrf);
 $router->put('/api/publications/{id}', [SystemController::class, 'updatePage'], $adminCsrf);
 $router->delete('/api/publications/{id}', [SystemController::class, 'deletePage'], $adminCsrf);

@@ -152,6 +152,19 @@ class SystemController {
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 
+    public function getPage($id){
+        $this->requireAdmin();
+        $pdo = Database::pdo();
+        $stmt = $pdo->prepare("SELECT * FROM pages WHERE id=?");
+        $stmt->execute([$id]);
+        $page = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$page) Response::json(['error'=>'not_found'], 404);
+        
+        // Mapear published a status para compatibilidad con frontend
+        $page['status'] = $page['published'] ? 'published' : 'draft';
+        Response::json(['item'=>$page]);
+    }
+
     public function createPage(){
         $this->requireAdmin();
         $in = $this->json();
