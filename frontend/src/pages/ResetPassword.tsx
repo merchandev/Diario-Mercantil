@@ -28,8 +28,8 @@ export default function ResetPassword() {
       return
     }
 
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+    if (password.length < 12) {
+      setError('La contraseña debe tener al menos 12 caracteres')
       return
     }
 
