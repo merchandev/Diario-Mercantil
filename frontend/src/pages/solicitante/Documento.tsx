@@ -713,8 +713,16 @@ export default function Documento() {
       return
     }
 
+    if (loading) return
     setLoading(true)
     try {
+      // Get or create idempotency key for this request
+      let idempotencyKey = sessionStorage.getItem(`dm-payment-idempotency-${req.id}`)
+      if (!idempotencyKey) {
+        idempotencyKey = crypto.randomUUID()
+        sessionStorage.setItem(`dm-payment-idempotency-${req.id}`, idempotencyKey)
+      }
+
       await updateLegal(req.id, {
         name: pay.name,
         document: pay.document,
@@ -728,13 +736,15 @@ export default function Documento() {
         bank: pay.bank,
         ref: pay.ref,
         date: pay.date,
-        amount_bs: Number(pdfAnalysis.total_bs),
-        status: 'Por verificar',
         mobile_phone: pay.type === 'pago_movil' ? pay.mobile_phone : undefined
-      })
+      }, idempotencyKey)
       await submitLegal(req.id)
+      
+      // Clear idempotency key on success
+      sessionStorage.removeItem(`dm-payment-idempotency-${req.id}`)
+      
       setLoading(false)
-      setAlertDialog({ isOpen: true, title: 'Éxito', message: '¡Solicitud enviada exitosamente! Su documento será verificado y publicado en la próxima edición.', variant: 'success' })
+      setAlertDialog({ isOpen: true, title: 'Éxito', message: '¡Solicitud registrada! Su solicitud fue registrada correctamente y se encuentra en espera de aprobación.', variant: 'success' })
       // Redirigir a Mis Publicaciones
       navigate('/solicitante/historial')
     } catch (err) {
@@ -1365,7 +1375,7 @@ export default function Documento() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Enviando...
+                    Registrando solicitud...
                   </>
                 ) : (
                   <>

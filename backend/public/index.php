@@ -99,6 +99,7 @@ $router->get('/api/legal/{id}/download', [LegalController::class, 'download'], $
 $router->get('/api/legal/{id}/files', [LegalController::class, 'listFiles'], $auth);
 $router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $csrf);
 $router->delete('/api/legal/{id}/files/{fid}', [LegalController::class, 'detachFile'], $csrf);
+$router->post('/api/admin/legal/{id}/files/{fid}/repair', [LegalController::class, 'repairPdf'], $adminCsrf);
 $router->post('/api/legal/{id}/payments', [LegalController::class, 'addPayment'], $csrf);
 $router->delete('/api/legal/{id}/payments/{pid}', [LegalController::class, 'deletePayment'], $csrf);
 $router->get('/api/legal/public/check', [LegalController::class, 'getPublic']);

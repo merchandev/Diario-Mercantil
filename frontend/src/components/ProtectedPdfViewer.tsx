@@ -41,10 +41,14 @@ export default function ProtectedPdfViewer({ src, height = 700, watermark }: Pro
         objectUrlRef.current = url
         setBlobUrl(url)
         if (iframeRef.current) iframeRef.current.scrollTo(0, 0)
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error cargando PDF:', err)
         if (!cancelled) {
-          setError(err.message || 'Error al cargar el PDF')
+          if (err.message === 'FILE_MISSING') {
+            setError('El documento no está disponible temporalmente. La solicitud permanece registrada. Contacte al administrador para recuperar el archivo.')
+          } else {
+            setError(err.message || 'Error al cargar el PDF')
+          }
           setBlobUrl(null)
         }
       } finally {

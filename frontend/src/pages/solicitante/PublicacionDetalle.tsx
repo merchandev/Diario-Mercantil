@@ -84,7 +84,7 @@ export default function PublicacionDetalleSolicitante() {
   }
 
   const meta = typeof req.meta === 'string' ? JSON.parse(req.meta) : (req.meta || {})
-  const totalPagado = payments.reduce((sum, p) => sum + (p.amount_bs || 0), 0)
+
   const isPublicada = req.status === 'Publicada'
   const publicUrl = `${window.location.origin}/publicaciones/${req.order_no || req.id}/${encodeURIComponent(req.name || 'publicacion')}`
 
@@ -120,51 +120,56 @@ export default function PublicacionDetalleSolicitante() {
         <div className="lg:col-span-2 space-y-6">
           <LegalRequestDetails item={req} meta={meta} />
 
-          {/* Historial de pagos (obs. 8 — added phone column) */}
+          {/* Información de Pago */}
           <div className="card p-6">
-            <h2 className="text-lg font-semibold mb-4 text-brand-800">Historial de Pagos</h2>
-            {payments.length === 0 ? (
-              <p className="text-slate-500 text-center py-4">No hay pagos registrados</p>
-            ) : (
-              <div className="space-y-4">
-                <div className="overflow-x-auto pb-2">
-                  <table className="min-w-[900px] w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2">Referencia</th>
-                        <th className="text-left py-2">Tipo</th>
-                        <th className="text-left py-2">Banco</th>
-                        <th className="text-left py-2">Teléfono Pago Móvil</th>
-                        <th className="text-left py-2">Fecha</th>
-                        <th className="text-right py-2">Monto (Bs.)</th>
-                        <th className="text-center py-2">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payments.map(p => (
-                        <tr key={p.id} className="border-b">
-                          <td className="py-2 font-mono text-xs">{p.ref || '-'}</td>
-                          <td className="py-2">{p.type}</td>
-                          <td className="py-2">{p.bank || '-'}</td>
-                          <td className="py-2">{(p as any).mobile_phone || '-'}</td>
-                          <td className="py-2">{p.date}</td>
-                          <td className="py-2 text-right font-semibold">{Number(p.amount_bs || 0).toFixed(2)}</td>
-                          <td className="py-2 text-center">
-                            <span className={`pill text-xs ${p.status === 'Verificado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                              {p.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex justify-end items-center gap-4 pt-4 border-t">
-                  <span className="text-slate-600">Total Pagado:</span>
-                  <span className="text-2xl font-bold text-brand-700">Bs. {Number(totalPagado || 0).toFixed(2)}</span>
-                </div>
+            <h2 className="text-lg font-semibold mb-4 text-brand-800">Información de Pago</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <p className="text-sm text-slate-500 mb-1">Monto de la Orden</p>
+                <p className="text-2xl font-bold text-brand-700">
+                  Bs. {Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(req?.total_bs ?? 0))}
+                </p>
               </div>
-            )}
+              
+              {payments.length === 0 ? (
+                <div className="flex items-center justify-start md:justify-end text-slate-500 text-sm">
+                  No hay pago reportado
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500 text-xs">Referencia</p>
+                      <p className="font-mono">{payments[0].ref || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">Tipo</p>
+                      <p>{payments[0].type}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">Banco</p>
+                      <p>{payments[0].bank || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">Teléfono</p>
+                      <p>{payments[0].mobile_phone || '-'}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500 text-xs">Fecha</p>
+                      <p>{payments[0].date}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-xs">Estado</p>
+                      <span className={`pill text-xs mt-1 block ${payments[0].status === 'Aprobado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                        {payments[0].status}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Documentos adjuntos */}

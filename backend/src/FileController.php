@@ -218,7 +218,10 @@ class FileController {
         $filePath = StoragePath::getFile($file['path']);
     } catch (RuntimeException $e) {
         http_response_code(404);
-        die(json_encode(['error' => 'Archivo no encontrado']));
+        die(json_encode([
+            'error' => 'FILE_MISSING',
+            'message' => 'El documento no está disponible actualmente.'
+        ]));
     }
 
     // Serve with proper CORS headers

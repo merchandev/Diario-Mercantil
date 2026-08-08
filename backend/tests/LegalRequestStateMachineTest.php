@@ -44,8 +44,10 @@ class LegalRequestStateMachineTest extends TestCase {
         
         $machine = new LegalRequestStateMachine($pdo);
         
+        // Mock auth
+        $_COOKIE['dm_token'] = 'test';
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("Solo se puede rechazar una solicitud que está 'Por verificar'.");
+        $this->expectExceptionMessage("Solo se pueden rechazar solicitudes 'Por verificar' o 'En trámite'.");
         
         $machine->reject(1, 'Reason');
     }

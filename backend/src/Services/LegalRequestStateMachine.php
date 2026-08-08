@@ -29,8 +29,14 @@ final class LegalRequestStateMachine {
             $result = $logic($req);
 
             // Audit
-            $u = AuthController::requireAuth();
-            $actorId = $u['id'] ?? null;
+            $actorId = null;
+            try {
+                $u = AuthController::requireAuth();
+                $actorId = $u['id'] ?? null;
+            } catch (Exception $e) {
+                // Background worker or test execution
+            }
+            
             $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
                 ->execute([$actorId, $action, 'legal_request', $id]);
 
@@ -69,8 +75,8 @@ final class LegalRequestStateMachine {
                 $userStmt->execute([$id]);
                 $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
                 if ($owner && $owner['email']) {
-                    require_once __DIR__ . '/EmailService.php';
-                    EmailService::sendPendingPayment($owner['email'], $owner['name'], $orderNo);
+                    require_once __DIR__ . '/EmailOutbox.php';
+                    EmailOutbox::enqueue($this->pdo, 'pending_payment', $owner['email'], $owner['name'], ['orderNo' => $orderNo]);
                 }
             } catch (Throwable $e) {
                 error_log("Failed to send pending payment email: " . $e->getMessage());
@@ -105,33 +111,37 @@ final class LegalRequestStateMachine {
                 $userStmt->execute([$id]);
                 $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
                 if ($owner && $owner['email']) {
-                    require_once __DIR__ . '/EmailService.php';
-                    EmailService::sendInReview($owner['email'], $owner['name'], $req['order_no'] ?? "ORD-UNKNOWN");
+                    require_once __DIR__ . '/EmailOutbox.php';
+                    EmailOutbox::enqueue($this->pdo, 'in_review', $owner['email'], $owner['name'], ['orderNo' => $req['order_no'] ?? "ORD-UNKNOWN"]);
                 }
             } catch (Throwable $e) {
-                error_log("Failed to send verify email: " . $e->getMessage());
+                error_log("Failed to send in-review email: " . $e->getMessage());
             }
 
             return true;
         });
     }
 
-    public function reject(int $id, string $reason = ''): void {
+    public function reject(int $id, string $reason): void {
         $this->executeTransition($id, 'reject', function($req) use ($id, $reason) {
-            if ($req['status'] !== 'Por verificar') {
-                throw new Exception("Solo se puede rechazar una solicitud que está 'Por verificar'.", 409);
+            if ($req['status'] !== 'Por verificar' && $req['status'] !== 'En trámite') {
+                throw new Exception("Solo se pueden rechazar solicitudes 'Por verificar' o 'En trámite'.", 409);
             }
 
-            $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', comment=? WHERE id=?")
-                 ->execute([$reason, $id]);
-            
+            $now = gmdate('Y-m-d H:i:s');
+            $update = $this->pdo->prepare("UPDATE legal_requests SET status='Rechazado', publish_date=NULL, reject_reason=? WHERE id=?");
+            $update->execute([$reason, $id]);
+
             try {
                 $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
                 $userStmt->execute([$id]);
                 $owner = $userStmt->fetch(PDO::FETCH_ASSOC);
                 if ($owner && $owner['email']) {
-                    require_once __DIR__ . '/EmailService.php';
-                    EmailService::sendRejected($owner['email'], $owner['name'], $req['order_no'] ?? "ORD-UNKNOWN", $reason);
+                    require_once __DIR__ . '/EmailOutbox.php';
+                    EmailOutbox::enqueue($this->pdo, 'rejected', $owner['email'], $owner['name'], [
+                        'orderNo' => $req['order_no'] ?? "ORD-UNKNOWN",
+                        'reason' => $reason
+                    ]);
                 }
             } catch (Throwable $e) {
                 error_log("Failed to send reject email: " . $e->getMessage());

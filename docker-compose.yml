@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.prod
     restart: unless-stopped
     volumes:
-      - ./backend/storage:/var/www/html/storage
+      - diario_mercantil_storage_data:/var/www/html/storage
     expose:
       - "9000"
     environment:
@@ -41,6 +41,36 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  worker:
+    container_name: dm-worker
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    command: php /var/www/html/bin/email_worker.php
+    restart: unless-stopped
+    volumes:
+      - diario_mercantil_storage_data:/var/www/html/storage
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_DATABASE: ${DB_DATABASE:?DB_DATABASE is required}
+      DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST is required}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-smtps}
+      SMTP_USER: ${SMTP_USER:?SMTP_USER is required}
+      SMTP_PASS: ${SMTP_PASS:?SMTP_PASS is required}
+      SMTP_FROM: ${SMTP_FROM:?SMTP_FROM is required}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Diario Mercantil}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
 
   frontend:
     build:
@@ -102,7 +132,9 @@ services:
 
 volumes:
   db_data:
-
+  diario_mercantil_storage_data:
+    external: true
+    name: diario_mercantil_storage_data
 networks:
   app-network:
     driver: bridge

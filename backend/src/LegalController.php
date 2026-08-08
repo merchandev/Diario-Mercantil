@@ -330,17 +330,11 @@ class LegalController {
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
       $this->ensureMutable($id);
-      $pdo = Database::pdo();
-      
-      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
-      $reqStatus = $s->fetchColumn();
-      
-      if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
-          return Response::json(['error'=>'Solo se pueden agregar pagos en Borrador o Por verificar'], 403);
-      }
       
       $in = json_decode(file_get_contents('php://input'),true);
       $idemKey = $_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? null;
+      $pdo = Database::pdo();
+      
       if ($idemKey) {
           $hash = hash('sha256', json_encode($in));
           $cached = IdempotencyService::check($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash);
@@ -357,23 +351,77 @@ class LegalController {
       if (strtotime($in['date']) > time()) {
           return Response::json(['error'=>'La fecha de pago no puede ser futura'], 400);
       }
-      if (!is_numeric($in['amount_bs']) || $in['amount_bs'] <= 0) {
-          return Response::json(['error'=>'El monto debe ser un nÃºmero positivo'], 400);
+
+      $ownsTransaction = !$pdo->inTransaction();
+      if ($ownsTransaction) {
+          $pdo->beginTransaction();
       }
 
-      $status = 'Por verificar';
-      $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
-      $pdo->prepare('INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone,created_at) VALUES(?,?,?,?,?,?,?,?,NOW())')
-          ->execute([$id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $in['amount_bs'], $status, $mobile_phone]);
-      
-      // Audit
-      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
-          ->execute([$u['id'], 'add_payment', 'legal_request', $id]);
+      try {
+          $stmt = $pdo->prepare('SELECT id, user_id, status, total_bs FROM legal_requests WHERE id=? FOR UPDATE');
+          $stmt->execute([$id]);
+          $req = $stmt->fetch(PDO::FETCH_ASSOC);
+
+          if (!$req) {
+              throw new Exception('Solicitud no encontrada', 404);
+          }
+
+          if (!in_array($req['status'], ['Borrador', 'Por verificar'])) {
+              throw new Exception('Solo se pueden agregar pagos en Borrador o Por verificar', 403);
+          }
+
+          if (!is_numeric($req['total_bs']) || (float)$req['total_bs'] <= 0) {
+              throw new Exception('La orden no tiene un monto total vÃ¡lido. Cotice la solicitud primero.', 400);
+          }
+
+          $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
+          $officialAmount = (float)$req['total_bs'];
           
-      if (isset($idemKey)) {
-          IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', hash('sha256', json_encode($in)), 200, ['ok'=>true]);
+          $upsert = "
+            INSERT INTO legal_payments(legal_request_id, ref, date, bank, type, amount_bs, status, mobile_phone, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'Por verificar', ?, NOW())
+            ON DUPLICATE KEY UPDATE
+                ref = VALUES(ref),
+                date = VALUES(date),
+                bank = VALUES(bank),
+                type = VALUES(type),
+                mobile_phone = VALUES(mobile_phone),
+                amount_bs = VALUES(amount_bs),
+                status = IF(legal_payments.status = 'Aprobado', legal_payments.status, 'Por verificar')
+          ";
+          $pdo->prepare($upsert)->execute([
+              $id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $officialAmount, $mobile_phone
+          ]);
+          
+          $paymentId = $pdo->lastInsertId();
+          if ($paymentId == 0) {
+              // Si fue un UPDATE sin cambios, lastInsertId puede ser 0
+              $pStmt = $pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id = ?");
+              $pStmt->execute([$id]);
+              $paymentId = $pStmt->fetchColumn();
+          }
+
+          // Audit
+          $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+              ->execute([$u['id'], 'add_payment', 'legal_request', $id]);
+          
+          if ($ownsTransaction) {
+              $pdo->commit();
+          }
+
+          $resBody = ['ok'=>true, 'payment_id'=>(int)$paymentId];
+          if ($idemKey) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', 200, $resBody);
+          Response::json($resBody);
+      } catch (Exception $e) {
+          if ($ownsTransaction) {
+              $pdo->rollBack();
+          }
+          $code = $e->getCode() ?: 500;
+          if ($code < 100 || $code > 599) $code = 400;
+          $resBody = ['error'=>$e->getMessage()];
+          if ($idemKey && $code < 500) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $code, $resBody);
+          Response::json($resBody, $code);
       }
-      Response::json(['ok'=>true]);
   }
   
   public function deletePayment($id,$pid){
@@ -501,4 +549,69 @@ class LegalController {
     Database::pdo()->prepare("DELETE FROM legal_files WHERE id=? AND legal_request_id=?")->execute([$fid, $id]);
     Response::json(['ok'=>true]);
   }
+
+  public function repairPdf($id, $fid) {
+      $u = AuthController::requireAuth();
+      $role = strtolower($u['role'] ?? '');
+      if (!in_array($role, ['admin', 'superadmin'])) {
+          return Response::json(['error'=>'No autorizado'], 403);
+      }
+
+      $pdo = Database::pdo();
+      
+      // 1. Verify file exists in DB
+      $s = $pdo->prepare('SELECT f.id, f.path, f.checksum FROM files f JOIN legal_files lf ON lf.file_id=f.id WHERE lf.legal_request_id=? AND f.id=?');
+      $s->execute([$id, $fid]);
+      $fileRow = $s->fetch(PDO::FETCH_ASSOC);
+
+      if (!$fileRow) {
+          return Response::json(['error'=>'Archivo no encontrado en la base de datos'], 404);
+      }
+
+      $existingChecksum = $fileRow['checksum'];
+      if (!$existingChecksum) {
+          return Response::json(['error'=>'No hay checksum original. No se puede reparar seguramente.'], 400);
+      }
+
+      // 2. Receive new PDF
+      if (empty($_FILES['file'])) {
+          return Response::json(['error'=>'No se recibió ningún archivo'], 400);
+      }
+
+      $uploaded = $_FILES['file'];
+      if ($uploaded['error'] !== UPLOAD_ERR_OK) {
+          return Response::json(['error'=>'Error en subida: ' . $uploaded['error']], 400);
+      }
+
+      $tmp = $uploaded['tmp_name'];
+      if (!is_uploaded_file($tmp)) {
+          return Response::json(['error'=>'Archivo inválido'], 400);
+      }
+
+      $newChecksum = hash_file('sha256', $tmp);
+
+      // 3. Compare checksum
+      if ($newChecksum !== $existingChecksum) {
+          return Response::json(['error'=>'El documento no coincide con el archivo originalmente registrado.'], 409);
+      }
+
+      require_once __DIR__.'/Services/StoragePath.php';
+      $dest = StoragePath::getFilePath($fileRow['path']);
+      
+      $dir = dirname($dest);
+      if (!is_dir($dir)) {
+          mkdir($dir, 0755, true);
+      }
+
+      if (!move_uploaded_file($tmp, $dest)) {
+          return Response::json(['error'=>'No se pudo guardar el archivo físico'], 500);
+      }
+
+      // Audit log
+      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+          ->execute([$u['id'], 'repair_file', 'file', $fid]);
+
+      return Response::json(['ok'=>true, 'message'=>'Archivo recuperado exitosamente']);
+  }
 }
+

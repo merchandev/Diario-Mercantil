@@ -404,8 +404,12 @@ export async function returnToDraftLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/return-to-draft`, { method: 'POST' })
   return res.json() as Promise<{ ok: boolean; error?: string }>
 }
-export async function addLegalPayment(id: number, body: Partial<LegalPayment>) {
-  const res = await fetchAuth(`/api/legal/${id}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+export async function addLegalPayment(id: number, body: Partial<LegalPayment>, idempotencyKey?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey
+  }
+  const res = await fetchAuth(`/api/legal/${id}/payments`, { method: 'POST', headers, body: JSON.stringify(body) })
   return res.json() as Promise<{ ok: true; payment_id: number }>
 }
 export async function deleteLegalPayment(id: number, paymentId: number) {
