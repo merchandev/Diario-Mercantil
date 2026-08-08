@@ -24,10 +24,13 @@ RUN composer install \
       --prefer-dist \
       --no-interaction \
       --no-progress \
-      --classmap-authoritative
+      --no-autoloader \
+      --no-scripts
 
 COPY . .
 COPY php.ini /usr/local/etc/php/conf.d/99-production.ini
+
+RUN composer dump-autoload --optimize --classmap-authoritative
 
 RUN mkdir -p storage/uploads storage/results \
     && chown -R www-data:www-data storage \
