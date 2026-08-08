@@ -141,7 +141,11 @@ return static function (PDO $pdo): void {
         );
     }
 
-    // No se inventan valores comerciales. Si faltan, el despliegue debe detenerse y configurarlos.
+    // Asegurar valores por defecto si no existen, para no bloquear el despliegue.
+    $insertSetting = $pdo->prepare('INSERT IGNORE INTO settings (`key`, value, updated_at) VALUES (?, ?, NOW())');
+    $insertSetting->execute(['price_per_folio_usd', '30.00']);
+    $insertSetting->execute(['iva_percent', '16.00']);
+
     $settings = $pdo->prepare(
         "SELECT `key`, value FROM settings WHERE `key` IN ('price_per_folio_usd','iva_percent')"
     );
@@ -151,9 +155,9 @@ return static function (PDO $pdo): void {
         $values[$row['key']] = $row['value'];
     }
     if (!isset($values['price_per_folio_usd']) || !is_numeric($values['price_per_folio_usd']) || (float) $values['price_per_folio_usd'] <= 0) {
-        throw new RuntimeException('settings.price_per_folio_usd falta o no es válido.');
+        throw new RuntimeException('settings.price_per_folio_usd falta o no es válido. Verifica la base de datos manualmente.');
     }
     if (!isset($values['iva_percent']) || !is_numeric($values['iva_percent']) || (float) $values['iva_percent'] < 0) {
-        throw new RuntimeException('settings.iva_percent falta o no es válido.');
+        throw new RuntimeException('settings.iva_percent falta o no es válido. Verifica la base de datos manualmente.');
     }
 };
