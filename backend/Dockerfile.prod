@@ -36,6 +36,7 @@ RUN mkdir -p storage/uploads storage/results \
     && chown -R www-data:www-data storage \
     && find storage -type d -exec chmod 0750 {} \; \
     && find storage -type f -exec chmod 0640 {} \; \
+    && sed -i 's/\r$//' /var/www/html/bin/entrypoint.sh \
     && chmod +x /var/www/html/bin/entrypoint.sh
 
 ENTRYPOINT ["/var/www/html/bin/entrypoint.sh"]
