@@ -17,6 +17,7 @@ class EmailService {
     private static function getMailer(): PHPMailer {
         $mail = new PHPMailer(true);
         $mail->isSMTP();
+        $mail->Timeout    = 5;
         $mail->Host       = self::requiredEnv('SMTP_HOST');
         $mail->SMTPAuth   = true;
         $mail->Username   = self::requiredEnv('SMTP_USER');
