@@ -28,16 +28,18 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->prepare("DELETE FROM users")->execute();
         
         $now = time();
+        $createdAt = date('Y-m-d H:i:s', $now);
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+1 day', $now));
         
         // Admin
-        $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(1, 'admin', 'Admin', 'V123', 'admin@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
+        $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at, updated_at) VALUES(1, 'admin', 'Admin', 'V123', 'admin@test.com', 'pwd', 'active', '$createdAt', '$createdAt')")->execute();
         $tokenHashAdmin = hash('sha256', 'admin_session_test');
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('admin_session_test', 1, $now, '$tokenHashAdmin', datetime('now', '+1 day'))")->execute();
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('admin_session_test', 1, $now, '$tokenHashAdmin', '$expiresAt')")->execute();
         
         // User
-        $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at) VALUES(2, 'solicitante', 'User', 'V456', 'user@test.com', 'pwd', 'active', '2026-01-01 00:00:00')")->execute();
+        $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at, updated_at) VALUES(2, 'solicitante', 'User', 'V456', 'user@test.com', 'pwd', 'active', '$createdAt', '$createdAt')")->execute();
         $tokenHashUser = hash('sha256', 'user_session_test');
-        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('user_session_test', 2, $now, '$tokenHashUser', datetime('now', '+1 day'))")->execute();
+        $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('user_session_test', 2, $now, '$tokenHashUser', '$expiresAt')")->execute();
     }
     
     public static function tearDownAfterClass(): void {
