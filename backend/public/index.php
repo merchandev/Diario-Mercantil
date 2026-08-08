@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/Http/RequestContext.php';
 require_once __DIR__ . '/../src/Exceptions/HttpException.php';
 require_once __DIR__ . '/../src/Http/ErrorHandler.php';
+require_once __DIR__ . '/../vendor/autoload.php';
 
 $context = new RequestContext();
 set_exception_handler(fn(Throwable $e) => ErrorHandler::handle($e, $context));
