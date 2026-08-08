@@ -48,4 +48,48 @@ final class RolePolicy {
     public static function canDeleteUser(array $actor, array $target): bool {
         return self::canModifyUser($actor, $target);
     }
+
+    /**
+     * Can the actor manage legal requests (verify, reject, return-to-draft, etc.)?
+     * Superadmin has full access; admin/staff/manager have operational access.
+     */
+    public static function canManageLegalRequests(array $actor): bool {
+        try {
+            $role = Role::from(strtolower($actor['role'] ?? ''));
+        } catch (ValueError) {
+            return false;
+        }
+        return in_array($role, [Role::SUPERADMIN, Role::ADMIN, Role::STAFF, Role::MANAGER], true);
+    }
+
+    /**
+     * Can the actor approve/reject payments?
+     */
+    public static function canVerifyPayments(array $actor): bool {
+        return self::canManageLegalRequests($actor);
+    }
+
+    /**
+     * Can the actor publish an edition?
+     */
+    public static function canPublishEdition(array $actor): bool {
+        try {
+            $role = Role::from(strtolower($actor['role'] ?? ''));
+        } catch (ValueError) {
+            return false;
+        }
+        return in_array($role, [Role::SUPERADMIN, Role::ADMIN], true);
+    }
+
+    /**
+     * Can the actor manage global settings?
+     */
+    public static function canManageSettings(array $actor): bool {
+        try {
+            $role = Role::from(strtolower($actor['role'] ?? ''));
+        } catch (ValueError) {
+            return false;
+        }
+        return in_array($role, [Role::SUPERADMIN, Role::ADMIN], true);
+    }
 }

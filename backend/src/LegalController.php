@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/AuthController.php';
+require_once __DIR__.'/RolePolicy.php';
 require_once __DIR__.'/Services/BcvService.php';
 require_once __DIR__.'/Services/PublicationService.php';
 require_once __DIR__.'/Services/PdfGenerationService.php';
@@ -14,8 +15,7 @@ require_once __DIR__.'/Services/DocumentUploadService.php';
 class LegalController {
   
   private function checkAccess($reqId, $u) {
-      $role = strtolower($u['role'] ?? '');
-      if (in_array($role, ['admin','staff','manager'])) return true;
+      if (RolePolicy::canManageLegalRequests($u)) return true;
       $pdo = Database::pdo();
       $s = $pdo->prepare('SELECT user_id FROM legal_requests WHERE id=?');
       $s->execute([$reqId]);
@@ -28,8 +28,7 @@ class LegalController {
   }
 
   private function requireAdmin($u) {
-      $role = strtolower($u['role'] ?? '');
-      if (!in_array($role, ['admin','staff','manager'])) {
+      if (!RolePolicy::canManageLegalRequests($u)) {
           Response::json(['error'=>'forbidden_admin_only'], 403);
           exit;
       }
@@ -40,7 +39,7 @@ class LegalController {
       $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?');
       $s->execute([$reqId]);
       if ($s->fetchColumn() === 'Publicada') {
-          Response::json(['error'=>'conflict', 'message'=>'No se puede modificar una solicitud que ya está publicada.'], 409);
+          Response::json(['error'=>'conflict', 'message'=>'No se puede modificar una solicitud que ya estÃ¡ publicada.'], 409);
           exit;
       }
   }
@@ -70,7 +69,7 @@ class LegalController {
     $sql = "SELECT * FROM legal_requests WHERE deleted_at IS NULL";
     $params = [];
     
-    if ($uid && !in_array($role, ['admin','staff','manager'])) {
+    if ($uid && !RolePolicy::canManageLegalRequests($u)) {
         $sql .= " AND user_id = ?";
         $params[] = $uid;
     }
@@ -152,14 +151,14 @@ class LegalController {
     
     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
     $currStatus = $s->fetchColumn();
-    $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
+    $isAdmin = RolePolicy::canManageLegalRequests($u);
     if (!$isAdmin && $currStatus !== 'Borrador') {
         return Response::json(['error'=>'No se puede editar una solicitud formalizada. Debe estar en Borrador.'], 403);
     }
     
     if (isset($in['meta']) && is_array($in['meta'])) {
         $m = $in['meta'];
-        if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
+        if (isset($m['aÃ±o'])) { $m['anio'] = $m['aÃ±o']; unset($m['aÃ±o']); }
         if (isset($m['fecha'])) { $m['fecha_registro'] = $m['fecha']; unset($m['fecha']); }
         if (isset($m['razon_denominacion_social'])) { $m['razon_social'] = $m['razon_denominacion_social']; unset($m['razon_denominacion_social']); }
         if (isset($m['expediente'])) { $m['numero_expediente'] = $m['expediente']; unset($m['expediente']); }
@@ -172,7 +171,7 @@ class LegalController {
             return Response::json(['error'=>'La planilla debe tener formato 000.0000.0.000000'], 400);
         }
         if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
-            return Response::json(['error'=>'El tomo debe ser solo números (máx 3)'], 400);
+            return Response::json(['error'=>'El tomo debe ser solo nÃºmeros (mÃ¡x 3)'], 400);
         }
         if (!empty($m['fecha_registro']) && strtotime($m['fecha_registro']) > time()) {
             return Response::json(['error'=>'La fecha de registro no puede ser futura'], 400);
@@ -263,7 +262,7 @@ class LegalController {
      $uid = (int)$u['id'];
      $role = strtolower($u['role'] ?? '');
      
-     if (in_array($role, ['admin','staff','manager'])) {
+     if (RolePolicy::canManageLegalRequests($u)) {
          $stmt = $pdo->query("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
      } else {
          $stmt = $pdo->prepare("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL AND user_id=? ORDER BY deleted_at DESC");
@@ -281,7 +280,7 @@ class LegalController {
      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
      $currStatus = $s->fetchColumn();
      
-     $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
+     $isAdmin = RolePolicy::canManageLegalRequests($u);
      if (!$isAdmin && $currStatus !== 'Borrador') {
          return Response::json(['error'=>'Solo puedes eliminar solicitudes en Borrador'], 403);
      }
@@ -300,7 +299,7 @@ class LegalController {
      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
      $currStatus = $s->fetchColumn();
      
-     $isAdmin = in_array(strtolower($u['role'] ?? ''), ['admin','staff','manager']);
+     $isAdmin = RolePolicy::canManageLegalRequests($u);
      if (!$isAdmin && $currStatus !== 'Borrador') {
          return Response::json(['error'=>'Solo puedes restaurar solicitudes en Borrador'], 403);
      }
@@ -353,13 +352,13 @@ class LegalController {
       }
 
       if (!preg_match('/^\d{4}$/', $in['ref'] ?? '')) {
-          return Response::json(['error'=>'La referencia debe tener exactamente 4 dígitos'], 400);
+          return Response::json(['error'=>'La referencia debe tener exactamente 4 dÃ­gitos'], 400);
       }
       if (strtotime($in['date']) > time()) {
           return Response::json(['error'=>'La fecha de pago no puede ser futura'], 400);
       }
       if (!is_numeric($in['amount_bs']) || $in['amount_bs'] <= 0) {
-          return Response::json(['error'=>'El monto debe ser un número positivo'], 400);
+          return Response::json(['error'=>'El monto debe ser un nÃºmero positivo'], 400);
       }
 
       $status = 'Por verificar';
@@ -387,7 +386,7 @@ class LegalController {
       $reqStatus = $s->fetchColumn();
       
       if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
-          return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya está en trámite'], 403);
+          return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya estÃ¡ en trÃ¡mite'], 403);
       }
       
       $pdo->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
@@ -417,7 +416,7 @@ class LegalController {
       }
       
       $role = strtolower($u['role'] ?? '');
-      if (!in_array($role, ['admin','staff','manager'])) {
+      if (!RolePolicy::canManageLegalRequests($u)) {
           if ((int)$r['user_id'] !== (int)$u['id']) {
               http_response_code(403);
               die('No tienes acceso a esta orden');
@@ -477,7 +476,7 @@ class LegalController {
     if ($owner === false) {
         return Response::json(['error'=>'Archivo no encontrado'], 404);
     }
-    $isAdmin = in_array(strtolower((string)($u['role'] ?? '')), ['admin','staff','manager','superadmin'], true);
+    $isAdmin = RolePolicy::canManageLegalRequests($u);
     if (!$isAdmin && (string)$owner !== (string)$u['id']) {
         return Response::json(['error'=>'El archivo no te pertenece.'], 403);
     }
@@ -485,7 +484,7 @@ class LegalController {
     $s = $pdo->prepare("SELECT COUNT(*) FROM legal_files WHERE file_id=? AND legal_request_id!=?");
     $s->execute([$fileId, $id]);
     if ($s->fetchColumn() > 0) {
-        return Response::json(['error'=>'El archivo ya está adjunto a otra solicitud'], 400);
+        return Response::json(['error'=>'El archivo ya estÃ¡ adjunto a otra solicitud'], 400);
     }
     
     $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $kind]);

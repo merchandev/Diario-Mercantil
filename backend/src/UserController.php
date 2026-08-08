@@ -4,6 +4,7 @@ require_once __DIR__."/Database.php";
 require_once __DIR__."/AuthController.php";
 require_once __DIR__."/Role.php";
 require_once __DIR__."/RolePolicy.php";
+require_once __DIR__."/PasswordPolicy.php";
 
 class UserController {
   private function json(){ $raw = file_get_contents("php://input"); return json_decode($raw, true) ?: []; }
@@ -61,6 +62,11 @@ class UserController {
 
         if ($document==="" || $name==="" || $password==="") {
             Response::json(["error"=>"missing_fields"], 400);
+        }
+        try {
+            PasswordPolicy::validate($password);
+        } catch (InvalidArgumentException $e) {
+            Response::json(["error"=>$e->getMessage()], 400);
         }
 
         // Check if exists
@@ -123,8 +129,13 @@ class UserController {
         if ($address !== "") { $set[] = "address=?"; $params[] = $address; }
         
         if ($password !== "") {
+            try {
+                PasswordPolicy::validate($password);
+            } catch (InvalidArgumentException $e) {
+                Response::json(["error"=>$e->getMessage()], 400);
+            }
             $set[] = "password_hash=?";
-            $params[] = password_hash($password, PASSWORD_BCRYPT);
+            $params[] = PasswordPolicy::hash($password);
         }
         
         if (empty($set)) {
@@ -134,7 +145,18 @@ class UserController {
         $params[] = $id;
         $sql = "UPDATE users SET " . implode(", ", $set) . " WHERE id=?";
         $pdo->prepare($sql)->execute($params);
-        
+
+        // Revoke other sessions if password was changed
+        if (in_array('password_hash=?', $set, true)) {
+            $currentTokenHash = isset($_COOKIE['dm_session'])
+                ? hash('sha256', $_COOKIE['dm_session'])
+                : null;
+            if ($currentTokenHash) {
+                $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=? AND token_hash != ?")
+                    ->execute([$id, $currentTokenHash]);
+            }
+        }
+
         Response::json(["ok"=>true]);
     } catch (Throwable $e) {
         error_log("Update error: " . $e->getMessage());
@@ -358,6 +380,45 @@ class UserController {
         header('Content-Type: application/json');
         echo json_encode(["error" => "server_error", "message" => "No fue posible completar la operación"]);
         exit;
+    }
+  }
+
+  /**
+   * Admin-level user update: edits any user the actor has authority over.
+   * Bound to PUT /api/admin/users/{id}
+   */
+  public function adminUpdate($id) {
+    try {
+        $u = AuthController::requireAuth();
+        $pdo = Database::pdo();
+        $target = $this->getTargetUser($pdo, $id);
+
+        if (!$target) { Response::json(["error"=>"not_found"], 404); exit; }
+        if (!RolePolicy::canModifyUser($u, $target)) { Response::json(["error"=>"forbidden", "message"=>"Jerarquía insuficiente."], 403); exit; }
+
+        $in = $this->json();
+        $set = ["updated_at=CURRENT_TIMESTAMP"];
+        $params = [];
+
+        $allowed = ['name', 'email', 'phone', 'state', 'municipality', 'address'];
+        foreach ($allowed as $field) {
+            $val = trim($in[$field] ?? '');
+            if ($val !== '') { $set[] = "{$field}=?"; $params[] = $val; }
+        }
+
+        if (count($set) === 1) {
+            Response::json(["ok"=>true, "message"=>"Sin cambios"]);
+        }
+
+        $params[] = (int)$id;
+        $pdo->prepare("UPDATE users SET " . implode(", ", $set) . " WHERE id=?")->execute($params);
+
+        $this->audit($pdo, $u['id'], 'admin_update', 'user', $id, null, $in);
+
+        Response::json(["ok"=>true]);
+    } catch (Throwable $e) {
+        error_log("adminUpdate error: " . $e->getMessage());
+        Response::json(["error" => "server_error", "message" => "No fue posible completar la operación"], 500);
     }
   }
 }

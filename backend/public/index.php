@@ -59,6 +59,7 @@ $router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
 $router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
 $router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 $router->get('/api/superadmin/verify', [AuthController::class, 'verifySuperAdmin']);
+$router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $auth);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);
@@ -69,6 +70,7 @@ $router->post('/api/admin/users/{id}/suspend', [UserController::class, 'suspend'
 $router->post('/api/admin/users/{id}/restore', [UserController::class, 'restore'], $adminCsrf);
 $router->post('/api/admin/users/{id}/role', [UserController::class, 'changeRole'], $adminCsrf);
 $router->post('/api/admin/users/{id}/reset-password', [UserController::class, 'resetPassword'], $adminCsrf);
+$router->put('/api/admin/users/{id}', [UserController::class, 'adminUpdate'], $adminCsrf);
 $router->post('/api/users/{id}/password', [UserController::class, 'resetPassword'], $adminCsrf); // Alias for backward compatibility
 
 // PROFILE

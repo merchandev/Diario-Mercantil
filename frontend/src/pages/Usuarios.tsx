@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import PromptDialog from '../components/PromptDialog'
 import AlertDialog from '../components/AlertDialog'
 import { Edit2, Key, Activity, Eye, Trash2 } from 'lucide-react'
+import { PASSWORD_MIN_LENGTH, PASSWORD_MIN_MESSAGE } from '../utils/passwordPolicy'
 
 export default function Usuarios() {
   const [rows, setRows] = useState<UserSummary[]>([])
@@ -54,7 +55,22 @@ export default function Usuarios() {
         </div>
       </div>
       {showForm && (
-        <form onSubmit={async e => { e.preventDefault(); await createUser(f as any); setF({ document: '', name: '', password: '', role: 'solicitante', email: '', phone: '', person_type: 'natural' }); setShowForm(false); reload() }} className="card p-4 space-y-3">
+        <form onSubmit={async e => {
+          e.preventDefault()
+          if (f.password.length < PASSWORD_MIN_LENGTH) {
+            setAlertDialog({ isOpen: true, title: 'Contraseña débil', message: PASSWORD_MIN_MESSAGE, variant: 'warning' })
+            return
+          }
+          try {
+            await createUser(f as any)
+            setF({ document: '', name: '', password: '', role: 'solicitante', email: '', phone: '', person_type: 'natural' })
+            setShowForm(false)
+            reload()
+          } catch (err: any) {
+            const msg = err?.response?.data?.error || err?.message || 'Error al crear el usuario'
+            setAlertDialog({ isOpen: true, title: 'Error', message: msg, variant: 'error' })
+          }
+        }} className="card p-4 space-y-3">
           <div className="grid md:grid-cols-3 gap-3">
             <div>
               <label className="block text-sm mb-1">Documento</label>
@@ -81,7 +97,7 @@ export default function Usuarios() {
             </div>
             <div>
               <label className="block text-sm mb-1">Contraseña</label>
-              <input className="input w-full" type="password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} required />
+              <input className="input w-full" type="password" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`} required />
             </div>
           </div>
           <div className="flex gap-2">

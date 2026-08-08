@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone, IconMap } from '../components/icons'
 import { ESTADOS_VENEZUELA, MUNICIPIOS_VENEZUELA } from '../lib/constants'
 import { useAuth } from '../hooks/useAuth'
+import { PASSWORD_MIN_LENGTH, PASSWORD_MIN_MESSAGE } from '../utils/passwordPolicy'
 
 export default function Register() {
   const navigate = useNavigate()
@@ -56,8 +57,8 @@ export default function Register() {
       return
     }
 
-    if (formData.password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+    if (formData.password.length < PASSWORD_MIN_LENGTH) {
+      setError(PASSWORD_MIN_MESSAGE)
       setLoading(false)
       return
     }
@@ -312,7 +313,7 @@ export default function Register() {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={`Mínimo ${PASSWORD_MIN_LENGTH} caracteres`}
                     className="w-full pl-10 pr-12 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     required
                   />

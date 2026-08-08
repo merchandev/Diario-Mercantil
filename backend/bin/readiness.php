@@ -13,7 +13,7 @@ function check(): bool {
 
         $pdo = Database::pdo();
         
-        $tables = ['schema_migrations', 'users', 'files', 'legal_requests', 'legal_files', 'file_events', 'settings'];
+        $tables = ['schema_migrations', 'users', 'files', 'legal_requests', 'legal_files', 'file_events', 'settings', 'sessions', 'password_resets', 'audit_logs'];
         foreach ($tables as $table) {
             $stmt = $pdo->prepare('SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?');
             $stmt->execute([$table]);

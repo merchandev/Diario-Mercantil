@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__."/Response.php";
 require_once __DIR__."/Database.php";
+require_once __DIR__."/PasswordPolicy.php";
 
 final class AuthController {
     private function jsonInput(): array {
@@ -254,51 +255,62 @@ final class AuthController {
             $address = trim($in["address"] ?? "");
 
             if ($document === "" || $name === "" || $password === "") Response::json(["error"=>"Faltan datos requeridos"], 400);
-            if (strlen($password) < 12) Response::json(["error"=>"La contraseña debe tener al menos 12 caracteres"], 400);
+            try {
+                PasswordPolicy::validate($password);
+            } catch (InvalidArgumentException $e) {
+                Response::json(["error"=>$e->getMessage()], 400);
+            }
             if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) Response::json(["error"=>"Formato de correo electrónico inválido"], 400);
-            
+
             $document = strtoupper(preg_replace('/[^A-Z0-9-]/i', '', $document));
-            
+
             $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
             $check->execute([$document]);
             if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);
 
-            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $hash = PasswordPolicy::hash($password);
             $now = date("Y-m-d H:i:s");
-            
-            $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,state,municipality,address,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)");
-            $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $state, $municipality, $address, "active", $now, $now]);
-            
-            $uid = $pdo->lastInsertId();
-            
+
             $plainToken = bin2hex(random_bytes(32));
             $tokenHash = hash('sha256', $plainToken);
             $ipHash = hash('sha256', $_SERVER['REMOTE_ADDR'] ?? '');
             $userAgentHash = hash('sha256', $_SERVER['HTTP_USER_AGENT'] ?? '');
             $expiresAt = date("Y-m-d H:i:s", time() + 604800);
-            
-            $pdo->prepare("INSERT INTO sessions (user_id, token_hash, ip_hash, user_agent_hash, expires_at) VALUES (?, ?, ?, ?, ?)")
-                ->execute([$uid, $tokenHash, $ipHash, $userAgentHash, $expiresAt]);
+
+            // Atomic: user + session in one transaction
+            $pdo->beginTransaction();
+            try {
+                $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,state,municipality,address,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)");
+                $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $state, $municipality, $address, "active", $now, $now]);
+                $uid = $pdo->lastInsertId();
+
+                $pdo->prepare("INSERT INTO sessions (user_id, token_hash, ip_hash, user_agent_hash, expires_at) VALUES (?, ?, ?, ?, ?)") 
+                    ->execute([$uid, $tokenHash, $ipHash, $userAgentHash, $expiresAt]);
+
+                $pdo->commit();
+            } catch (Throwable $txEx) {
+                $pdo->rollBack();
+                throw $txEx;
+            }
 
             self::setSessionCookies($plainToken);
 
-            // Send Welcome Email
+            // Send Welcome Email AFTER commit — a slow SMTP must not affect the user
             if ($email !== "") {
                 try {
                     require_once __DIR__ . '/Services/EmailService.php';
                     EmailService::sendWelcome($email, $name);
                 } catch (Throwable $mailEx) {
-                    // Ignore email error to not break registration
                     error_log("Failed to send welcome email: " . $mailEx->getMessage());
                 }
             }
 
             Response::json([
-                "user" => [ 
-                    "id" => (int)$uid, 
-                    "document" => $document, 
-                    "name" => $name, 
-                    "role" => "solicitante" 
+                "user" => [
+                    "id" => (int)$uid,
+                    "document" => $document,
+                    "name" => $name,
+                    "role" => "solicitante"
                 ]
             ]);
         } catch (Throwable $e) {
@@ -363,37 +375,46 @@ final class AuthController {
             if ($token === "" || $password === "") {
                 Response::json(["error" => "Datos incompletos"], 400);
             }
-            if (strlen($password) < 12) {
-                Response::json(["error" => "La contraseña debe tener al menos 12 caracteres"], 400);
+            try {
+                PasswordPolicy::validate($password);
+            } catch (InvalidArgumentException $e) {
+                Response::json(["error" => $e->getMessage()], 400);
             }
 
             $pdo = Database::pdo();
             $tokenHash = hash('sha256', $token);
             $now = date("Y-m-d H:i:s");
 
-            $stmt = $pdo->prepare("SELECT id, user_id FROM password_resets WHERE token=? AND expires_at > ? AND used_at IS NULL ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$tokenHash, $now]);
-            $reset = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$reset) {
-                Response::json(["error" => "Enlace inválido o expirado"], 400);
-            }
-
-            $userId = $reset['user_id'];
-            $resetId = $reset['id'];
-            $passwordHash = password_hash($password, PASSWORD_DEFAULT);
-
+            // SELECT ... FOR UPDATE inside transaction to prevent race condition
             $pdo->beginTransaction();
             try {
+                $stmt = $pdo->prepare("SELECT id, user_id FROM password_resets WHERE token=? AND expires_at > ? AND used_at IS NULL ORDER BY id DESC LIMIT 1 FOR UPDATE");
+                $stmt->execute([$tokenHash, $now]);
+                $reset = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$reset) {
+                    $pdo->rollBack();
+                    Response::json(["error" => "Enlace inválido o expirado"], 400);
+                }
+
+                $userId = $reset['user_id'];
+                $resetId = $reset['id'];
+                $passwordHash = PasswordPolicy::hash($password);
+
                 $pdo->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE id=? AND status='active'")
                     ->execute([$passwordHash, $now, $userId]);
-                
-                // Mark token as used
+
+                // Verify the update actually affected a row (account could be suspended)
+                $affected = $pdo->query("SELECT ROW_COUNT()")->fetchColumn();
+                if ((int)$affected === 0) {
+                    $pdo->rollBack();
+                    Response::json(["error" => "La cuenta no está activa"], 400);
+                }
+
+                // Consume token
                 $pdo->prepare("UPDATE password_resets SET used_at=? WHERE id=?")->execute([$now, $resetId]);
-                
-                // Invalidate all tokens for this user
+                // Invalidate all remaining tokens for this user
                 $pdo->prepare("DELETE FROM password_resets WHERE user_id=?")->execute([$userId]);
-                
                 // Revoke all sessions for security
                 $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$userId]);
 
@@ -474,6 +495,25 @@ final class AuthController {
             Response::json(["ok" => true, "superadmin" => $sa]);
         } catch (Throwable $e) {
             Response::json(["error" => "unauthorized"], 401);
+        }
+    }
+
+    public function superadminLogout(): void {
+        try {
+            $token = self::sessionToken();
+            if ($token) {
+                $pdo = Database::pdo();
+                $tokenHash = hash('sha256', $token);
+                // Revoke superadmin token
+                $pdo->prepare("DELETE FROM superadmin_tokens WHERE token=?")->execute([$tokenHash]);
+                // Also revoke regular session if one exists
+                $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE token_hash=?")->execute([$tokenHash]);
+            }
+            self::clearCookies();
+            Response::json(["ok" => true]);
+        } catch (Throwable $e) {
+            self::clearCookies();
+            Response::json(["ok" => true]);
         }
     }
 }
