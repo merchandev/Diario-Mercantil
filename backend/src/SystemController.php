@@ -46,7 +46,7 @@ class SystemController {
             
             // Publication Statistics
             try { $stats["publications"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
-            try { $stats["publications_pending"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status IN ('Pendiente', 'Procesando', 'Por verificar')")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["publications_pending"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status IN ('Por verificar', 'En trámite')")->fetchColumn(); } catch(Throwable $e){}
             
             // Publications by type
             try { $stats["publications_documents"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE pub_type='Documento' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
@@ -55,12 +55,10 @@ class SystemController {
             // Edition Statistics
             try { $stats["editions"] = (int)$pdo->query("SELECT COUNT(*) FROM editions")->fetchColumn(); } catch(Throwable $e){}
             
-            // Financial Statistics (Fixed: use legal_payments)
+            // Financial Statistics
             try { 
-                // Using amount_bs as revenue for now. Convert to USD if needed requires rate.
-                // Assuming 1 USD = 36 BS approx if simplistic, but let's just show BS amount.
-                $stats["revenue_total_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(amount_bs), 0) FROM legal_payments")->fetchColumn();
-                $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(amount_bs), 0) FROM legal_payments WHERE status='Pendiente'")->fetchColumn();
+                $stats["revenue_total_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('En trámite', 'Publicada')")->fetchColumn();
+                $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('Borrador', 'Por verificar')")->fetchColumn();
             } catch(Throwable $e){
                 error_log("Financial stats error: " . $e->getMessage());
             }
@@ -76,6 +74,13 @@ class SystemController {
         }
         
         Response::json($stats);
+    }
+    
+    public function clearStats() {
+        $this->requireAdmin();
+        // Since stats are calculated on the fly, clearing them might just mean resetting something if cached.
+        // For now, return ok to satisfy the frontend contract.
+        Response::json(['ok'=>true]);
     }
 
     // --- SETTINGS (BCV, Prices) ---

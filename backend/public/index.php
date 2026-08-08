@@ -113,6 +113,7 @@ $router->delete('/api/files/trash/{id}', [FileController::class, 'permanentDelet
 $router->post('/api/files/{id}/restore', [FileController::class, 'restore'], $adminCsrf);
 $router->get('/api/files/{id}', [FileController::class, 'get'], $auth);
 $router->delete('/api/files/{id}', [FileController::class, 'softDelete'], $adminCsrf);
+$router->post('/api/files/{id}/retry', [FileController::class, 'retry'], $adminCsrf);
 $router->get('/api/files', [FileController::class, 'list'], $admin);
 $router->post('/api/files', [UploadController::class, 'upload'], $csrf);
 
@@ -123,6 +124,7 @@ $router->get('/api/editions/{id}', [EditionController::class, 'get'], $admin);
 $router->put('/api/editions/{id}', [EditionController::class, 'update'], $adminCsrf);
 $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adminCsrf);
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
+$router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
 $router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById'], $auth);
@@ -131,8 +133,10 @@ $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES
 $router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
+$router->post('/api/stats/clear', [SystemController::class, 'clearStats'], $adminCsrf);
 $router->get('/api/rate/bcv', [RateController::class, 'bcv']);
 $router->get('/api/settings', [SystemController::class, 'getPublicSettings']);
+$router->post('/api/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $admin);
 $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
@@ -140,6 +144,7 @@ $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
 $router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
+$router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/publications', [SystemController::class, 'listPages'], $admin);
 $router->get('/api/publications/{id}', [SystemController::class, 'getPage'], $admin);
 $router->post('/api/publications', [SystemController::class, 'createPage'], $adminCsrf);

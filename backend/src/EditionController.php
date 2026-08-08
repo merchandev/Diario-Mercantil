@@ -257,6 +257,40 @@ class EditionController {
     }
   }
   
+  public function autoSelect($id){
+      $u = $this->requireAdmin();
+      $pdo = Database::pdo();
+      
+      $in = json_decode(file_get_contents('php://input'), true) ?: [];
+      $limit = (int)($in['limit'] ?? 100);
+      
+      try {
+          $s = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND id NOT IN (SELECT order_id FROM edition_orders) ORDER BY created_at ASC LIMIT " . max(1, $limit));
+          $s->execute();
+          $ids = $s->fetchAll(PDO::FETCH_COLUMN);
+          
+          $cnt = 0;
+          if (!empty($ids)) {
+              // We should get existing orders and append these new ones
+              $exStmt = $pdo->prepare("SELECT order_id FROM edition_orders WHERE edition_id=?");
+              $exStmt->execute([$id]);
+              $existingIds = $exStmt->fetchAll(PDO::FETCH_COLUMN);
+              
+              $mergedIds = array_unique(array_merge($existingIds, $ids));
+              
+              $orderService = new EditionOrderService($pdo);
+              $cnt = $orderService->setOrdersForEdition($id, $mergedIds);
+          }
+          
+          $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+              ->execute([$u['id'], 'auto_select_edition_orders', 'edition', $id]);
+              
+          Response::json(['ok'=>true, 'count'=>count($ids), 'added'=>$ids]);
+      } catch (Exception $e) {
+          Response::json(['error'=>$e->getMessage()], 500);
+      }
+  }
+  
   public function publish($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();

@@ -54,6 +54,9 @@ final class LegalRequestStateMachine {
                 throw new Exception("La solicitud no está en Borrador ni Rechazado.", 409);
             }
 
+            require_once __DIR__ . '/LegalSubmissionValidator.php';
+            LegalSubmissionValidator::validate($this->pdo, $id, $req);
+
             $now = gmdate('Y-m-d H:i:s');
             $year = substr($req['created_at'], 0, 4) ?: gmdate('Y');
             $orderNo = "ORD-{$year}-" . str_pad((string)$id, 6, "0", STR_PAD_LEFT);
@@ -83,9 +86,19 @@ final class LegalRequestStateMachine {
                 throw new Exception("La solicitud no está en estado 'Por verificar'.", 409);
             }
 
+            // Lock associated payments FOR UPDATE to prevent race conditions
+            $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=? FOR UPDATE")->execute([$id]);
+            
             $now = gmdate('Y-m-d H:i:s');
+            
+            // Mark payments as Aprobado
+            $this->pdo->prepare("UPDATE legal_payments SET status='Aprobado' WHERE legal_request_id=?")
+                 ->execute([$id]);
+
+            // Mark request as En trámite
             $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")
                  ->execute([$now, $id]);
+
             
             try {
                 $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
