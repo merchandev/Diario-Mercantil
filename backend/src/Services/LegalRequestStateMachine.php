@@ -17,7 +17,7 @@ final class LegalRequestStateMachine {
 
         try {
             // Lock row
-            $stmt = $this->pdo->prepare('SELECT status, created_at FROM legal_requests WHERE id=? FOR UPDATE');
+            $stmt = $this->pdo->prepare('SELECT * FROM legal_requests WHERE id=? FOR UPDATE');
             $stmt->execute([$id]);
             $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
