@@ -336,6 +336,7 @@ export type LegalRequest = {
   comment?: string;
   deleted_at?: string | null;
   pub_type?: 'Documento' | 'Convocatoria';
+  total_bs?: number;
   meta?: any;
   files?: LegalFile[];
 }

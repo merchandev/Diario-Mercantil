@@ -35,11 +35,11 @@ class LegalRequestStateMachineTest extends TestCase {
         $machine->verify(1);
     }
 
-    public function testRejectRequiresPorVerificar() {
+    public function testRejectRequiresPorVerificarOrEnTramite() {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetch')->willReturn(['status' => 'En trámite']);
+        $stmt->method('fetch')->willReturn(['status' => 'Publicada']);
         $pdo->method('prepare')->willReturn($stmt);
         
         $machine = new LegalRequestStateMachine($pdo);
