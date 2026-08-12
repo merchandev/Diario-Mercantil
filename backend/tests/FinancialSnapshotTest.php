@@ -59,9 +59,9 @@ class FinancialSnapshotTest extends TestCase {
         $this->assertEquals(40.0, $pricing['bcv_rate']);
         $this->assertEquals(16.0, $pricing['iva_percent']);
         
-        $this->assertEquals(3.0, $pricing['price_usd']);
-        $this->assertEquals(120.0, $pricing['subtotal_bs']);
-        $this->assertEquals(19.2, $pricing['iva_bs']);
-        $this->assertEquals(139.2, $pricing['total_bs']);
+        $this->assertEquals(6.0, $pricing['price_usd']);
+        $this->assertEquals(240.0, $pricing['subtotal_bs']);
+        $this->assertEquals(38.4, $pricing['iva_bs']);
+        $this->assertEquals(278.4, $pricing['total_bs']);
     }
 }
