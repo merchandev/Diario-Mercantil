@@ -27,25 +27,27 @@ final class BcvScraper
                 return $cached;
             }
         }
+
+        // 1. Try reliable DolarAPI first (BCV HTML is often cached/wrong)
+        try {
+            $apiData = self::fetchFromApiProvider();
+            if ($apiData) {
+                $apiData['from_cache'] = false;
+                self::cacheWrite($cacheFile, $apiData);
+                return $apiData;
+            }
+        } catch (\Throwable $e) {
+            // Ignore and fallback
+        }
+
+        // 2. Fallback to HTML scraping
         try {
             $fresh = self::fetchAndParse(self::BCV_URL);
             $fresh['from_cache'] = false;
+            $fresh['warning'] = 'Using HTML fallback';
             self::cacheWrite($cacheFile, $fresh);
             return $fresh;
         } catch (\Throwable $e) {
-            // Attempt 3rd party fallback for BCV data
-            try {
-                $fallback = self::fetchFromApiProvider();
-                if ($fallback) {
-                    $fallback['from_cache'] = false;
-                    $fallback['warning'] = 'Using API fallback due to main site failure: ' . $e->getMessage();
-                    self::cacheWrite($cacheFile, $fallback);
-                    return $fallback;
-                }
-            } catch (\Throwable $e2) {
-                // Ignore fallback error and proceed to cache/error
-            }
-
             $stale = self::cacheReadAny($cacheFile);
             if ($stale !== null) {
                 $stale['from_cache'] = true;
@@ -328,33 +330,43 @@ final class BcvScraper
     }
     private static function fetchFromApiProvider(): ?array
     {
-        // Public API from pydolarvenezuela
-        $url = 'https://pydolarvenezuela-api.vercel.app/api/v1/dollar/page?page=bcv';
-        
+        // 1. Fetch USD rate
+        $usdUrl = 'https://ve.dolarapi.com/v1/dolares/oficial';
+        $usdJson = '';
         try {
-            $json = self::httpGet($url);
+            $usdJson = self::httpGet($usdUrl);
         } catch (\Throwable $e) {
             return null;
         }
-
-        if ($json === '' || $json === false) return null;
         
-        $data = json_decode($json, true);
-        if (!is_array($data)) return null;
+        $usdData = json_decode($usdJson, true);
+        if (!is_array($usdData) || !isset($usdData['promedio'])) {
+            return null;
+        }
         
-        // Structure: { monitors: { usd: { price: float }, eur: { price: float } }, datetime: { date: string } }
-        $usdVal = $data['monitors']['usd']['price'] ?? null;
-        $eurVal = $data['monitors']['eur']['price'] ?? null;
-        $dateStr = $data['datetime']['date'] ?? null; // e.g. "2024-01-28"
+        $usdVal = (float)$usdData['promedio'];
+        $dateStr = $usdData['fechaActualizacion'] ?? null;
 
-        if (!$usdVal && !$eurVal) return null;
+        // 2. Fetch EUR rate
+        $eurUrl = 'https://ve.dolarapi.com/v1/euros/oficial';
+        $eurJson = '';
+        $eurVal = null;
+        try {
+            $eurJson = self::httpGet($eurUrl);
+            $eurData = json_decode($eurJson, true);
+            if (is_array($eurData) && isset($eurData['promedio'])) {
+                $eurVal = (float)$eurData['promedio'];
+            }
+        } catch (\Throwable $e) {
+            // EUR is optional
+        }
 
         return [
-            'source_url' => 'https://pydolarvenezuela-api.vercel.app',
+            'source_url' => 'https://ve.dolarapi.com',
             'date_iso'   => $dateStr,
             'rates'      => [
-                'USD' => $usdVal ? ['raw' => (string)$usdVal, 'value' => (float)$usdVal] : null,
-                'EUR' => $eurVal ? ['raw' => (string)$eurVal, 'value' => (float)$eurVal] : null,
+                'USD' => ['raw' => (string)$usdVal, 'value' => $usdVal],
+                'EUR' => $eurVal ? ['raw' => (string)$eurVal, 'value' => $eurVal] : null,
             ],
             'fetched_at' => gmdate('c'),
         ];
