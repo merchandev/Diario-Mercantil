@@ -493,7 +493,8 @@ export async function createUser(body: { document: string; name: string; passwor
   return res.json() as Promise<{ id: number }>
 }
 export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string; phone?: string; person_type?: string }) {
-  const res = await fetchAuth(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  // Usa la ruta de admin para editar cualquier usuario (no la de auto-perfil)
+  const res = await fetchAuth(`/api/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }
 export async function setUserPassword(id: number, password: string) {
@@ -508,6 +509,14 @@ export async function setUserPassword(id: number, password: string) {
 export async function deleteUser(id: number) {
   const res = await fetchAuth(`/api/users/${id}`, { method: 'DELETE' })
   return res.json()
+}
+export async function changeUserRole(id: number, role: string) {
+  const res = await fetchAuth(`/api/admin/users/${id}/role`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  })
+  return res.json() as Promise<{ ok: boolean }>
 }
 
 // Settings

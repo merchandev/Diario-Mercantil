@@ -38,11 +38,14 @@ final class RolePolicy {
             return false;
         }
 
-        return $actorRole === Role::SUPERADMIN
-            || (
-                $actorRole === Role::ADMIN
-                && $targetRole->rank() < Role::ADMIN->rank()
-            );
+        if ($actorRole === Role::SUPERADMIN) {
+            return true;
+        }
+
+        // Admin puede modificar a cualquier usuario que NO sea superadmin
+        // (incluyendo otros admins, managers, staff y solicitantes)
+        return $actorRole === Role::ADMIN
+            && $targetRole !== Role::SUPERADMIN;
     }
 
     public static function canDeleteUser(array $actor, array $target): bool {
