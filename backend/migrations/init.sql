@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Seed defaults
 INSERT IGNORE INTO settings(`key`,value,updated_at) VALUES
  ('bcv_rate','203.74',NOW()),
- ('price_per_folio_usd','1.50',NOW()),
+ ('price_per_folio_usd','3.00',NOW()),
  ('convocatoria_usd','10.00',NOW()),
  ('iva_percent','16',NOW()),
  ('raptor_mini_preview_enabled','1',NOW());
