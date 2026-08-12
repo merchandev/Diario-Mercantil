@@ -34,9 +34,7 @@ final class RolePolicy {
             return false;
         }
         
-        if ((int)$actor['id'] === (int)$target['id']) {
-            return false;
-        }
+        // Permitimos que el actor se modifique a sí mismo
 
         if ($actorRole === Role::SUPERADMIN) {
             return true;
@@ -49,6 +47,9 @@ final class RolePolicy {
     }
 
     public static function canDeleteUser(array $actor, array $target): bool {
+        if ((int)$actor['id'] === (int)$target['id']) {
+            return false;
+        }
         return self::canModifyUser($actor, $target);
     }
 

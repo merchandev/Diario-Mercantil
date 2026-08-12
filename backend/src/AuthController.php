@@ -163,17 +163,17 @@ final class AuthController {
             }
             
             $this->checkRateLimit($doc);
-            $u = $pdo->prepare("SELECT * FROM users WHERE document=? AND status='active'");
-            $u->execute([$doc]);
+            $u = $pdo->prepare("SELECT * FROM users WHERE (document=? OR email=?) AND status='active'");
+            $u->execute([$doc, $doc]);
             $user = $u->fetch(PDO::FETCH_ASSOC);
 
             if (!$user && preg_match("/^[VEJGP][-]?(.+)$/i", $doc, $m)) {
-                $u->execute([$m[1]]);
+                $u->execute([$m[1], $m[1]]);
                 $user = $u->fetch(PDO::FETCH_ASSOC);
             }
 
             if (!$user && !preg_match("/^[VEJGP]/i", $doc)) {
-                $u->execute(['V'.$doc]);
+                $u->execute(['V'.$doc, 'V'.$doc]);
                 $user = $u->fetch(PDO::FETCH_ASSOC);
             }
 
@@ -192,6 +192,10 @@ final class AuthController {
                 ->execute([$user["id"], $tokenHash, $ipHash, $userAgentHash, $expiresAt]);
 
             self::setSessionCookies($plainToken);
+
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $pdo->prepare("INSERT INTO audit_logs (actor_user_id, action, resource_type, resource_id, ip_address, created_at) VALUES (?, 'login', 'user', ?, ?, NOW())")
+                ->execute([$user['id'], $user['document'], $ip]);
 
             Response::json([
                 "user" => [ 
@@ -460,6 +464,10 @@ final class AuthController {
                 ->execute([$user["id"], $tokenHash, $expiresAt]);
 
             self::setSessionCookies($plainToken);
+
+            $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $pdo->prepare("INSERT INTO audit_logs (actor_user_id, action, resource_type, resource_id, ip_address, created_at) VALUES (NULL, 'login', 'superadmin', ?, ?, NOW())")
+                ->execute([$username, $ip]);
 
             Response::json([
                 "token" => $plainToken,

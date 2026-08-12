@@ -60,6 +60,7 @@ $router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // 
 $router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 $router->get('/api/superadmin/verify', [AuthController::class, 'verifySuperAdmin']);
 $router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $auth);
+$router->get('/api/superadmin/activity', [SystemController::class, 'getActivityLog'], $auth);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);

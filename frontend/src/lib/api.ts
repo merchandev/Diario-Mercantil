@@ -449,6 +449,12 @@ export async function cleanupOldTrashed() {
   return res.json() as Promise<{ ok: boolean; message: string; count: number }>
 }
 
+// Activity Log
+export async function getActivityLog() {
+  const res = await fetchAuth('/api/superadmin/activity')
+  return res.json() as Promise<{ items: any[] }>
+}
+
 // Legal files attachments
 export type LegalFile = { id: number; kind: string; file_id: number; name: string; type: string; size: number; created_at: string }
 export async function listLegalFiles(id: number) {

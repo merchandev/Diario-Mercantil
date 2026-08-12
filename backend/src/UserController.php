@@ -406,8 +406,15 @@ class UserController {
             if ($val !== '') { $set[] = "{$field}=?"; $params[] = $val; }
         }
 
+        $password = (string)($in["password"] ?? "");
+        if ($password !== "") {
+            $set[] = "password_hash=?";
+            $params[] = PasswordPolicy::hash($password);
+        }
+
         if (count($set) === 1) {
             Response::json(["ok"=>true, "message"=>"Sin cambios"]);
+            exit;
         }
 
         $params[] = (int)$id;
