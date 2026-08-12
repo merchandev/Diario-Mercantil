@@ -52,11 +52,11 @@ class UserController {
         $password = (string)($in["password"] ?? "");
         
         // Extra fields
-        $email = trim($in["email"] ?? null);
-        $phone = trim($in["phone"] ?? null);
-        $state = trim($in["state"] ?? null);
-        $municipality = trim($in["municipality"] ?? null);
-        $address = trim($in["address"] ?? null);
+        $email = trim($in["email"] ?? "");
+        $phone = trim($in["phone"] ?? "");
+        $state = trim($in["state"] ?? "");
+        $municipality = trim($in["municipality"] ?? "");
+        $address = trim($in["address"] ?? "");
         $status = "active";
         $personType = $in["person_type"] ?? "natural";
 
