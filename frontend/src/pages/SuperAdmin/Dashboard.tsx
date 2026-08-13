@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Shield, Users, FileText, Settings, LogOut, Activity, BarChart3, Search } from 'lucide-react'
+import { Shield, Users, FileText, Settings, LogOut, Activity, BarChart3, Search, LayoutTemplate } from 'lucide-react'
 import { verifySuperAdmin, superadminLogout } from '../../lib/api'
 
 export default function SuperAdminDashboard() {
@@ -64,6 +64,7 @@ export default function SuperAdminDashboard() {
 
     const cards = [
         { title: 'Usuarios', icon: Users, path: '/lotus/users', color: 'from-blue-500 to-cyan-500' },
+        { title: 'Páginas (CMS)', icon: LayoutTemplate, path: '/lotus/paginas', color: 'from-teal-500 to-cyan-500' },
         { title: 'Publicaciones', icon: FileText, path: '/lotus/publications', color: 'from-green-500 to-emerald-500' },
         { title: 'Gestor SEO', icon: Search, path: '/lotus/seo', color: 'from-pink-500 to-rose-500' },
         { title: 'Actividad', icon: Activity, path: '/lotus/activity', color: 'from-orange-500 to-red-500' },
