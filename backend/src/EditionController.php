@@ -302,7 +302,10 @@ class EditionController {
         $service->publish($id, $u['id']);
         Response::json(['ok'=>true]);
     } catch (RuntimeException $e) {
-        $code = $e->getCode() ?: 500;
+        $code = $e->getCode();
+        if (!is_int($code) || $code < 400 || $code > 599) {
+            $code = 500;
+        }
         Response::json(['error'=>$e->getMessage()], $code);
     } catch (Throwable $e) {
         Response::json(['error'=>$e->getMessage()], 500);

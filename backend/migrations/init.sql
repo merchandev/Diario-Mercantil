@@ -109,7 +109,11 @@ CREATE TABLE IF NOT EXISTS editions (
   orders_count INT DEFAULT 0,
   file_id INT,
   file_name VARCHAR(255),
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  published_at DATETIME NULL,
+  published_by INT NULL,
+  published_file_checksum VARCHAR(64) NULL,
+  FOREIGN KEY(published_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Link table Edition -> Legal Requests
