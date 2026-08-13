@@ -1,5 +1,6 @@
 import React from 'react'
 import EditionPromoAside from '../components/EditionPromoAside'
+import { SEO } from '../components/SEO'
 
 function BannerBox({ label, className }: { label: string; className?: string }) {
   return (
@@ -13,6 +14,10 @@ export default function Home() {
   console.log('[Home] Component rendering')
   return (
     <div>
+      <SEO 
+        title="Diario Mercantil Venezuela | Avisos Legales y Edictos" 
+        description="Publica avisos legales, edictos, actas y balances en el Diario Mercantil digital líder en Venezuela. Válido para Registros Mercantiles."
+      />
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 md:py-8 grid gap-6 lg:grid-cols-[220px_1fr_300px] items-start">
         <div className="space-y-6 order-2 lg:order-1">
           <BannerBox label="BANNER B" className="aspect-[9/20]" />

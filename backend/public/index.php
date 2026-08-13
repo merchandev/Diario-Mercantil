@@ -41,6 +41,7 @@ require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
 require_once __DIR__."/../src/MetricsController.php";
 require_once __DIR__."/../src/UploadController.php";
+require_once __DIR__."/../src/SeoController.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
 
@@ -154,6 +155,12 @@ $router->post('/api/publications', [SystemController::class, 'createPage'], $adm
 $router->put('/api/publications/{id}', [SystemController::class, 'updatePage'], $adminCsrf);
 $router->delete('/api/publications/{id}', [SystemController::class, 'deletePage'], $adminCsrf);
 $router->get('/api/directory/profile', [SystemController::class, 'getDirectoryProfile']);
+
+// SEO
+$router->get('/api/seo/all', [SeoController::class, 'getAllPublic']);
+$router->get('/api/admin/seo', [SeoController::class, 'listAll'], $admin);
+$router->post('/api/admin/seo', [SeoController::class, 'save'], $adminCsrf);
+$router->delete('/api/admin/seo', [SeoController::class, 'delete'], $adminCsrf);
 
 // STUBS
 class StubController {

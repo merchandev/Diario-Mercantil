@@ -3,8 +3,9 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
 import FlipbookViewer from '../components/FlipbookViewer'
 import { listPublicEditions } from '../lib/api'
+import { SEO } from '../components/SEO'
 
-type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null }
+type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null; seo?: { title?: string, description?: string, og_image?: string } }
 type Order = { id: number; name: string; document: string; status: string; date: string }
 
 export default function EditionPublic() {
@@ -57,6 +58,11 @@ export default function EditionPublic() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
+      <SEO 
+        title={edition.seo?.title || `Edición N° ${edition.edition_no} | Diario Mercantil Venezuela`} 
+        description={edition.seo?.description || `Consulte el archivo digital de la edición ${edition.edition_no} de fecha ${edition.date} del Diario Mercantil Venezuela.`}
+        ogImage={edition.seo?.og_image}
+      />
       {/* 1. Barra de Búsqueda Superior */}
       <div className="bg-white border-b border-slate-200 shadow-sm z-10 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">

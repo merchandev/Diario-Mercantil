@@ -50,6 +50,7 @@ const DirectorioLegal = lazyImport(() => import('./pages/DirectorioLegal'))
 const Usuarios = lazyImport(() => import('./pages/Usuarios'))
 const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
+const SeoManager = lazyImport(() => import('./pages/SeoManager'))
 const FileManager = lazyImport(() => import('./pages/FileManager'))
 const Medios = lazyImport(() => import('./pages/Medios'))
 const Promo = lazyImport(() => import('./pages/Promo'))
@@ -199,6 +200,7 @@ export default function App() {
                         <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
                         <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
                         <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
+                        <Route path="seo" element={<RequireAdmin><LazyRoute><SeoManager /></LazyRoute></RequireAdmin>} />
                         <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
                         <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
                         <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />

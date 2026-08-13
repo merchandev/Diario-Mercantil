@@ -54,6 +54,13 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
     $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    
+    $edition['seo'] = [
+        'title' => 'Edición N° ' . $edition['edition_no'] . ' | Diario Mercantil Venezuela',
+        'description' => 'Consulta el archivo digital de la edición N° ' . $edition['edition_no'] . ' de fecha ' . $edition['date'] . ' del Diario Mercantil Venezuela. Válido para Registros Mercantiles.',
+        'og_image' => 'https://diariomercantil.com/logo-blanco.png'
+    ];
+
     $ord = $pdo->prepare("SELECT l.name, l.status, l.date FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id");
     $ord->execute([$edition['id']]);
     return Response::json(['edition'=>$edition,'orders'=>$ord->fetchAll(PDO::FETCH_ASSOC)]);

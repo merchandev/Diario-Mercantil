@@ -4,6 +4,7 @@ import { type LegalRequest } from '../lib/api'
 import QRCode from 'qrcode.react'
 import { IconArrowLeft } from '../components/icons'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
+import { SEO } from '../components/SEO'
 
 export default function PublicacionPublic(){
   const { orden, razon } = useParams<{orden:string; razon?:string}>()
@@ -45,6 +46,10 @@ export default function PublicacionPublic(){
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <SEO 
+        title={`Publicación Legal: ${razonSocial} | Diario Mercantil Venezuela`} 
+        description={`Documento publicado por ${razonSocial}. Verifica la autenticidad en el Diario Mercantil de Venezuela.`}
+      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button className="btn btn-ghost inline-flex items-center gap-2" onClick={()=>navigate(-1)}><IconArrowLeft/> Volver</button>

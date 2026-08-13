@@ -670,3 +670,33 @@ export async function listPagesPublic() {
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ items: { slug: string; title: string }[] }>
 }
+
+// SEO Management
+export type SeoMetadata = {
+  path: string;
+  title?: string;
+  description?: string;
+  og_image?: string;
+  robots?: string;
+}
+
+export async function getPublicSeo() {
+  const res = await fetch(getUrl('/api/seo/all'))
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{ seo: Record<string, SeoMetadata> }>
+}
+
+export async function listSeoAdmin() {
+  const res = await fetchAuth('/api/admin/seo')
+  return res.json() as Promise<{ items: SeoMetadata[] }>
+}
+
+export async function saveSeoAdmin(body: SeoMetadata) {
+  const res = await fetchAuth('/api/admin/seo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return res.json() as Promise<{ ok: boolean }>
+}
+
+export async function deleteSeoAdmin(path: string) {
+  const res = await fetchAuth('/api/admin/seo', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) })
+  return res.json() as Promise<{ ok: boolean }>
+}
