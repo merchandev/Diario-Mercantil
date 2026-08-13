@@ -1,148 +1,223 @@
-# Sistema de Gestion Digital - Diario Mercantil de Venezuela
+# Diario Mercantil de Venezuela — Sistema de Gestión Digital
 
-Plataforma integral para la gestion, publicacion y verificacion de documentos legales y avisos mercantiles. El sistema automatiza el flujo editorial, desde la solicitud del cliente hasta la publicacion digital y la generacion de ediciones compaginadas.
+Plataforma integral para la gestión, publicación y verificación de documentos legales y avisos mercantiles. El sistema automatiza el flujo editorial completo: desde la solicitud del cliente hasta la publicación digital, la generación de ediciones compaginadas y la consulta pública con código QR.
 
-## Caracteristicas principales
+---
 
-### Gestion de usuarios
-- Roles y permisos: sistema jerarquico (SuperAdmin, Administrador, Solicitante).
-- Autenticacion segura: sesiones persistentes y cierre automatico por inactividad.
+## ✨ Características principales
 
-### Publicaciones legales
-- Procesamiento de documentos PDF.
-- Calculo automatico basado en folios y tasas indexadas (BCV).
-- Generacion de ordenes de servicio y recibos en PDF.
+### 🔐 Autenticación y usuarios
+- Sistema de roles jerárquico: **SuperAdmin > Administrador > Solicitante**.
+- Registro instantáneo con auto-login (sin esperas por correo).
+- Sesiones seguras con tokens, cierre automático por inactividad.
+- Recuperación de contraseña por correo.
+- Login por cédula/RIF **o** correo electrónico.
+- Suspensión y restauración de cuentas.
+- **Eliminación de usuarios**: soft-delete (marcado como inactivo) para Administradores; hard-delete permanente para SuperAdmins.
+- Subida y gestión de avatar de usuario.
 
-### Verificacion y acceso publico
-- Validacion QR para verificar autenticidad de publicaciones.
-- Ruta publica directa mediante `/ver/{orden}`.
+### 📄 Solicitudes legales
+- Flujo completo: Borrador → Enviada → Verificada → En Edición → Publicada.
+- Cálculo automático de montos basado en folios, tasa BCV y porcentaje de IVA.
+- Scraper automático de la tasa BCV vía DolarAPI como fuente alternativa.
+- Carga de documentos en PDF (voucher de pago + documento legal).
+- Generación de órdenes de servicio y recibos en PDF (FPDF).
+- Historial de pagos por solicitud.
 
-### Ediciones digitales
-- Compaginacion y publicacion de la edicion diaria.
-- Visor interactivo para las ediciones digitales.
+### 📰 Ediciones digitales
+- Compaginación y publicación de la edición diaria.
+- Visor de PDF interactivo integrado (modo página).
+- Visor de tipo Flipbook/revista digital.
+- Ediciones accesibles al público sin necesidad de iniciar sesión.
 
-## Stack tecnologico
+### ✅ Verificación pública
+- Validación de autenticidad mediante código QR.
+- Ruta pública directa `/ver/{orden}` para consultar cualquier publicación.
+- Visor público de ediciones accesible desde `/edicion/{code}`.
 
-- Frontend:
-  - React 18
-  - TypeScript
-  - TailwindCSS
-  - Vite
-- Backend:
-  - PHP 8.2
-  - PDO
-  - FPDF
-- Infraestructura:
-  - Docker y Docker Compose
-  - Nginx
-  - MySQL / MariaDB
-  - Traefik compartido en Hostinger Docker Manager
+### 🖼️ Galería de medios
+- Gestión centralizada de archivos del sistema.
+- Subida, previsualización y eliminación de archivos.
 
-## Instalacion y despliegue
+### 🏛️ Directorio legal
+- Perfiles de abogados/profesionales con foto e información de contacto.
+- Gestión de áreas de práctica y colegios de abogados.
+- Flujo de aprobación por parte del administrador.
+
+### 📰 CMS de publicaciones
+- Creación y edición de publicaciones tipo blog/noticias.
+- Páginas estáticas editables (CMS).
+
+### ⚙️ Panel de administración
+- Dashboard con métricas y actividad reciente.
+- Gestión completa de solicitudes, ediciones, usuarios, publicaciones y medios.
+- Configuración de tasa BCV, precio por folio e IVA.
+- Log de auditoría completo con IP de cada acción crítica.
+- Actividad del sistema en tiempo real.
+
+---
+
+## 🛠️ Stack tecnológico
+
+| Capa | Tecnologías |
+|---|---|
+| **Frontend** | React 18, TypeScript, TailwindCSS, Vite |
+| **Backend** | PHP 8.2, PDO (MySQL), FPDF, Slim-like router propio |
+| **Base de datos** | MySQL 8.0 con migraciones versionadas |
+| **Infraestructura** | Docker, Docker Compose, Nginx, Traefik / Caddy |
+| **Servidor** | VPS Hostinger con 2GB Swap configurado |
+
+---
+
+## 🚀 Instalación y despliegue
 
 ### Requisitos previos
 - Docker y Docker Compose instalados.
 - Git.
+- `.env` configurado (ver `.env.example`).
 
 ### Desarrollo local
 
-Para desarrollo local usa la compose de desarrollo:
-
 ```bash
+git clone https://github.com/merchandev/Diario-Mercantil.git
+cd Diario-Mercantil
+cp .env.example .env
+# Editar .env con las credenciales locales
 docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-### Produccion en Hostinger Docker Manager
+Acceso local: `http://localhost:5173`
 
-La `docker-compose.yml` raiz esta orientada a Hostinger Docker Manager. En ese entorno no debes publicar `80/443` desde este proyecto, porque Hostinger ya ejecuta un Traefik compartido para todos los proyectos.
+---
 
-Antes de desplegar:
+### Producción en VPS (con Traefik de Hostinger)
+
+La `docker-compose.yml` raíz está orientada a Hostinger Docker Manager con Traefik compartido.
 
 1. Despliega el template de Traefik de Hostinger.
 2. Verifica que exista la red externa `traefik-proxy`.
 3. Configura tu `.env`:
 
 ```bash
-cp .env.example .env
-```
-
-4. Ajusta al menos estas variables:
-
-```bash
 APP_HOST=diariomercantil.com
 TRAEFIK_NETWORK=traefik-proxy
+DB_DATABASE=diario_db
+DB_USERNAME=diario_user
+DB_PASSWORD=tu_password_seguro
 ```
 
-5. Despliega:
+4. Despliega:
 
 ```bash
 docker compose up -d --build
 ```
 
-### Produccion sin Traefik de Hostinger
+---
 
-Si el Traefik compartido de Hostinger sigue devolviendo `404 page not found` aunque el `frontend` responda bien por dentro del contenedor, puedes desplegar una variante autocontenida con Caddy.
+### Producción sin Traefik (variante Caddy)
 
-Antes de usar esta variante:
+Si el Traefik compartido de Hostinger no enruta correctamente:
 
-1. Deten o elimina el proyecto Traefik de Hostinger para liberar `80/443`.
-2. Asegura que el dominio apunte a la IP del VPS.
-3. Configura tu `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Variables minimas:
+1. Detén el proyecto Traefik de Hostinger para liberar los puertos `80/443`.
+2. Configura `.env`:
 
 ```bash
 APP_HOST=diariomercantil.com
 ACME_EMAIL=admin@diariomercantil.com
 ```
 
-Despliegue:
+3. Despliega con Caddy (gestiona TLS automáticamente):
 
 ```bash
 docker compose -f docker-compose.caddy.yml up -d --build
 ```
 
-Con esta compose:
+---
 
-- `Caddy` publica `80/443`.
-- El certificado TLS lo gestiona el propio proyecto.
-- `frontend` ya no depende de las labels Traefik de Hostinger.
+### Actualización limpia en el servidor
 
-### Acceso
+```bash
+cd /docker/diario-mercantil/
 
-- Sitio: `https://diariomercantil.com`
-- API: `https://diariomercantil.com/api/...`
-- phpMyAdmin: `http://<VPS_IP>:8080`
+# 1. Descartar cambios locales y bajar última versión
+git reset --hard
+git pull origin main
 
-## Nota importante para Hostinger
+# 2. Reconstruir sin caché
+docker compose build --no-cache
 
-Si el proyecto queda en `Partially running` con `nginx-proxy` en estado `Created`, la compose anterior era incorrecta para Hostinger: intentaba bindear `80/443` aunque esos puertos ya pertenecen al Traefik compartido del VPS.
+# 3. Recrear contenedores
+docker compose up -d --force-recreate
 
-El modelo correcto es:
-
-- Hostinger Traefik escucha en `80/443`.
-- Este proyecto solo publica labels Traefik en el `frontend`.
-- El `frontend` se conecta a la red externa `traefik-proxy`.
-- El `backend` no debe exponerse con un puerto publico; solo atiende a `frontend` por la red Docker.
-- Las labels Traefik del `frontend` deben mantenerse simples y usar nombres de router/service alfanumericos.
-
-## DNS
-
-Aunque el proyecto arranque correctamente en Docker, el dominio no funcionara si:
-
-- `diariomercantil.com` no resuelve hacia la IP del VPS.
-- Si luego quieres publicar `www`, crea primero el registro DNS y solo despues agregalo a las labels Traefik.
-- Los resolvers publicos devuelven `SERVFAIL`, lo que suele indicar zona DNS rota o problema de DNSSEC.
-
-## Seguridad
-
-- Las credenciales y configuraciones sensibles deben manejarse mediante variables de entorno.
-- No se deben versionar secretos reales.
-- El sistema incluye logs de auditoria para acciones criticas.
+# 4. Limpiar caché e imágenes sin uso (no afecta volúmenes/datos)
+docker system prune -f
+```
 
 ---
-© Diario Mercantil de Venezuela - Todos los derechos reservados.
+
+## 📁 Estructura del proyecto
+
+```
+Diario-Mercantil/
+├── backend/                  # API PHP 8.2
+│   ├── src/                  # Controladores, modelos, servicios
+│   ├── database/
+│   │   └── migrations/       # Migraciones versionadas de BD
+│   └── Dockerfile.prod
+├── frontend/                 # App React + TypeScript
+│   ├── src/
+│   │   ├── pages/            # Vistas del sistema
+│   │   ├── components/       # Componentes reutilizables
+│   │   └── lib/              # API client, hooks, utilidades
+│   └── Dockerfile.prod
+├── docker-compose.yml        # Producción (Traefik Hostinger)
+├── docker-compose.dev.yml    # Desarrollo local
+├── docker-compose.caddy.yml  # Producción (Caddy/autocontenido)
+└── .env.example
+```
+
+---
+
+## 🌐 URLs de acceso
+
+| Entorno | URL |
+|---|---|
+| Sitio público | `https://diariomercantil.com` |
+| API backend | `https://diariomercantil.com/api/...` |
+| Verificación pública | `https://diariomercantil.com/ver/{orden}` |
+| Edición digital pública | `https://diariomercantil.com/edicion/{code}` |
+| phpMyAdmin (dev) | `http://<VPS_IP>:8080` |
+
+---
+
+## 🔒 Seguridad
+
+- Credenciales y configuraciones sensibles manejadas exclusivamente mediante variables de entorno (`.env`).
+- No se versionan secretos reales en el repositorio.
+- Tokens de sesión con expiración automática.
+- Log de auditoría completo (actor, acción, recurso, IP, before/after) en tabla `audit_logs`.
+- Protección CSRF en todas las rutas de escritura del admin.
+- Política de contraseñas con hash bcrypt.
+
+---
+
+## 📋 Migraciones de base de datos
+
+Las migraciones se ejecutan automáticamente al iniciar el backend. Se encuentran en `backend/database/migrations/` ordenadas por timestamp. Para ejecutarlas manualmente:
+
+```bash
+docker compose exec backend php migrate.php
+```
+
+---
+
+## 📝 Changelog reciente
+
+- **v2026.08.13** — Hard delete para SuperAdmin, soft delete para Admin. Usuarios eliminados ocultos de la lista.
+- **v2026.08.12** — Registro instantáneo con auto-login. Corrección de cálculo en ediciones. Visor de PDF y Flipbook funcionales. Botón de cuadrícula eliminado de visores.
+- **v2026.08.11** — Login por email, edición de perfil admin, log de actividad con IP real. Corrección scraper BCV.
+- **v2026.08.10** — Estabilización de pagos y persistencia de PDFs. Precio por folio actualizado.
+
+---
+
+© Diario Mercantil de Venezuela — Todos los derechos reservados.
