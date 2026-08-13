@@ -24,9 +24,9 @@ class UserController {
     }
     $pdo = Database::pdo();
     $q = trim($_GET["q"] ?? "");
-    $sql = "SELECT id, document, name, role, email, phone, status, person_type FROM users";
+    $sql = "SELECT id, document, name, role, email, phone, status, person_type FROM users WHERE status != 'deleted'";
     if ($q !== "") {
-      $stmt = $pdo->prepare($sql." WHERE (document LIKE ? OR name LIKE ?) ORDER BY id DESC LIMIT 500");
+      $stmt = $pdo->prepare($sql." AND (document LIKE ? OR name LIKE ?) ORDER BY id DESC LIMIT 500");
       $stmt->execute(["%".$q."%","%".$q."%"]);
     } else {
       $stmt = $pdo->query($sql." ORDER BY id DESC LIMIT 500");
