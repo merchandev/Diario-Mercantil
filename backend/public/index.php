@@ -9,7 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $context = new RequestContext();
 set_exception_handler(fn(Throwable $e) => ErrorHandler::handle($e, $context));
 
-$allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com'];
+$allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com', 'https://www.diariomercantil.com'];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins) || getenv('APP_ENV') === 'development') {
     header("Access-Control-Allow-Origin: " . ($origin ?: '*'));

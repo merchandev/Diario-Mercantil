@@ -134,6 +134,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                                     alt={file.name}
                                     className="w-full h-full object-cover"
                                     loading="lazy"
+                                    crossOrigin="use-credentials"
                                 />
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 p-3 bg-slate-50">
