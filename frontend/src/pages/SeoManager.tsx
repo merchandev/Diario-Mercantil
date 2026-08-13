@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { SeoMetadata, listSeoAdmin, saveSeoAdmin, deleteSeoAdmin } from '../lib/api'
 
+const DEFAULT_PUBLIC_PAGES = [
+  { path: '/', title: 'Inicio (Home)' },
+  { path: '/ediciones', title: 'Ediciones' },
+  { path: '/publicaciones', title: 'Publicaciones' },
+  { path: '/contacto', title: 'Contacto' },
+  { path: '/medios-pago', title: 'Medios de Pago' },
+  { path: '/directorio-legal', title: 'Directorio Legal' }
+];
+
 export default function SeoManager() {
   const [items, setItems] = useState<SeoMetadata[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,6 +30,19 @@ export default function SeoManager() {
   }
 
   useEffect(() => { load() }, [])
+
+  const displayItems = [...items];
+  DEFAULT_PUBLIC_PAGES.forEach(def => {
+    if (!displayItems.find(i => i.path === def.path)) {
+      displayItems.push({ 
+        path: def.path, 
+        title: def.title + ' (Sin Configurar)', 
+        description: 'Falta SEO', 
+        og_image: '', 
+        robots: 'index, follow' 
+      });
+    }
+  });
 
   const handleEdit = (item: SeoMetadata) => {
     setSelected(item)
@@ -81,22 +103,26 @@ export default function SeoManager() {
             {!loading && items.length === 0 ? <p className="text-sm text-slate-500">No hay reglas SEO creadas.</p> : null}
             
             <div className="space-y-3">
-              {items.map(item => (
+              {displayItems.map(item => (
                 <div 
                   key={item.path} 
-                  className={`p-3 rounded border transition-colors cursor-pointer ${form.path === item.path ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300'}`}
+                  className={`p-3 rounded border transition-colors cursor-pointer ${form.path === item.path ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300'} ${item.title.includes('(Sin Configurar)') ? 'bg-orange-50 border-orange-200' : ''}`}
                   onClick={() => handleEdit(item)}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-mono text-xs px-2 py-0.5 bg-slate-800 text-white rounded">{item.path}</span>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDelete(item.path) }} 
-                      className="text-rose-500 hover:text-rose-700 text-xs font-semibold"
-                    >
-                      Eliminar
-                    </button>
+                    {!item.title.includes('(Sin Configurar)') && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(item.path) }} 
+                        className="text-rose-500 hover:text-rose-700 text-xs font-semibold"
+                      >
+                        Eliminar
+                      </button>
+                    )}
                   </div>
-                  <div className="text-sm font-semibold truncate">{item.title || '(Sin título)'}</div>
+                  <div className={`text-sm font-semibold truncate ${item.title.includes('(Sin Configurar)') ? 'text-orange-600' : ''}`}>
+                    {item.title || '(Sin título)'}
+                  </div>
                   <div className="text-xs text-slate-500 truncate">{item.description || '(Sin descripción)'}</div>
                 </div>
               ))}
