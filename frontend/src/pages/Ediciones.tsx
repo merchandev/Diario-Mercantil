@@ -99,7 +99,7 @@ export default function Ediciones() {
     setUploadingPdf(true)
     try {
       const result = await uploadEditionPdf(selId, file)
-      setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_url: result.edition?.file_url || `/api/e/${encodeURIComponent(prev.edition.code)}/download` } } : prev)
+      setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_url: result.edition?.file_url || `/api/e/code/${encodeURIComponent(prev.edition.code)}/download` } } : prev)
       await load()
       setAlertDialog({ isOpen: true, title: 'Exito', message: 'PDF actualizado', variant: 'success' })
     } catch (error) {
@@ -110,7 +110,7 @@ export default function Ediciones() {
     }
   }
 
-  const pdfUrl = detail?.edition.code ? `/api/e/${encodeURIComponent(detail.edition.code)}/download` : (selId ? `/api/e/${selId}/download` : '')
+  const pdfUrl = detail?.edition.code ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download` : (selId ? `/api/e/${selId}/download` : '')
   const viewerUrl = detail?.edition.code ? `/visor-espresivo/${encodeURIComponent(detail.edition.code)}` : ''
   useEffect(() => {
     if (detail && pdfSectionRef.current) {

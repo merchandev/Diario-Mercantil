@@ -52,7 +52,7 @@ export default function EdicionesPublic() {
   }, [filtered, showList, q, from, to])
 
   const latestPdfUrl = latestEdition?.file_url
-    || (latestEdition?.code ? `/api/e/${encodeURIComponent(latestEdition.code)}/download` : '')
+    || (latestEdition?.code ? `/api/e/code/${encodeURIComponent(latestEdition.code)}/download` : '')
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -169,7 +169,7 @@ export default function EdicionesPublic() {
                   <tbody>
                     {filtered.map((ed: any) => {
                       const dateTxt = ed.date || ed.created_at
-                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/${encodeURIComponent(ed.code)}/download` : '')
+                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/code/${encodeURIComponent(ed.code)}/download` : '')
                       const hasPdf = Boolean(ed.file_id || ed.file_url)
                       return (
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">

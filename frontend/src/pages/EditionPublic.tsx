@@ -50,7 +50,7 @@ export default function EditionPublic() {
     navigate(`/ediciones?${params.toString()}`)
   }
 
-  const pdfUrl = useMemo(() => edition ? (edition.file_url || `/api/e/${encodeURIComponent(edition.code)}/download`) : '', [edition])
+  const pdfUrl = useMemo(() => edition ? (edition.file_url || `/api/e/code/${encodeURIComponent(edition.code)}/download`) : '', [edition])
 
   if (err) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">{err}</div></div>
   if (!edition) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">Cargando...</div></div>
