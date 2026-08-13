@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
 import FlipbookViewer from '../components/FlipbookViewer'
-import { listEditions } from '../lib/api'
+import { listPublicEditions } from '../lib/api'
 
 type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null }
 type Order = { id: number; name: string; document: string; status: string; date: string }
@@ -30,7 +30,7 @@ export default function EditionPublic() {
 
   useEffect(() => {
     // Cargar ediciones recientes para los widgets de abajo
-    listEditions().then(res => {
+    listPublicEditions().then(res => {
       setRecentEditions(res.items.filter(e => e.code !== activeCode && e.status === 'Publicada').slice(0, 4))
     }).catch(console.error)
   }, [activeCode])
@@ -68,7 +68,7 @@ export default function EditionPublic() {
                 <input
                   type="text"
                   placeholder="Ej. dm120..."
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchCve}
                   onChange={e => setSearchCve(e.target.value)}
                 />
@@ -80,7 +80,7 @@ export default function EditionPublic() {
                 <IconCalendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="date"
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchDate}
                   onChange={e => setSearchDate(e.target.value)}
                 />
@@ -93,7 +93,7 @@ export default function EditionPublic() {
                 <input
                   type="text"
                   placeholder="Nombre de la empresa"
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchRazon}
                   onChange={e => setSearchRazon(e.target.value)}
                 />

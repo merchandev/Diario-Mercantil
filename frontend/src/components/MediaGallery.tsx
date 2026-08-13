@@ -78,7 +78,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                             <input
                                 type="text"
                                 placeholder="Buscar archivos..."
-                                className="input pl-10 w-full"
+                                className="input !pl-10 w-full"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                             />

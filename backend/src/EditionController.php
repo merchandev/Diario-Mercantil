@@ -122,6 +122,16 @@ class EditionController {
     Response::json(['items'=>$items]);
   }
 
+  public function listPublic(){
+      $pdo = Database::pdo();
+      $stmt = $pdo->query("SELECT * FROM editions WHERE status='Publicada' ORDER BY date DESC, id DESC LIMIT 50");
+      $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+      foreach ($items as &$row) {
+        $row['file_url'] = $row['file_id'] ? '/api/dm/e-'.urlencode((string)$row['code']) : null;
+      }
+      Response::json(['items'=>$items]);
+  }
+
   public function get($id){
     $this->requireAdmin();
     $pdo = Database::pdo();

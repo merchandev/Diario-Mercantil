@@ -299,11 +299,11 @@ final class AuthController {
 
             self::setSessionCookies($plainToken);
 
-            // Send Welcome Email AFTER commit — a slow SMTP must not affect the user
+            // Send Welcome Email AFTER commit 
             if ($email !== "") {
                 try {
-                    require_once __DIR__ . '/Services/EmailService.php';
-                    EmailService::sendWelcome($email, $name);
+                    // require_once __DIR__ . '/Services/EmailService.php';
+                    // EmailService::sendWelcome($email, $name);
                 } catch (Throwable $mailEx) {
                     error_log("Failed to send welcome email: " . $mailEx->getMessage());
                 }
@@ -318,6 +318,7 @@ final class AuthController {
                 ]
             ]);
         } catch (Throwable $e) {
+            error_log("REGISTER FATAL ERROR: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             http_response_code(500);
             echo json_encode(["error" => "server_error", "message" => "Error interno al registrar usuario"]);
             exit;

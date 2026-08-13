@@ -129,8 +129,9 @@ $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders
 $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
-$router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById'], $auth);
-$router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode'], $auth);
+$router->get('/api/e', [EditionController::class, 'listPublic']);
+$router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById']);
+$router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode']);
 $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES

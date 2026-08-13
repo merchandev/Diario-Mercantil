@@ -251,6 +251,10 @@ export type Edition = {
   created_at?: string;
   updated_at?: string;
 }
+export async function listPublicEditions() {
+  const res = await fetchAuth('/api/e')
+  return res.json() as Promise<{ items: Edition[] }>
+}
 export async function listEditions() {
   const res = await fetchAuth('/api/editions')
   return res.json() as Promise<{ items: Edition[] }>

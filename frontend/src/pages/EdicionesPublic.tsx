@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { listEditions, type Edition } from '../lib/api'
+import { listPublicEditions, type Edition } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import FlipbookViewer from '../components/FlipbookViewer'
 
@@ -15,7 +15,7 @@ export default function EdicionesPublic() {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await listEditions()
+      const r = await listPublicEditions()
       setRows(r.items ?? [])
     } catch {
       setRows([])
