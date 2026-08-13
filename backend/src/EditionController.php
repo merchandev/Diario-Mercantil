@@ -117,7 +117,7 @@ class EditionController {
     $stmt = $pdo->query('SELECT * FROM editions ORDER BY id DESC LIMIT 200');
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$row) {
-      $row['file_url'] = $row['file_id'] ? '/api/e/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
     }
     Response::json(['items'=>$items]);
   }
@@ -129,7 +129,7 @@ class EditionController {
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
-    $edition['file_url'] = $edition['file_id'] ? '/api/e/'.urlencode((string)$edition['code']).'/download' : null;
+    $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
     $ord = $pdo->prepare('SELECT l.id, l.name, l.document, l.status, l.date FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id');
     $ord->execute([$id]);
     Response::json(['edition'=>$edition,'orders'=>$ord->fetchAll(PDO::FETCH_ASSOC)]);
@@ -308,6 +308,7 @@ class EditionController {
         }
         Response::json(['error'=>$e->getMessage()], $code);
     } catch (Throwable $e) {
+        error_log("Publish Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
         Response::json(['error'=>$e->getMessage()], 500);
     }
   }
