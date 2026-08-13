@@ -291,16 +291,25 @@ class UserController {
             }
         }
         
-        $pdo->beginTransaction();
-        $pdo->prepare("UPDATE users SET status='deleted', updated_at=NOW() WHERE id=?")
-            ->execute([$id]);
-        $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
-        $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['status'=>'deleted']);
-        $pdo->commit();
+        try {
+            $pdo->beginTransaction();
+            if ($u['role'] === RolePolicy::SUPERADMIN) {
+                $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
+            } else {
+                $pdo->prepare("UPDATE users SET status='deleted', updated_at=NOW() WHERE id=?")
+                    ->execute([$id]);
+                $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
+            }
+            $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['status'=>'deleted']);
+            $pdo->commit();
         
-        Response::json(["ok"=>true]);
+            Response::json(["ok"=>true]);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            Response::json(["error" => "server_error"], 500);
+        }
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log("Delete error: " . $e->getMessage());
         Response::json(["error" => "server_error"], 500);
     }
   }
