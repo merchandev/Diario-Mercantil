@@ -81,12 +81,13 @@ jobs:
           find src public tests bin -type f -name "*.php" -print0 | xargs -0 -n1 php -l
 
       - name: Setup Database Schema
+        env:
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: dm_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
         run: |
-          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/init.sql
-          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/02_audit_schema.sql
-          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/03_phase5_schema.sql
-          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/04_phase6_schema.sql
-          mysql -h 127.0.0.1 -u root -proot dm_test < migrations/05_phase8_schema.sql
+          php bin/migrate.php
           mysql -h 127.0.0.1 -u root -proot dm_test -e "INSERT INTO settings(\`key\`, \`value\`) VALUES ('price_per_folio_usd', '3.0'), ('iva_percent', '16.0') ON DUPLICATE KEY UPDATE \`value\`=VALUES(\`value\`);"
 
       - name: Run backend tests
