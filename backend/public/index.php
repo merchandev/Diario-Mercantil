@@ -152,7 +152,7 @@ $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], 
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
-$router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
+$router->get('/api/public/pages', [PagesController::class, 'publicList']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/pages/public', [PagesController::class, 'publicList']);
