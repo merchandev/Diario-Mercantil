@@ -105,6 +105,7 @@ export default function Sidebar({
               <LinkItem to="/dashboard/directorio" icon={<IconLegal />} label="Directorio legal" collapsed={collapsed} />
               <LinkItem to="/dashboard/perfil" icon={<IconUser />} label="Mi perfil" collapsed={collapsed} />
               <LinkItem to="/dashboard/usuarios" icon={<IconUsers />} label="Gestionar usuarios" collapsed={collapsed} />
+              <LinkItem to="/dashboard/paginas" icon={<IconDocs />} label="Gestor Páginas" collapsed={collapsed} />
               <LinkItem to="/dashboard/seo" icon={<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>} label="Gestor SEO" collapsed={collapsed} />
               <LinkItem to="/dashboard/configuracion" icon={<IconSettings />} label="Configuración" collapsed={collapsed} />
               <div className="my-2 border-t border-white/10 mx-2"></div>
