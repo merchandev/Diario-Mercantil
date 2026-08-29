@@ -5,14 +5,14 @@ declare(strict_types=1);
 return static function (PDO $pdo): void {
     // Check if published_at exists
     $stmt = $pdo->prepare("
-        SELECT COUNT(*)
-        FROM information_schema.columns
-        WHERE table_schema = DATABASE()
-          AND table_name = 'editions'
+        SELECT COUNT(*) 
+        FROM information_schema.columns 
+        WHERE table_schema = DATABASE() 
+          AND table_name = 'editions' 
           AND column_name = 'published_at'
     ");
     $stmt->execute();
-
+    
     if ((int)$stmt->fetchColumn() === 0) {
         $pdo->exec("
             ALTER TABLE editions
