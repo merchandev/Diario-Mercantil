@@ -252,4 +252,24 @@ class SystemController {
         Response::json(['ok'=>true]);
     }
 
+    public function getActivityLog(){
+        $u = AuthController::requireAuth();
+        if ($u['role'] !== 'superadmin') {
+            Response::json(["error"=>"forbidden", "message"=>"Acceso denegado."], 403);
+            exit;
+        }
+
+        $pdo = Database::pdo();
+        $stmt = $pdo->query("
+            SELECT a.id, a.actor_user_id, a.action, a.resource_type, a.resource_id, a.ip_address, a.created_at, u.name as actor_name, u.role as actor_role
+            FROM audit_logs a
+            LEFT JOIN users u ON a.actor_user_id = u.id
+            ORDER BY a.created_at DESC
+            LIMIT 50
+        ");
+        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        Response::json(['items' => $logs]);
+    }
+
 }

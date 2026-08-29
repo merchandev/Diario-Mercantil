@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
+import { SEO } from './SEO'
 
 export default function RequireAdmin({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth()
@@ -21,5 +22,10 @@ export default function RequireAdmin({ children }: { children: JSX.Element }) {
   }
 
   console.log('✅ [RequireAdmin] Acceso concedido. Usuario:', user?.name, 'Rol:', user?.role)
-  return children
+  return (
+    <>
+      <SEO title="Dashboard de Cargas | Diario Mercantil" description="Sistema interno" noindex={true} />
+      {children}
+    </>
+  )
 }

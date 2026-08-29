@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import EditionPromoAside from '../components/EditionPromoAside'
 import { getSettings } from '../lib/api'
 import { IconDocs, IconSearch, IconUserCircle, IconClose } from '../components/icons'
+import { SEO } from '../components/SEO'
 
 function BannerBox({ settingKey, className }: { settingKey: string; className?: string }) {
   const [url, setUrl] = useState<string>()
@@ -88,6 +89,10 @@ const services = [
 export default function Home() {
   return (
     <div className="bg-slate-50/60 min-h-screen">
+      <SEO
+        title="Diario Mercantil Venezuela | Avisos Legales y Edictos"
+        description="Publica avisos legales, edictos, actas y balances en el Diario Mercantil digital líder en Venezuela. Válido para Registros Mercantiles."
+      />
       <PromoPopup />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-7 md:py-10 space-y-8">

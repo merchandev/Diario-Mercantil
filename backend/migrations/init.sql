@@ -109,7 +109,11 @@ CREATE TABLE IF NOT EXISTS editions (
   orders_count INT DEFAULT 0,
   file_id INT,
   file_name VARCHAR(255),
-  created_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL,
+  published_at DATETIME NULL,
+  published_by INT NULL,
+  published_file_checksum VARCHAR(64) NULL,
+  FOREIGN KEY(published_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- Link table Edition -> Legal Requests
@@ -214,7 +218,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Seed defaults
 INSERT IGNORE INTO settings(`key`,value,updated_at) VALUES
  ('bcv_rate','203.74',NOW()),
- ('price_per_folio_usd','1.50',NOW()),
+ ('price_per_folio_usd','3.00',NOW()),
  ('convocatoria_usd','10.00',NOW()),
  ('iva_percent','16',NOW()),
  ('raptor_mini_preview_enabled','1',NOW());

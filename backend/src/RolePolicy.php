@@ -34,18 +34,22 @@ final class RolePolicy {
             return false;
         }
         
-        if ((int)$actor['id'] === (int)$target['id']) {
-            return false;
+        // Permitimos que el actor se modifique a sí mismo
+
+        if ($actorRole === Role::SUPERADMIN) {
+            return true;
         }
 
-        return $actorRole === Role::SUPERADMIN
-            || (
-                $actorRole === Role::ADMIN
-                && $targetRole->rank() <= Role::ADMIN->rank()
-            );
+        // Admin puede modificar a cualquier usuario que NO sea superadmin
+        // (incluyendo otros admins, managers, staff y solicitantes)
+        return $actorRole === Role::ADMIN
+            && $targetRole !== Role::SUPERADMIN;
     }
 
     public static function canDeleteUser(array $actor, array $target): bool {
+        if ((int)$actor['id'] === (int)$target['id']) {
+            return false;
+        }
         return self::canModifyUser($actor, $target);
     }
 

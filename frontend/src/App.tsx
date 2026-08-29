@@ -52,6 +52,7 @@ const Usuarios = lazyImport(() => import('./pages/Usuarios'))
 const UsuarioDetalle = lazyImport(() => import('./pages/UsuarioDetalle'))
 const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
+const SeoManager = lazyImport(() => import('./pages/SeoManager'))
 const FileManager = lazyImport(() => import('./pages/FileManager'))
 const Medios = lazyImport(() => import('./pages/Medios'))
 const Promo = lazyImport(() => import('./pages/Promo'))
@@ -92,6 +93,8 @@ const SuperAdminPublications = lazyImport(() => import('./pages/SuperAdmin/Publi
 const SuperAdminSettings = lazyImport(() => import('./pages/SuperAdmin/Settings'))
 const SuperAdminStats = lazyImport(() => import('./pages/SuperAdmin/Stats'))
 const SuperAdminActivity = lazyImport(() => import('./pages/SuperAdmin/Activity'))
+const SuperAdminSeo = lazyImport(() => import('./pages/SuperAdmin/Seo'))
+const SuperAdminPaginas = lazyImport(() => import('./pages/SuperAdmin/Paginas'))
 
 // Wrapper component for lazy-loaded routes
 function LazyRoute({ children }: { children: React.ReactNode }) {
@@ -165,6 +168,8 @@ export default function App() {
         <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} />
         <Route path="/lotus/stats" element={<LazyRoute><SuperAdminStats /></LazyRoute>} />
         <Route path="/lotus/activity" element={<LazyRoute><SuperAdminActivity /></LazyRoute>} />
+        <Route path="/lotus/seo" element={<LazyRoute><SuperAdminSeo /></LazyRoute>} />
+        <Route path="/lotus/paginas" element={<LazyRoute><SuperAdminPaginas /></LazyRoute>} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -207,6 +212,7 @@ export default function App() {
                         <Route path="publicaciones/:id" element={<RequireAdmin><LazyRoute><PublicacionDetalle /></LazyRoute></RequireAdmin>} />
                         <Route path="papelera" element={<RequireAdmin><LazyRoute><Papelera /></LazyRoute></RequireAdmin>} />
                         <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
+                        <Route path="seo" element={<RequireAdmin><LazyRoute><SeoManager /></LazyRoute></RequireAdmin>} />
                         <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
                         <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
                         <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />

@@ -511,7 +511,7 @@ class LegalController {
               'payment_id'=>(int)$paymentId,
               'remaining_bs'=>max(0.0, $remaining - $paymentAmount),
           ];
-          if ($idemKey) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', 200, $resBody);
+          if ($idemKey) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash, 200, $resBody);
           Response::json($resBody);
       } catch (Exception $e) {
           if ($ownsTransaction) {
@@ -523,7 +523,7 @@ class LegalController {
           if ($e->getMessage() === 'payment_exceeds_remaining') {
               $resBody['remaining_bs'] = $remaining;
           }
-          if ($idemKey && $code < 500) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $code, $resBody);
+          if ($idemKey && $code < 500) IdempotencyService::save($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash, $code, $resBody);
           Response::json($resBody, $code);
       }
   }
@@ -757,7 +757,7 @@ class LegalController {
           return Response::json(['error'=>'El documento no coincide con el archivo originalmente registrado.'], 409);
       }
 
-      require_once __DIR__.'/Services/StoragePath.php';
+      require_once __DIR__.'/Http/StoragePath.php';
       $dest = StoragePath::getFilePath($fileRow['path']);
       
       $dir = dirname($dest);

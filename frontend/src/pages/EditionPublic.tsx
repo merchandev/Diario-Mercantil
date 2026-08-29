@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
-import { listPublicEditions, type Edition } from '../lib/api'
+import { listPublicEditions, type Edition as ApiEdition } from '../lib/api'
+import { SEO } from '../components/SEO'
 
+type Edition = ApiEdition & { seo?: { title?: string, description?: string, og_image?: string } }
 type Order = { id: number; name: string; document: string; status: string; date: string }
 
 export default function EditionPublic() {
@@ -55,6 +57,11 @@ export default function EditionPublic() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
+      <SEO
+        title={edition.seo?.title || `Edición N° ${edition.edition_no} | Diario Mercantil Venezuela`}
+        description={edition.seo?.description || `Consulte el archivo digital de la edición ${edition.edition_no} de fecha ${edition.date} del Diario Mercantil Venezuela.`}
+        ogImage={edition.seo?.og_image}
+      />
       {/* 1. Barra de Búsqueda Superior */}
       <div className="bg-white border-b border-slate-200 shadow-sm z-10 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
@@ -66,7 +73,7 @@ export default function EditionPublic() {
                 <input
                   type="text"
                   placeholder="Ej. dm120..."
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchCve}
                   onChange={e => setSearchCve(e.target.value)}
                 />
@@ -78,7 +85,7 @@ export default function EditionPublic() {
                 <IconCalendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="date"
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchDate}
                   onChange={e => setSearchDate(e.target.value)}
                 />
@@ -91,7 +98,7 @@ export default function EditionPublic() {
                 <input
                   type="text"
                   placeholder="Nombre de la empresa"
-                  className="input w-full pl-9 bg-slate-50 focus:bg-white"
+                  className="input w-full !pl-10 bg-slate-50 focus:bg-white"
                   value={searchRazon}
                   onChange={e => setSearchRazon(e.target.value)}
                 />

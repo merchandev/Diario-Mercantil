@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
+import { SEO } from './SEO'
 
 export default function RequireSolicitante({ children }: { children: JSX.Element }) {
   const { user, loading } = useAuth()
@@ -21,5 +22,10 @@ export default function RequireSolicitante({ children }: { children: JSX.Element
   }
 
   console.log('✅ [RequireSolicitante] Acceso permitido. Usuario:', user?.name, 'Rol:', user?.role)
-  return children
+  return (
+    <>
+      <SEO title="Panel de Usuario | Diario Mercantil" description="Sistema de clientes" noindex={true} />
+      {children}
+    </>
+  )
 }

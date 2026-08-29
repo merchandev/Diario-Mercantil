@@ -496,6 +496,12 @@ export async function cleanupOldTrashed() {
   return res.json() as Promise<{ ok: boolean; message: string; count: number }>
 }
 
+// Activity Log
+export async function getActivityLog() {
+  const res = await fetchAuth('/api/superadmin/activity')
+  return res.json() as Promise<{ items: any[] }>
+}
+
 // Legal files attachments
 export type LegalFile = { id: number; kind: string; file_id: number; name: string; type: string; size: number; created_at: string }
 export async function listLegalFiles(id: number) {
@@ -540,11 +546,8 @@ export async function createUser(body: { document: string; name: string; passwor
   return res.json() as Promise<{ id: number }>
 }
 export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string; phone?: string; person_type?: string }) {
+  // Usa la ruta de admin para editar cualquier usuario (no la de auto-perfil)
   const res = await fetchAuth(`/api/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  return res.json()
-}
-export async function changeUserRole(id: number, role: string) {
-  const res = await fetchAuth(`/api/admin/users/${id}/role`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) })
   return res.json()
 }
 export async function setUserPassword(id: number, password: string) {
@@ -559,6 +562,14 @@ export async function setUserPassword(id: number, password: string) {
 export async function deleteUser(id: number) {
   const res = await fetchAuth(`/api/users/${id}`, { method: 'DELETE' })
   return res.json()
+}
+export async function changeUserRole(id: number, role: string) {
+  const res = await fetchAuth(`/api/admin/users/${id}/role`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  })
+  return res.json() as Promise<{ ok: boolean }>
 }
 
 // Settings
@@ -708,4 +719,34 @@ export async function listPagesPublic() {
   const res = await fetch(getUrl('/api/public/pages'))
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ items: { slug: string; title: string }[] }>
+}
+
+// SEO Management
+export type SeoMetadata = {
+  path: string;
+  title?: string;
+  description?: string;
+  og_image?: string;
+  robots?: string;
+}
+
+export async function getPublicSeo() {
+  const res = await fetch(getUrl('/api/seo/all'))
+  if (!res.ok) throw new Error(await res.text())
+  return res.json() as Promise<{ seo: Record<string, SeoMetadata> }>
+}
+
+export async function listSeoAdmin() {
+  const res = await fetchAuth('/api/admin/seo')
+  return res.json() as Promise<{ items: SeoMetadata[] }>
+}
+
+export async function saveSeoAdmin(body: SeoMetadata) {
+  const res = await fetchAuth('/api/admin/seo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return res.json() as Promise<{ ok: boolean }>
+}
+
+export async function deleteSeoAdmin(path: string) {
+  const res = await fetchAuth('/api/admin/seo', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) })
+  return res.json() as Promise<{ ok: boolean }>
 }

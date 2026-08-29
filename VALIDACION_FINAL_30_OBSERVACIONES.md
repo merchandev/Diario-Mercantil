@@ -57,11 +57,11 @@ Este paquete contiene la copia completa del proyecto con las correcciones aplica
 - `npm run typecheck`: **OK, 0 errores TypeScript**.
 - `npm test -- --run`: **OK, 4 pruebas frontend**.
 - `npm run build`: **OK en host, Docker Node 20 y contenedor Node 18 equivalente a CI**.
-- Lint PHP completo (sin `vendor`): **OK, 135 archivos sin errores de sintaxis**.
+- Lint PHP completo (sin `vendor`): **OK, 142 archivos sin errores de sintaxis**.
 - PHPUnit: **OK, 21 pruebas y 53 aserciones**.
 - `composer validate --strict`, `composer check-platform-reqs`, `composer audit` y generación OpenAPI: **OK**.
 - `npm audit --omit=dev`: se redujo de 3 altas a 2 moderadas al actualizar React Router 6; las restantes solo ofrecen corrección automática migrando a React Router 7, un cambio mayor fuera de este cierre.
-- Docker Compose: **backend, frontend y MySQL healthy; worker activo**.
+- Docker Compose: **imágenes frontend/backend/worker reconstruidas sin caché; backend, frontend y MySQL healthy; worker activo**.
 - Migraciones canónicas en MySQL 8: **OK desde base limpia y en reejecución idempotente**.
 - MySQL mantiene la sesión en UTC (`+00:00`): **OK**.
 - Flujos E2E Admin/Solicitante, pagos parciales, edición/CVE/QR, Directorio, CMS, SSE, sesión y banner/papelera: **OK**.

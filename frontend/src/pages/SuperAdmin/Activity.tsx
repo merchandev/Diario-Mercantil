@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Activity as ActivityIcon, FileText, User, CheckCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { listPublications, listUsers, verifySuperAdmin } from '../../lib/api'
+import { getActivityLog, verifySuperAdmin } from '../../lib/api'
 
 export default function Activity() {
     const [activities, setActivities] = useState<any[]>([])
@@ -15,37 +15,41 @@ export default function Activity() {
 
     async function loadActivity() {
         try {
-            const [pubs, users] = await Promise.all([
-                listPublications(),
-                listUsers()
-            ])
+            const data = await getActivityLog()
 
-            // Mock activity feed from actual data
-            const pubEvents = pubs.items.map(p => ({
-                id: `pub-${p.id}`,
-                type: 'publication',
-                title: 'Nueva Publicación',
-                description: `Se ha creado/modificado "${p.title}"`,
-                date: new Date(p.updated_at),
-                icon: FileText,
-                color: 'text-green-400',
-                bg: 'bg-green-500/10'
-            }))
+            const allEvents = data.items.map(a => {
+                let icon = ActivityIcon
+                let color = 'text-gray-400'
+                let bg = 'bg-gray-500/10'
+                let title = 'Acción'
+                let description = `Acción: ${a.action}`
 
-            const userEvents = users.items.map(u => ({
-                id: `user-${u.id}`,
-                type: 'user',
-                title: 'Usuario Registrado',
-                description: `Usuario ${u.name} (${u.role}) activo en el sistema`,
-                date: new Date(), // API doesn't return created_at for users listing, using now as fallback or we could fetch detail
-                icon: User,
-                color: 'text-blue-400',
-                bg: 'bg-blue-500/10'
-            }))
+                if (a.action === 'login') {
+                    icon = User
+                    color = a.resource_type === 'superadmin' ? 'text-purple-400' : 'text-blue-400'
+                    bg = a.resource_type === 'superadmin' ? 'bg-purple-500/10' : 'bg-blue-500/10'
+                    title = a.resource_type === 'superadmin' ? 'Inicio de sesión Superadmin' : 'Inicio de sesión'
+                    description = `Usuario: ${a.actor_name || a.resource_id} (${a.resource_type})`
+                } else if (a.action === 'admin_update') {
+                    icon = CheckCircle
+                    color = 'text-green-400'
+                    bg = 'bg-green-500/10'
+                    title = 'Actualización por Administrador'
+                    description = `El administrador ${a.actor_name || ''} modificó el recurso ${a.resource_type} #${a.resource_id}`
+                }
 
-            const allEvents = [...pubEvents, ...userEvents]
-                .sort((a, b) => b.date.getTime() - a.date.getTime())
-                .slice(0, 20)
+                return {
+                    id: `log-${a.id}`,
+                    type: a.resource_type,
+                    title,
+                    description,
+                    ip: a.ip_address,
+                    date: new Date(a.created_at),
+                    icon,
+                    color,
+                    bg
+                }
+            })
 
             setActivities(allEvents)
         } catch (error) {
@@ -102,7 +106,10 @@ export default function Activity() {
                                         <div className="flex-1 pt-1">
                                             <div className="flex items-center justify-between mb-1">
                                                 <h4 className="text-white font-medium">{item.title}</h4>
-                                                <span className="text-xs text-gray-500">{item.date.toLocaleDateString()}</span>
+                                                <span className="text-xs text-gray-400">
+                                                    {item.date.toLocaleDateString()} {item.date.toLocaleTimeString()}
+                                                    {item.ip && <span className="ml-2 text-purple-400">IP: {item.ip}</span>}
+                                                </span>
                                             </div>
                                             <p className="text-gray-400 text-sm">{item.description}</p>
                                         </div>

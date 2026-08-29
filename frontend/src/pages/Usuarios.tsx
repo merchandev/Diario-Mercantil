@@ -135,7 +135,7 @@ export default function Usuarios() {
                     <a className="p-1.5 text-slate-600 hover:bg-slate-50 rounded" href={`/dashboard/publicaciones?q=${encodeURIComponent(u.document || u.name)}&auto=1`} title="Ver publicaciones">
                       <Eye className="w-4 h-4" />
                     </a>
-                    <button className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: '¿Está seguro de eliminar este usuario?', onConfirm: async () => { await deleteUser(u.id); reload() } })} title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                    <button className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar usuario', message: `¿Está seguro de eliminar a "${u.name}"? Esta acción no se puede deshacer.`, onConfirm: async () => { try { await deleteUser(u.id); reload() } catch (e: any) { setAlertDialog({ isOpen: true, title: 'Error al eliminar', message: e?.message || 'No se pudo eliminar el usuario.', variant: 'error' }) } } })} title="Eliminar"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </td>
               </tr>
@@ -149,13 +149,25 @@ export default function Usuarios() {
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-6 z-50">
             <h3 className="text-lg font-semibold mb-3">Editar usuario</h3>
             <form onSubmit={async e => {
-              e.preventDefault();
-              const oldRole = rows.find(u => u.id === editUser.id)?.role;
-              await updateUser(editUser.id, { name: editUser.name, email: editUser.email, phone: editUser.phone, status: editUser.status, person_type: editUser.person_type });
-              if (oldRole !== editUser.role) {
-                await changeUserRole(editUser.id, editUser.role);
+              e.preventDefault()
+              try {
+                await updateUser(editUser.id, {
+                  name: editUser.name,
+                  email: editUser.email,
+                  phone: editUser.phone,
+                  status: editUser.status,
+                  person_type: editUser.person_type,
+                })
+                const originalUser = rows.find((r: any) => r.id === editUser.id)
+                if (originalUser && originalUser.role !== editUser.role) {
+                  await changeUserRole(editUser.id, editUser.role)
+                }
+                setEditUser(undefined)
+                reload()
+              } catch (err: any) {
+                const msg = err?.message || 'No se pudo guardar los cambios'
+                setAlertDialog({ isOpen: true, title: 'Error al editar', message: msg, variant: 'error' })
               }
-              setEditUser(undefined); reload()
             }} className="space-y-3">
               <div className="grid md:grid-cols-2 gap-3">
                 <div>

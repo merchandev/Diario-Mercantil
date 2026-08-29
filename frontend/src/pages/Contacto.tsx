@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { SEO } from '../components/SEO'
 
 export default function Contacto(){
   const [nombre, setNombre] = useState('')
@@ -8,13 +9,17 @@ export default function Contacto(){
   const onSubmit = (e: React.FormEvent)=>{
     e.preventDefault()
     if (!nombre || !tiempo || !vivienda) return
-    const mensaje = `Hola Carmelo Bungalows, quisiera recibir información:\n· Nombre: ${nombre}\n· Tiempo de estadía: ${tiempo}\n· Tipo de vivienda: ${vivienda}`
-    const url = 'https://wa.me/59898341539?text=' + encodeURIComponent(mensaje)
+    const mensaje = `Hola, quisiera recibir información:\n· Nombre: ${nombre}\n· Tiempo de estadía: ${tiempo}\n· Tipo de vivienda: ${vivienda}`
+    const url = 'https://wa.me/584120000000?text=' + encodeURIComponent(mensaje)
     window.open(url, '_blank')
   }
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SEO
+        title="Contacto y Soporte | Diario Mercantil Venezuela"
+        description="Contáctanos para asesoría en la publicación de carteles, edictos y actas mercantiles. Soporte técnico y atención al usuario corporativo."
+      />
       <div className="max-w-4xl mx-auto p-6">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-semibold">Contacto</h1>

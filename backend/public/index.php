@@ -9,7 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $context = new RequestContext();
 set_exception_handler(fn(Throwable $e) => ErrorHandler::handle($e, $context));
 
-$allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com'];
+$allowedOrigins = getenv('ALLOWED_ORIGINS') ? explode(',', getenv('ALLOWED_ORIGINS')) : ['http://localhost:5173', 'http://localhost:8000', 'https://diariomercantil.com', 'https://www.diariomercantil.com'];
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins) || getenv('APP_ENV') === 'development') {
     header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
@@ -43,6 +43,7 @@ require_once __DIR__."/../src/HealthController.php";
 require_once __DIR__."/../src/MetricsController.php";
 require_once __DIR__."/../src/UploadController.php";
 require_once __DIR__."/../src/DirectoryController.php";
+require_once __DIR__."/../src/SeoController.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
 
@@ -62,6 +63,7 @@ $router->post('/api/auth/logout', [AuthController::class, 'logout'], $csrf);
 $router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 $router->get('/api/superadmin/verify', [AuthController::class, 'verifySuperAdmin']);
 $router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $csrf);
+$router->get('/api/superadmin/activity', [SystemController::class, 'getActivityLog'], $admin);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);
@@ -137,11 +139,18 @@ $router->post('/api/editions/{id}/notify', [EditionController::class, 'notify'],
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
 $router->get('/api/editions/{id}/download', [EditionController::class, 'downloadById'], $admin);
 $router->get('/api/editions/{id}/export', [EditionController::class, 'exportCsv'], $admin);
+$router->get('/api/e', [EditionController::class, 'listPublic']);
 $router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById']);
 $router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode']);
 $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES
+$router->get('/api/pages', [PagesController::class, 'list'], $admin);
+$router->post('/api/pages', [PagesController::class, 'create'], $adminCsrf);
+$router->get('/api/pages/{id}', [PagesController::class, 'get'], $admin);
+$router->put('/api/pages/{id}', [PagesController::class, 'update'], $adminCsrf);
+$router->delete('/api/pages/{id}', [PagesController::class, 'delete'], $adminCsrf);
+
 $router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
 $router->post('/api/stats/clear', [SystemController::class, 'clearStats'], $adminCsrf);
 $router->get('/api/rate/bcv', [RateController::class, 'bcv']);
@@ -158,11 +167,7 @@ $router->get('/api/public/editions', [EditionController::class, 'listPublic']);
 $router->get('/api/public/pages', [PagesController::class, 'publicList']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
-$router->get('/api/pages', [PagesController::class, 'list'], $admin);
-$router->post('/api/pages', [PagesController::class, 'create'], $adminCsrf);
-$router->get('/api/pages/{id}', [PagesController::class, 'get'], $admin);
-$router->put('/api/pages/{id}', [PagesController::class, 'update'], $adminCsrf);
-$router->delete('/api/pages/{id}', [PagesController::class, 'delete'], $adminCsrf);
+$router->get('/api/pages/public', [PagesController::class, 'publicList']);
 
 // Alias temporal para clientes CMS anteriores.
 $router->get('/api/publications', [PagesController::class, 'list'], $admin);
@@ -182,6 +187,12 @@ $router->get('/api/directory/colleges', [DirectoryController::class, 'listColleg
 $router->post('/api/directory/colleges', [DirectoryController::class, 'createCollege'], $adminCsrf);
 $router->put('/api/directory/colleges/{id}', [DirectoryController::class, 'updateCollege'], $adminCsrf);
 $router->delete('/api/directory/colleges/{id}', [DirectoryController::class, 'deleteCollege'], $adminCsrf);
+
+// SEO
+$router->get('/api/seo/all', [SeoController::class, 'getAllPublic']);
+$router->get('/api/admin/seo', [SeoController::class, 'listAll'], $admin);
+$router->post('/api/admin/seo', [SeoController::class, 'save'], $adminCsrf);
+$router->delete('/api/admin/seo', [SeoController::class, 'delete'], $adminCsrf);
 
 // HEALTH
 $router->get('/api/health/live', [HealthController::class, 'live']);

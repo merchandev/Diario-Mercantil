@@ -164,7 +164,7 @@ export default function Publicaciones() {
       <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="relative">
           <span className="absolute inset-y-0 left-3 grid place-items-center text-slate-400 w-5"><IconSearch /></span>
-          <input className="input pl-9 w-full" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
+          <input className="input !pl-10 w-full" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
         </div>
         <select className="input w-full" value={status} onChange={e => setStatus(e.target.value)}>
           {estOpts.map(o => <option key={o} value={o}>{o}</option>)}

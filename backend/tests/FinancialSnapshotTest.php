@@ -28,7 +28,7 @@ class FinancialSnapshotTest extends TestCase {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(1.5, false);
+        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(3.0, false);
         $pdo->method('prepare')->willReturn($stmt);
         
         $bcvService = $this->createMock(BcvService::class);
@@ -46,7 +46,7 @@ class FinancialSnapshotTest extends TestCase {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
         
-        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(1.5, 16.0);
+        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(3.0, 16.0);
         $pdo->method('prepare')->willReturn($stmt);
         
         $bcvService = $this->createMock(BcvService::class);
@@ -55,13 +55,13 @@ class FinancialSnapshotTest extends TestCase {
         $service = new PublicationService($pdo, $bcvService);
         $pricing = $service->calculatePricing(2);
         
-        $this->assertEquals(1.5, $pricing['price_per_folio_usd']);
+        $this->assertEquals(3.0, $pricing['price_per_folio_usd']);
         $this->assertEquals(40.0, $pricing['bcv_rate']);
         $this->assertEquals(16.0, $pricing['iva_percent']);
         
-        $this->assertEquals(3.0, $pricing['price_usd']);
-        $this->assertEquals(120.0, $pricing['subtotal_bs']);
-        $this->assertEquals(19.2, $pricing['iva_bs']);
-        $this->assertEquals(139.2, $pricing['total_bs']);
+        $this->assertEquals(6.0, $pricing['price_usd']);
+        $this->assertEquals(240.0, $pricing['subtotal_bs']);
+        $this->assertEquals(38.4, $pricing['iva_bs']);
+        $this->assertEquals(278.4, $pricing['total_bs']);
     }
 }

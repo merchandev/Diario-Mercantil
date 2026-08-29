@@ -1,0 +1,9 @@
+User-agent: *
+Disallow: /dashboard/
+Disallow: /login
+Disallow: /lotus/
+Disallow: /solicitante/
+Disallow: /register
+Disallow: /olvide-password
+Disallow: /reset-password
+Sitemap: https://diariomercantil.com/sitemap.xml

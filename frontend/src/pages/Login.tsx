@@ -4,6 +4,7 @@ import { login as apiLogin } from '../lib/api'
 import { IconEye, IconEyeOff, IconIdCard, IconKey } from '../components/icons'
 import { isSolicitanteRole } from '../lib/roleUtils'
 import { useAuth } from '../hooks/useAuth'
+import { SEO } from '../components/SEO'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -62,6 +63,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-brand-50 via-white to-slate-50 flex items-center justify-center px-4 py-10">
+      <SEO title="Acceso al Sistema | Diario Mercantil" description="Panel de gestión" noindex={true} />
       {/* decorative blobs */}
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-brand-600/10 blur-3xl animate-pulse"></div>
       <div className="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-rose-400/10 blur-3xl animate-pulse"></div>

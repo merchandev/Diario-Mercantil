@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { listPublicEditions, type Edition } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import FlipbookViewer from '../components/FlipbookViewer'
+import { SEO } from '../components/SEO'
 
 export default function EdicionesPublic() {
   const [searchParams] = useSearchParams()
@@ -38,6 +39,10 @@ export default function EdicionesPublic() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <SEO
+        title="Ediciones Publicadas | Diario Mercantil Venezuela"
+        description="Consulta el archivo digital de ediciones publicadas. Verifica actas de asamblea, balances y notificaciones exigidas por la ley venezolana."
+      />
       <div className="mx-auto max-w-7xl p-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>

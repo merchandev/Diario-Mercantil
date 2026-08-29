@@ -64,11 +64,11 @@ class UserController {
         $password = (string)($in["password"] ?? "");
         
         // Extra fields
-        $email = trim($in["email"] ?? null);
-        $phone = trim($in["phone"] ?? null);
-        $state = trim($in["state"] ?? null);
-        $municipality = trim($in["municipality"] ?? null);
-        $address = trim($in["address"] ?? null);
+        $email = trim($in["email"] ?? "");
+        $phone = trim($in["phone"] ?? "");
+        $state = trim($in["state"] ?? "");
+        $municipality = trim($in["municipality"] ?? "");
+        $address = trim($in["address"] ?? "");
         $status = "active";
         $personType = $in["person_type"] ?? "natural";
 
@@ -303,16 +303,25 @@ class UserController {
             }
         }
         
-        $pdo->beginTransaction();
-        $pdo->prepare("UPDATE users SET status='deleted', updated_at=NOW() WHERE id=?")
-            ->execute([$id]);
-        $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
-        $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['status'=>'deleted']);
-        $pdo->commit();
+        try {
+            $pdo->beginTransaction();
+            if ($u['role'] === RolePolicy::SUPERADMIN) {
+                $pdo->prepare("DELETE FROM users WHERE id=?")->execute([$id]);
+            } else {
+                $pdo->prepare("UPDATE users SET status='deleted', updated_at=NOW() WHERE id=?")
+                    ->execute([$id]);
+                $pdo->prepare("UPDATE sessions SET revoked_at=NOW() WHERE user_id=?")->execute([$id]);
+            }
+            $this->audit($pdo, $u['id'], 'delete', 'user', $id, null, ['status'=>'deleted']);
+            $pdo->commit();
         
-        Response::json(["ok"=>true]);
+            Response::json(["ok"=>true]);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            Response::json(["error" => "server_error"], 500);
+        }
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
+        error_log("Delete error: " . $e->getMessage());
         Response::json(["error" => "server_error"], 500);
     }
   }
@@ -436,8 +445,15 @@ class UserController {
             $set[] = 'person_type=?'; $params[] = $personType;
         }
 
+        $password = (string)($in["password"] ?? "");
+        if ($password !== "") {
+            $set[] = "password_hash=?";
+            $params[] = PasswordPolicy::hash($password);
+        }
+
         if (count($set) === 1) {
             Response::json(["ok"=>true, "message"=>"Sin cambios"]);
+            exit;
         }
 
         $params[] = (int)$id;
