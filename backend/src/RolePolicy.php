@@ -23,7 +23,7 @@ final class RolePolicy {
         }
 
         return $actorRole === Role::ADMIN
-            && $newRole->rank() < Role::ADMIN->rank();
+            && $newRole->rank() <= Role::ADMIN->rank();
     }
 
     public static function canModifyUser(array $actor, array $target): bool {
@@ -41,7 +41,7 @@ final class RolePolicy {
         return $actorRole === Role::SUPERADMIN
             || (
                 $actorRole === Role::ADMIN
-                && $targetRole->rank() < Role::ADMIN->rank()
+                && $targetRole->rank() <= Role::ADMIN->rank()
             );
     }
 

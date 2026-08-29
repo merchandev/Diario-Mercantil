@@ -250,6 +250,8 @@ export type Edition = {
   file_url?: string | null;
   created_at?: string;
   updated_at?: string;
+  published_by_name?: string;
+  published_at?: string;
 }
 export async function listEditions() {
   const res = await fetchAuth('/api/editions')
@@ -275,9 +277,41 @@ export async function autoSelectEditionOrders(id: number, limit: number) {
   const res = await fetchAuth(`/api/editions/${id}/auto-select`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit }) })
   return res.json() as Promise<{ ok: true; orders_count: number; order_ids: number[] }>
 }
-export async function publishEdition(id: number) {
+export async function listPublicEditions(params?: { q?: string; from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set('q', params.q);
+  if (params?.from) qs.set('from', params.from);
+  if (params?.to) qs.set('to', params.to);
+  const suffix = qs.toString() ? '?' + qs.toString() : '';
+  const res = await fetch(`/api/public/editions${suffix}`);
+  if (!res.ok) throw new Error('No se pudieron cargar las ediciones');
+  return res.json() as Promise<{ items: Edition[] }>;
+}
+export async function notifyEdition(id: number) {
+  const res = await fetchAuth(`/api/editions/${id}/notify`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; sent: number }>
+}
+export async function publishEdition(id: number, onProgress?: (prog: number, msg: string) => void): Promise<{ ok: true }> {
   const res = await fetchAuth(`/api/editions/${id}/publish`, { method: 'POST' })
-  return res.json() as Promise<{ ok: true }>
+  if (!res.body) return { ok: true }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+    for (const chunk of chunks) {
+      if (!chunk.startsWith('data: ')) continue
+      const data = JSON.parse(chunk.slice(6))
+      if (data.error) throw new Error(data.error)
+      if (typeof data.progress === 'number') onProgress?.(data.progress, data.msg ?? '')
+      if (data.ok) return { ok: true }
+    }
+  }
+  return { ok: true }
 }
 export async function uploadEditionPdf(id: number, file: File) {
   const fd = new FormData()
@@ -339,6 +373,10 @@ export type LegalRequest = {
   total_bs?: number;
   meta?: any;
   files?: LegalFile[];
+  edition_code?: string;
+  edition_no?: number;
+  edition_id?: number | null;
+  edition_file_url?: string | null;
 }
 export type LegalPayment = {
   id: number;
@@ -396,6 +434,10 @@ export async function rejectLegal(id: number, reason: string) {
 export async function submitLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/submit`, { method: 'POST' })
   return res.json() as Promise<{ ok: boolean; order_no?: string; error?: string }>
+}
+export async function unpublishLegal(id: number) {
+  const res = await fetchAuth(`/api/legal/${id}/unpublish`, { method: 'POST' })
+  return res.json()
 }
 export async function verifyLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/verify`, { method: 'POST' })
@@ -493,7 +535,11 @@ export async function createUser(body: { document: string; name: string; passwor
   return res.json() as Promise<{ id: number }>
 }
 export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string; phone?: string; person_type?: string }) {
-  const res = await fetchAuth(`/api/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const res = await fetchAuth(`/api/admin/users/`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return res.json()
+}
+export async function changeUserRole(id: number, role: string) {
+  const res = await fetchAuth(`/api/admin/users/${id}/role`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) })
   return res.json()
 }
 export async function setUserPassword(id: number, password: string) {
@@ -506,7 +552,7 @@ export async function setUserPassword(id: number, password: string) {
   return res.json() as Promise<{ ok: true }>
 }
 export async function deleteUser(id: number) {
-  const res = await fetchAuth(`/api/users/${id}`, { method: 'DELETE' })
+  const res = await fetchAuth(`/api/admin/users/`, { method: 'DELETE' })
   return res.json()
 }
 
@@ -519,6 +565,9 @@ export type Settings = {
   instructions_documents_text?: string;
   instructions_documents_image_url?: string;
   instructions_convocatorias_text?: string;
+  banner_main_1?: string;
+  banner_sidebar?: string;
+  promo_popup?: string;
   default_user_role?: string;
   unit_tax_bs?: number;
 }
@@ -526,8 +575,12 @@ export async function getSettings() {
   const res = await fetchAuth('/api/settings')
   return res.json() as Promise<{ settings: Partial<Settings> }>
 }
+export async function getAdminSettings() {
+  const res = await fetchAuth('/api/admin/settings')
+  return res.json() as Promise<{ settings: Partial<Settings> }>
+}
 export async function saveSettings(settings: Partial<Settings>) {
-  const res = await fetchAuth('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+  const res = await fetchAuth('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
   return res.json()
 }
 
@@ -651,3 +704,5 @@ export async function listPagesPublic() {
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ items: { slug: string; title: string }[] }>
 }
+
+

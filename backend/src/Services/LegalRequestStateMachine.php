@@ -162,4 +162,17 @@ final class LegalRequestStateMachine {
             return true;
         });
     }
+
+    public function unpublish(int $id): void {
+        $this->executeTransition($id, 'unpublish', function($req) use ($id) {
+            if ($req['status'] !== 'Publicada') {
+                throw new Exception("Solo se pueden despublicar solicitudes 'Publicada'.", 409);
+            }
+
+            $this->pdo->prepare("DELETE FROM edition_orders WHERE legal_request_id=?")->execute([$id]);
+            $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', publish_date=NULL WHERE id=?")->execute([$id]);
+            
+            return true;
+        });
+    }
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { listEditions, type Edition } from '../lib/api'
+import { listPublicEditions, type Edition } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
 import FlipbookViewer from '../components/FlipbookViewer'
 
@@ -15,7 +15,7 @@ export default function EdicionesPublic() {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await listEditions()
+      const r = await listPublicEditions()
       setRows(r.items ?? [])
     } catch {
       setRows([])
@@ -23,27 +23,9 @@ export default function EdicionesPublic() {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [q, from, to])
 
-  const filtered = useMemo(() => {
-    const fFrom = from ? new Date(from) : null
-    const fTo = to ? new Date(to) : null
-    return [...rows]
-      .filter(ed => {
-        if (ed.status !== 'Publicada') return false
-        const t = (String(ed.code || '') + ' ' + String(ed.edition_no || '') + ' ' + String(ed.status || '')).toLowerCase()
-        if (q && !t.includes(q.toLowerCase())) return false
-        const d = ed.date ? new Date(ed.date) : (ed.created_at ? new Date(ed.created_at) : null)
-        if (fFrom && d && d < fFrom) return false
-        if (fTo && d && d > new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1)) return false
-        return true
-      })
-      .sort((a, b) => {
-        const da = a.date ? new Date(a.date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0)
-        const db = b.date ? new Date(b.date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0)
-        return db - da
-      })
-  }, [rows, q, from, to])
+  const filtered = rows
 
   // Latest published edition
   const latestEdition = useMemo(() => {
@@ -87,7 +69,7 @@ export default function EdicionesPublic() {
                     </p>
                     {latestEdition.code && (
                       <p className="text-xs text-slate-500 font-mono mt-1">
-                        CEV: {latestEdition.code}
+                        CVE: {latestEdition.code}
                       </p>
                     )}
                   </div>
@@ -161,7 +143,7 @@ export default function EdicionesPublic() {
                     <tr className="text-left border-b bg-brand-800 text-white">
                       <th className="p-3">Fecha de la Edición</th>
                       <th className="p-3">N° de Edición</th>
-                      <th className="p-3">Código de Verificación (CEV)</th>
+                      <th className="p-3">Código de Verificación (CVE)</th>
                       <th className="p-3">Estado</th>
                       <th className="p-3 text-right">Acciones</th>
                     </tr>

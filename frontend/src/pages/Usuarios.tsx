@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { listUsers, type UserSummary, createUser, deleteUser, updateUser, setUserPassword, listLegal, type LegalRequest } from '../lib/api'
+import { listUsers, type UserSummary, createUser, deleteUser, updateUser, changeUserRole, setUserPassword, listLegal, type LegalRequest } from '../lib/api'
 import RolesModal from '../components/RolesModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PromptDialog from '../components/PromptDialog'
@@ -147,7 +147,15 @@ export default function Usuarios() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setEditUser(undefined)}></div>
           <div className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-6 z-50">
             <h3 className="text-lg font-semibold mb-3">Editar usuario</h3>
-            <form onSubmit={async e => { e.preventDefault(); await updateUser(editUser.id, { name: editUser.name, role: editUser.role, email: editUser.email, phone: editUser.phone, status: editUser.status, person_type: editUser.person_type }); setEditUser(undefined); reload() }} className="space-y-3">
+            <form onSubmit={async e => {
+              e.preventDefault();
+              const oldRole = rows.find(u => u.id === editUser.id)?.role;
+              await updateUser(editUser.id, { name: editUser.name, email: editUser.email, phone: editUser.phone, status: editUser.status, person_type: editUser.person_type });
+              if (oldRole !== editUser.role) {
+                await changeUserRole(editUser.id, editUser.role);
+              }
+              setEditUser(undefined); reload()
+            }} className="space-y-3">
               <div className="grid md:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Nombre</label>
@@ -222,3 +230,4 @@ export default function Usuarios() {
     </section>
   )
 }
+

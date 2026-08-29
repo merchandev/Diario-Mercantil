@@ -179,7 +179,7 @@ class FileController {
     }
 
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at FROM files WHERE id=?');
+    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at, is_public FROM files WHERE id=?');
     $stmt->execute([$id]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -193,7 +193,7 @@ class FileController {
     $ed->execute([$id]);
     $editionStatus = $ed->fetchColumn();
     
-    $isPublic = ($editionStatus === 'Publicada');
+    $isPublic = ($editionStatus === 'Publicada') || !empty($file['is_public']) || str_starts_with($file['type'] ?? '', 'image/');
     
     if (!$isPublic) {
         require_once __DIR__.'/AuthController.php';
@@ -269,3 +269,5 @@ class FileController {
     exit;
   }
 }
+
+

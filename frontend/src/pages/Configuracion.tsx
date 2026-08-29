@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
+import { getSettings, getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
 
 export default function Configuracion() {
   const [s, setS] = useState<Partial<Settings>>({})
@@ -8,7 +8,7 @@ export default function Configuracion() {
   const [areas, setAreas] = useState<{ id: number; name: string }[]>([])
   const [colleges, setColleges] = useState<{ id: number; name: string }[]>([])
 
-  useEffect(() => { getSettings().then(r => setS(r.settings)).catch(() => { }) }, [])
+  useEffect(() => { getAdminSettings().then(r => setS(r.settings)).catch(() => { }) }, [])
   const loadDir = async () => {
     try {
       const [a, c] = await Promise.all([listDirAreas(), listDirColleges()])
@@ -18,8 +18,11 @@ export default function Configuracion() {
   useEffect(() => { if (tab === 'Directorio Legal') loadDir() }, [tab])
   const onSave = async () => {
     setSaving(true)
-    await saveSettings(s)
-    setSaving(false)
+    try {
+      await saveSettings(s)
+    } finally {
+      setSaving(false)
+    }
   }
   return (
     <section className="space-y-4">

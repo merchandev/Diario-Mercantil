@@ -5,33 +5,19 @@ import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
 import { IconUserCircle, IconLogout, IconHome, IconMenu, IconX } from './icons'
 
-function HeroSlider({ heightClass = "h-28 md:h-32", labelPrefix = "BANNER A" }: { heightClass?: string; labelPrefix?: string }) {
-  const slides = [1, 2, 3]
-  const [idx, setIdx] = useState(0)
-  const timer = useRef<number | undefined>(undefined)
-  const go = (n: number) => setIdx(((n % slides.length) + slides.length) % slides.length)
+function HeroSlider() {
+  const [banner, setBanner] = useState<string | undefined>(undefined);
   useEffect(() => {
-    timer.current && clearInterval(timer.current)
-    // @ts-ignore
-    timer.current = setInterval(() => go(idx + 1), 5000)
-    return () => { timer.current && clearInterval(timer.current) }
-  }, [idx])
+    import('../lib/api').then(({ getSettings }) => {
+      getSettings().then(r => setBanner(r.settings?.banner_main_1));
+    });
+  }, []);
+  
+  if (!banner) return null;
+  
   return (
-    <div className={`card relative overflow-hidden px-2 ${heightClass}`}>
-      <div className="h-full w-full flex transition-transform duration-500" style={{ transform: `translateX(-${idx * 100}%)` }}>
-        {slides.map(i => (
-          <div key={i} className="shrink-0 w-full h-full grid place-items-center bg-slate-100 text-slate-500">
-            <div className="text-sm">{labelPrefix} {i}</div>
-          </div>
-        ))}
-      </div>
-      <button aria-label="Anterior" onClick={() => go(idx - 1)} className="absolute left-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-icon bg-white/70 backdrop-blur border border-slate-200">‹</button>
-      <button aria-label="Siguiente" onClick={() => go(idx + 1)} className="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-icon bg-white/70 backdrop-blur border border-slate-200">›</button>
-      <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-1">
-        {slides.map((_, i) => (
-          <button key={i} aria-label={`Ir al slide ${i + 1}`} onClick={() => go(i)} className={["w-2.5 h-2.5 rounded-full border", i === idx ? 'bg-brand-600 border-brand-600' : 'bg-white/80 border-slate-300'].join(' ')} />
-        ))}
-      </div>
+    <div className="relative w-full h-28 md:h-32 bg-slate-100 overflow-hidden">
+      <img src={banner} className="w-full h-full object-cover" alt="Banner Principal" />
     </div>
   )
 }
@@ -58,7 +44,7 @@ function TopBannerRow() {
             </Link>
           </div>
           <div className="flex-1">
-            <HeroSlider heightClass="h-28 md:h-32" />
+            <HeroSlider />
           </div>
         </div>
       </div>
@@ -205,7 +191,7 @@ export default function PublicHeader() {
               ) : (
                 <div className="flex flex-col gap-2">
                   <Link to="/login" onClick={() => setIsMenuOpen(false)} className="btn btn-outline h-9 text-sm justify-center">Iniciar sesión</Link>
-                  <Link to="/login" onClick={() => setIsMenuOpen(false)} className="btn btn-primary h-9 text-sm justify-center">Crear cuenta</Link>
+                  <Link to="/register" onClick={() => setIsMenuOpen(false)} className="btn btn-primary h-9 text-sm justify-center">Crear cuenta</Link>
                 </div>
               )}
             </div>

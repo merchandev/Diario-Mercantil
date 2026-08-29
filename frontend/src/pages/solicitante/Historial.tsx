@@ -49,6 +49,21 @@ export default function Historial() {
     load();
   }, [])
 
+  const [dismissedNotifs, setDismissedNotifs] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem('dismissedNotifs') || '[]') } catch { return [] }
+  })
+  
+  const dismissNotif = (id: number) => {
+    const updated = [...dismissedNotifs, id]
+    setDismissedNotifs(updated)
+    localStorage.setItem('dismissedNotifs', JSON.stringify(updated))
+  }
+
+  // Determine notifications: recent published ones not dismissed
+  const notifications = allRows
+    .filter(r => r.status === 'Publicada' && !dismissedNotifs.includes(r.id))
+    .slice(0, 3)
+
   // Format: use created_at if available, fallback to date
   const prettyDate = (r: LegalRequest) => {
     const raw = (r as any).created_at || r.date
@@ -69,7 +84,46 @@ export default function Historial() {
     <section className="space-y-4">
       <AdvertisingSlider className="mb-6 shadow-sm border border-slate-200" />
 
-      <div className="flex items-center justify-between">
+      {notifications.length > 0 && (
+        <div className="space-y-2 mb-6">
+          {notifications.map(notif => (
+            <div key={notif.id} className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center gap-3">
+                <div className="bg-emerald-100 p-2 rounded-full hidden sm:block">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-sm">¡Publicación Confirmada!</h4>
+                  <p className="text-sm">
+                    Tu publicación con CVE <span className="font-mono bg-emerald-100 px-1 rounded">{notif.edition_code}</span> ha sido publicada {notif.edition_no ? <span>en la Edición N° <strong>{notif.edition_no}</strong></span> : 'con éxito'}.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={() => navigate(`/solicitante/publicaciones/${notif.id}`)}
+                  className="btn btn-sm bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100 flex-1 sm:flex-none justify-center"
+                >
+                  Ver detalle
+                </button>
+                <button
+                  onClick={() => dismissNotif(notif.id)}
+                  className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors"
+                  title="Ocultar"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Mis Publicaciones</h1>
         <button
           onClick={() => navigate('/solicitante/documento')}
@@ -185,6 +239,11 @@ export default function Historial() {
                         )}
                         <button className="text-brand-700 hover:underline" onClick={() => navigate(`/solicitante/publicaciones/${r.id}`)}>Ver detalles</button>
                         <button className="text-blue-600 hover:underline" onClick={async () => { const b = await downloadLegal(r.id); const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `orden-servicio-${r.id}.pdf`; a.click(); URL.revokeObjectURL(url) }}>Descargar orden</button>
+                        {r.status === 'Publicada' && (r.edition_code || r.order_no) && (
+                          <a href={`/api/e/code/${encodeURIComponent(r.edition_code || r.order_no || '')}/download?download=1`} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
+                            Descargar publicación
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -197,3 +256,6 @@ export default function Historial() {
     </section>
   )
 }
+
+
+

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getSettings, saveSettings, Settings, FileRow } from '../lib/api'
+import { getAdminSettings, saveSettings, Settings, FileRow } from '../lib/api'
 import MediaGallery from '../components/MediaGallery'
 import { IconImage, IconX, IconCheck } from '../components/icons'
 import { LoadingSpinner } from '../components/LoadingSpinner'
@@ -23,7 +23,7 @@ export default function Promo() {
     const API_URL = import.meta.env.VITE_BACKEND_URL || ''
 
     useEffect(() => {
-        getSettings()
+        getAdminSettings()
             .then(res => setSettings(res.settings as Partial<Settings & Record<string, string>>))
             .catch(console.error)
             .finally(() => setLoading(false))

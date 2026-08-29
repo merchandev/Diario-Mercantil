@@ -1,10 +1,23 @@
 import React from 'react'
 import EditionPromoAside from '../components/EditionPromoAside'
 
-function BannerBox({ label, className }: { label: string; className?: string }) {
+import { useEffect, useState } from 'react';
+import { getSettings } from '../lib/api';
+
+function BannerBox({ settingKey, className }: { settingKey: string; className?: string }) {
+  const [url, setUrl] = useState<string | undefined>();
+  useEffect(() => {
+    getSettings().then(r => {
+      const settings = r.settings as any;
+      if (settings[settingKey]) setUrl(settings[settingKey]);
+    });
+  }, [settingKey]);
+
+  if (!url) return null;
+
   return (
-    <div className={`card grid place-items-center aspect-[16/5] text-slate-500 ${className || ''}`}>
-      <span className="text-sm">{label}</span>
+    <div className={`card overflow-hidden ${className || ''}`}>
+      <img src={url} alt="Banner" className="w-full h-full object-cover" />
     </div>
   )
 }
@@ -15,13 +28,13 @@ export default function Home() {
     <div>
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 md:py-8 grid gap-6 lg:grid-cols-[220px_1fr_300px] items-start">
         <div className="space-y-6 order-2 lg:order-1">
-          <BannerBox label="BANNER B" className="aspect-[9/20]" />
-          <BannerBox label="BANNER B2" className="aspect-[9/16]" />
-          <BannerBox label="BANNER B3" className="aspect-[9/16]" />
+          <BannerBox settingKey="banner_sidebar" className="aspect-[9/20]" />
+          
+          
         </div>
 
         <section className="order-1 lg:order-2 space-y-6">
-          <BannerBox label="BANNER C (principal)" className="aspect-[16/9] sm:aspect-[21/9]" />
+          <BannerBox settingKey="banner_main_1" className="aspect-[16/9] sm:aspect-[21/9]" />
           <div className="grid sm:grid-cols-2 gap-6">
             <article className="card p-4">
               <div className="aspect-video rounded-xl bg-slate-100 mb-3" />
@@ -43,8 +56,8 @@ export default function Home() {
             <p className="text-sm text-slate-600 mb-3">Accede al PDF completo de hoy.</p>
             <button className="btn btn-primary w-full">Ver edición</button>
           </div>
-          <BannerBox label="BANNER D" />
-          <BannerBox label="BANNER E" />
+          
+          
         </aside>
       </main>
 

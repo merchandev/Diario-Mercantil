@@ -96,14 +96,17 @@ export default function LegalRequestDetails({ item, meta }: Props) {
                   <div className="font-medium">{meta.oficina}</div>
                 </div>
               )}
-              {meta.registrador && (
+              {(meta.registrador || meta.registrador_nombre) && (
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Registrador Mercantil</label>
-                  <div className="font-medium">{meta.registrador}</div>
+                  <div className="font-medium">
+                    {meta.registrador_nombre || meta.registrador}
+                    {(meta.registrador_tipo || meta.tipo_registrador) ? ` (${(meta.registrador_tipo || meta.tipo_registrador)})` : ''}
+                  </div>
                 </div>
               )}
               {meta.tomo && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-sm text-slate-600 mb-1">Tomo</label>
                     <div className="font-medium">{meta.tomo}</div>
@@ -112,6 +115,12 @@ export default function LegalRequestDetails({ item, meta }: Props) {
                     <div>
                       <label className="block text-sm text-slate-600 mb-1">Número</label>
                       <div className="font-medium">{meta.numero}</div>
+                    </div>
+                  )}
+                  {meta.letra && (
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Letra</label>
+                      <div className="font-medium">{meta.letra}</div>
                     </div>
                   )}
                 </div>
@@ -154,3 +163,4 @@ export default function LegalRequestDetails({ item, meta }: Props) {
     </>
   )
 }
+

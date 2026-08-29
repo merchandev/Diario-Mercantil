@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -60,7 +60,7 @@ class EmailService {
                 </div>
                 <div class="footer">
                     &copy; $year Diario Mercantil de Venezuela. Todos los derechos reservados.<br>
-                    Este es un mensaje automático, por favor no responda a este correo.
+                    Este es un mensaje automÃ¡tico, por favor no responda a este correo.
                 </div>
             </div>
         </body>
@@ -74,10 +74,10 @@ class EmailService {
         $mail->Subject = 'Bienvenido al Diario Mercantil';
         
         $content = <<<HTML
-        <h2>¡Hola, $name!</h2>
+        <h2>Â¡Hola, $name!</h2>
         <p>Gracias por registrarte en el <strong>Diario Mercantil</strong>.</p>
-        <p>Tu cuenta ha sido creada exitosamente. A partir de ahora podrás gestionar la publicación de documentos legales, carteles de citación, asambleas y más de forma rápida y segura a través de nuestra plataforma.</p>
-        <p>Si tienes alguna duda o necesitas asistencia, nuestro equipo está listo para ayudarte.</p>
+        <p>Tu cuenta ha sido creada exitosamente. A partir de ahora podrÃ¡s gestionar la publicaciÃ³n de documentos legales, carteles de citaciÃ³n, asambleas y mÃ¡s de forma rÃ¡pida y segura a travÃ©s de nuestra plataforma.</p>
+        <p>Si tienes alguna duda o necesitas asistencia, nuestro equipo estÃ¡ listo para ayudarte.</p>
         HTML;
 
         $mail->Body = self::renderTemplate('Bienvenido', $content);
@@ -89,9 +89,9 @@ class EmailService {
         $mail->addAddress($to, $name);
         $mail->Subject = 'Recuperacion de contrasena - Diario Mercantil';
         
-        // Link del frontend para reset. En un entorno real se tomaría de la config.
+        // Link del frontend para reset. En un entorno real se tomarÃ­a de la config.
         $baseUrl = getenv('FRONTEND_URL') ?: 'http://localhost:5173';
-        // Ajustar el puerto 80 para producción o localhost si se requiere
+        // Ajustar el puerto 80 para producciÃ³n o localhost si se requiere
         if (getenv('FRONTEND_URL') === false) {
            // Intenta auto-detectar
            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
@@ -101,17 +101,17 @@ class EmailService {
         $resetLink = rtrim($baseUrl, '/') . "/reset-password?token=" . urlencode($token);
 
         $content = <<<HTML
-        <h2>Recuperación de contraseña</h2>
+        <h2>RecuperaciÃ³n de contraseÃ±a</h2>
         <p>Hola, $name.</p>
-        <p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en el Diario Mercantil.</p>
-        <p>Haz clic en el siguiente botón para elegir una nueva contraseña:</p>
+        <p>Hemos recibido una solicitud para restablecer la contraseÃ±a de tu cuenta en el Diario Mercantil.</p>
+        <p>Haz clic en el siguiente botÃ³n para elegir una nueva contraseÃ±a:</p>
         <div style="text-align: center;">
-            <a href="$resetLink" class="btn" style="color: #ffffff !important;">Restablecer Contraseña</a>
+            <a href="$resetLink" class="btn" style="color: #ffffff !important;">Restablecer ContraseÃ±a</a>
         </div>
-        <p style="margin-top: 30px;">Si no has solicitado este cambio, por favor ignora este mensaje. El enlace expirará en 1 hora.</p>
+        <p style="margin-top: 30px;">Si no has solicitado este cambio, por favor ignora este mensaje. El enlace expirarÃ¡ en 1 hora.</p>
         HTML;
 
-        $mail->Body = self::renderTemplate('Recuperar contraseña', $content);
+        $mail->Body = self::renderTemplate('Recuperar contraseÃ±a', $content);
         return $mail->send();
     }
 
@@ -123,12 +123,12 @@ class EmailService {
         $content = <<<HTML
         <h2>Solicitud Recibida</h2>
         <p>Hola, $name.</p>
-        <p>Hemos recibido tu solicitud de publicación con el número de orden <strong>$orderNo</strong>.</p>
-        <p>Actualmente se encuentra en estado <strong>Por verificar</strong>. Nuestro equipo de administración validará el pago y los documentos anexados.</p>
-        <p>Recibirás una notificación en cuanto el estado de tu solicitud se actualice.</p>
+        <p>Hemos recibido tu solicitud de publicaciÃ³n con el nÃºmero de orden <strong>$orderNo</strong>.</p>
+        <p>Actualmente se encuentra en estado <strong>Por verificar</strong>. Nuestro equipo de administraciÃ³n validarÃ¡ el pago y los documentos anexados.</p>
+        <p>RecibirÃ¡s una notificaciÃ³n en cuanto el estado de tu solicitud se actualice.</p>
         HTML;
 
-        $mail->Body = self::renderTemplate('Solicitud en Verificación', $content);
+        $mail->Body = self::renderTemplate('Solicitud en VerificaciÃ³n', $content);
         return $mail->send();
     }
 
@@ -155,14 +155,14 @@ class EmailService {
         $mail->Subject = "Publicacion Exitosa - $orderNo";
         
         $content = <<<HTML
-        <h2>¡Tu documento ha sido publicado!</h2>
+        <h2>Â¡Tu documento ha sido publicado!</h2>
         <p>Hola, $name.</p>
-        <p>Te informamos que tu solicitud <strong>$orderNo</strong> ha sido incorporada en la edición <strong>$editionCode</strong> del Diario Mercantil.</p>
-        <p>Ya puedes acceder a nuestra plataforma para ver la edición oficial o generar el certificado digital de publicación legal.</p>
+        <p>Te informamos que tu solicitud <strong>$orderNo</strong> ha sido incorporada en la edición con CVE <strong>$editionCode</strong> del Diario Mercantil.</p>
+        <p>Ya puedes acceder a nuestra plataforma para ver la ediciÃ³n oficial o generar el certificado digital de publicaciÃ³n legal.</p>
         <p>Gracias por confiar en nosotros.</p>
         HTML;
 
-        $mail->Body = self::renderTemplate('Publicación Exitosa', $content);
+        $mail->Body = self::renderTemplate('PublicaciÃ³n Exitosa', $content);
         return $mail->send();
     }
 
@@ -172,17 +172,22 @@ class EmailService {
         $mail->Subject = "Solicitud Rechazada - $orderNo";
         
         $content = <<<HTML
-        <h2>Atención con tu solicitud $orderNo</h2>
+        <h2>AtenciÃ³n con tu solicitud $orderNo</h2>
         <p>Hola, $name.</p>
-        <p>Lamentablemente, tu solicitud de publicación no pudo ser procesada y ha sido <strong>Rechazada</strong>.</p>
+        <p>Lamentablemente, tu solicitud de publicaciÃ³n no pudo ser procesada y ha sido <strong>Rechazada</strong>.</p>
         <p><strong>Motivo indicado por el administrador:</strong></p>
         <blockquote style="border-left: 4px solid #c0252b; padding-left: 10px; color: #555; background-color: #f9f9f9; padding: 10px;">
             $reason
         </blockquote>
-        <p>Por favor, revisa la información en tu panel e intenta crear una nueva solicitud con los datos corregidos si corresponde.</p>
+        <p>Por favor, revisa la informaciÃ³n en tu panel e intenta crear una nueva solicitud con los datos corregidos si corresponde.</p>
         HTML;
 
         $mail->Body = self::renderTemplate('Solicitud Rechazada', $content);
         return $mail->send();
     }
 }
+
+
+
+
+

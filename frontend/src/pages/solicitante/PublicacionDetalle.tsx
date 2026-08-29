@@ -86,7 +86,9 @@ export default function PublicacionDetalleSolicitante() {
   const meta = typeof req.meta === 'string' ? JSON.parse(req.meta) : (req.meta || {})
 
   const isPublicada = req.status === 'Publicada'
-  const publicUrl = `${window.location.origin}/publicaciones/${req.order_no || req.id}/${encodeURIComponent(req.name || 'publicacion')}`
+  // Use edition_code if available, otherwise fallback to order_no (which also works for editions)
+  const editionIdentifier = req.edition_code || req.order_no || req.id;
+  const publicUrl = `${window.location.origin}/edicion/${encodeURIComponent(editionIdentifier)}`
 
   // Date: use created_at (system date) for "Fecha de solicitud", fallback to date
   const fechaSolicitud = (() => {
@@ -186,9 +188,18 @@ export default function PublicacionDetalleSolicitante() {
                       <span className="text-xs text-slate-500">Vista protegida</span>
                     </div>
                     {f.type === 'pdf' ? (
-                      <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8, '0')} - Solo Lectura`} />
+                      <div className="h-96">
+                        <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8, '0')} - Solo Lectura`} />
+                      </div>
+                    ) : f.type === 'image' || (f.name && f.name.match(/\.(jpg|jpeg|png|gif)$/i)) ? (
+                      <div className="p-4 flex justify-center bg-slate-100">
+                        <img src={`/api/uploads/${f.file_id}`} alt={f.name} className="max-h-96 max-w-full rounded shadow" />
+                      </div>
                     ) : (
-                      <div className="p-6 text-center text-slate-500">Tipo de archivo no soportado para vista previa</div>
+                      <div className="p-6 text-center text-slate-500">
+                        <p>Tipo de archivo no soportado para vista previa</p>
+                        <a href={`/api/uploads/${f.file_id}`} download className="text-brand-600 hover:underline mt-2 inline-block">Descargar archivo</a>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -270,12 +281,21 @@ export default function PublicacionDetalleSolicitante() {
             <div className="card p-6 bg-green-50 border border-green-200">
               <h3 className="font-semibold mb-3 text-green-800">Publicación en Edición</h3>
               <p className="text-xs text-green-700 mb-4">Su documento ya forma parte de una edición del Diario Mercantil de Venezuela.</p>
-              <a
-                href="/ediciones"
-                className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
-              >
-                <IconDownload /> Ver Ediciones del Diario
-              </a>
+              {req.edition_file_url ? (
+                <a
+                  href={`${req.edition_file_url}?download=1`}
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+                >
+                  <IconDownload /> Descargar publicaci�n
+                </a>
+              ) : (
+                <a
+                  href="/ediciones"
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+                >
+                  <IconDownload /> Ver Ediciones del Diario
+                </a>
+              )}
             </div>
           )}
         </div>

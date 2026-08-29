@@ -95,6 +95,7 @@ $router->post('/api/legal/{id}/reject', [LegalController::class, 'reject'], $adm
 $router->post('/api/legal/{id}/submit', [LegalController::class, 'submit'], $csrf);
 $router->post('/api/legal/{id}/verify', [LegalController::class, 'verify'], $adminCsrf);
 $router->post('/api/legal/{id}/return-to-draft', [LegalController::class, 'returnToDraft'], $adminCsrf);
+$router->post('/api/legal/{id}/unpublish', [LegalController::class, 'unpublish'], $adminCsrf);
 $router->get('/api/legal/{id}/download', [LegalController::class, 'download'], $auth);
 $router->get('/api/legal/{id}/files', [LegalController::class, 'listFiles'], $auth);
 $router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $csrf);
@@ -127,9 +128,12 @@ $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adm
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
 $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
+$router->post('/api/editions/{id}/notify', [EditionController::class, 'notify'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
-$router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById'], $auth);
-$router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode'], $auth);
+$router->get('/api/editions/{id}/download', [EditionController::class, 'downloadById'], $admin);
+$router->get('/api/editions/{id}/export', [EditionController::class, 'exportCsv'], $admin);
+$router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById']);
+$router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode']);
 $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES
@@ -143,6 +147,7 @@ $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], 
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
+$router->get('/api/public/editions', [EditionController::class, 'listPublic']);
 $router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
@@ -190,3 +195,5 @@ try {
     error_log((string)$e);
     Response::json(['error' => 'server_error', 'message' => 'Error interno del servidor'], 500);
 }
+
+

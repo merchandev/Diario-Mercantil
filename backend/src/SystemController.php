@@ -31,6 +31,7 @@ class SystemController {
             "publications_convocations" => 0,
             "publications_recent_30d" => 0,
             "editions" => 0,
+            "editions_published" => 0,
             "revenue_total_usd" => 0,
             "revenue_pending_usd" => 0,
             "transactions_completed" => 0
@@ -54,6 +55,7 @@ class SystemController {
             
             // Edition Statistics
             try { $stats["editions"] = (int)$pdo->query("SELECT COUNT(*) FROM editions")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["editions_published"] = (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
             
             // Financial Statistics
             try { 

@@ -12,12 +12,16 @@ final class StoragePath
         return $dir;
     }
 
-    public static function getFile(string $filename): string
+    public static function getFile(string $filePath): string
     {
-        $filename = basename($filename);
-        $path = self::getUploadsDir() . DIRECTORY_SEPARATOR . $filename;
+        // Prevent path traversal
+        if (strpos($filePath, '..') !== false) {
+            throw new RuntimeException('Invalid path: ' . $filePath);
+        }
+        
+        $path = self::getUploadsDir() . DIRECTORY_SEPARATOR . ltrim($filePath, '/\\');
         if (!file_exists($path)) {
-            throw new RuntimeException('File not found: ' . $filename);
+            throw new RuntimeException('File not found: ' . $filePath);
         }
         return $path;
     }

@@ -9,6 +9,15 @@ final class SettingSchema
         'bcv_rate' => ['type' => 'float', 'min' => 0.0001],
         'bcv_rate_date' => ['type' => 'string'],
         'app_name' => ['type' => 'string'],
+        'convocatoria_usd' => ['type' => 'float', 'min' => 0.0],
+        'unit_tax_bs' => ['type' => 'float', 'min' => 0.0],
+        'banner_main_1' => ['type' => 'string'],
+        'banner_sidebar' => ['type' => 'string'],
+        'promo_popup' => ['type' => 'string'],
+        'instructions_documents_text' => ['type' => 'string'],
+        'instructions_documents_image_url' => ['type' => 'string'],
+        'instructions_convocatorias_text' => ['type' => 'string'],
+        'default_user_role' => ['type' => 'string'],
     ];
 
     public static function validate(string $key, mixed $value): mixed

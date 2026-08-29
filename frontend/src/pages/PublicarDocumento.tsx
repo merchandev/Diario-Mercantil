@@ -16,7 +16,7 @@ export default function PublicarDocumento() {
   // Step 1 fields
   const [f1, setF1] = useState<any>({
     tipo_sociedad: '', tipo_acto: '', nombre: '', estado: '', oficina: '', registrador_nombre: '', registrador_tipo: '',
-    tomo: '', numero: '', anio: '', expediente: '', fecha: '', planilla: ''
+    tomo: '', numero: '', letra: '', anio: '', expediente: '', fecha: '', planilla: ''
   })
 
   // Resume draft logic
@@ -52,7 +52,7 @@ export default function PublicarDocumento() {
   // Step 2 files count -> folios
   const [folios, setFolios] = useState<number>(1)
   // Step 3 payment fields
-  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'transferencia', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '' })
+  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'transferencia', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_operator: '0414' })
   const [accepted, setAccepted] = useState(false)
   const priceUsd = Number(settings.price_per_folio_usd || 0)
   const unitBs = rate ? +(priceUsd * rate).toFixed(2) : undefined
@@ -149,7 +149,7 @@ export default function PublicarDocumento() {
         bank: pay.banco,
         type: pay.tipo_operacion,
         amount_bs: Number(pay.amount_bs || total || 0),
-        mobile_phone: pay.tipo_operacion?.toLowerCase?.() === 'pago móvil' ? pay.mobile_phone : undefined,
+        mobile_phone: pay.tipo_operacion?.toLowerCase?.() === 'pago móvil' ? `${pay.mobile_operator || '0414'}${pay.mobile_phone}` : undefined,
         status: 'Por verificar'
       })
       alert('¡Tu solicitud fue enviada! Está Por verificar.')
@@ -234,6 +234,7 @@ export default function PublicarDocumento() {
               </div>
               <input className="input" placeholder="Tomo" maxLength={3} pattern="^\d{1,3}$" title="Debe ingresar hasta 3 números" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.replace(/\D/g, '') })} />
               <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '') })} />
+              <input className="input" placeholder="Letra" value={f1.letra} onChange={e => setF1({ ...f1, letra: e.target.value })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
               <input className="input" placeholder="Número de expediente" maxLength={12} pattern="^\d{3}-\d{1,8}$" title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
               <input className="input" type="date" placeholder="Fecha" max={new Date().toISOString().split('T')[0]} value={f1.fecha} onChange={e => setF1({ ...f1, fecha: e.target.value })} />
@@ -329,7 +330,16 @@ export default function PublicarDocumento() {
                   <input className="input" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
                   <input className="input" type="number" step="0.01" placeholder="Monto (Bs.)" value={pay.amount_bs} onChange={e => setPay({ ...pay, amount_bs: e.target.value })} />
                   {pay.tipo_operacion === 'pago móvil' && (
-                    <input className="input md:col-span-3" placeholder="Número de teléfono desde donde realizó el pago móvil" value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value })} />
+                    <div className="md:col-span-3 flex gap-2">
+                      <select className="input w-32" value={pay.mobile_operator || '0414'} onChange={e => setPay({ ...pay, mobile_operator: e.target.value })}>
+                        <option>0414</option>
+                        <option>0424</option>
+                        <option>0412</option>
+                        <option>0416</option>
+                        <option>0426</option>
+                      </select>
+                      <input className="input flex-1" placeholder="Número de teléfono desde donde realizó el pago móvil" maxLength={7} value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '').slice(0, 7) })} />
+                    </div>
                   )}
                 </div>
                 <label className="mt-3 flex items-start gap-2 text-sm">

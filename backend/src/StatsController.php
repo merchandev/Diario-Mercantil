@@ -8,13 +8,14 @@ class StatsController {
     $pdo = Database::pdo();
     $pubs = (int)$pdo->query('SELECT COUNT(*) FROM legal_requests')->fetchColumn();
     $ed = (int)$pdo->query('SELECT COUNT(*) FROM editions')->fetchColumn();
+    $ed_pub = (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE status='Publicada'")->fetchColumn();
     $usersActive = 0;
     try {
       $usersActive = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE COALESCE(status,'active')='active'")->fetchColumn();
     } catch (Throwable $e) {
       $usersActive = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
     }
-    Response::json(['publications'=>$pubs,'editions'=>$ed,'users_active'=>$usersActive]);
+    Response::json(['publications'=>$pubs,'editions'=>$ed,'editions_published'=>$ed_pub,'users_active'=>$usersActive]);
   }
   public function clear(){
     // Only admins can clear
@@ -36,3 +37,4 @@ class StatsController {
     $this->get();
   }
 }
+

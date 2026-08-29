@@ -16,6 +16,7 @@ export default function Publicaciones() {
   const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('Todos')
+  const [editionCode, setEditionCode] = useState('')
   const [reqFrom, setReqFrom] = useState('')
   const [reqTo, setReqTo] = useState('')
   const [pubFrom, setPubFrom] = useState('')
@@ -34,6 +35,7 @@ export default function Publicaciones() {
     const filters = {
       q,
       status: status === 'Todos' ? '' : mapFilterStatus(status),
+      edition_code: editionCode || undefined,
       req_from: reqFrom || undefined,
       req_to: reqTo || undefined,
       pub_from: pubFrom || undefined,
@@ -62,7 +64,7 @@ export default function Publicaciones() {
     const t = setTimeout(() => { reload() }, 400)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, status, reqFrom, reqTo, pubFrom, pubTo])
+  }, [q, status, editionCode, reqFrom, reqTo, pubFrom, pubTo])
   // Initialize from URL params (?q=...&auto=1)
   useEffect(() => {
     const sp = new URLSearchParams(location.search)
@@ -133,7 +135,7 @@ export default function Publicaciones() {
           <strong>Error:</strong> {error}
         </div>
       )}
-      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="card p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="relative">
           <span className="absolute inset-y-0 left-3 grid place-items-center text-slate-400 w-5"><IconSearch /></span>
           <input className="input pl-9 w-full" placeholder="Buscador..." value={q} onChange={e => setQ(e.target.value)} />
@@ -141,6 +143,9 @@ export default function Publicaciones() {
         <select className="input w-full" value={status} onChange={e => setStatus(e.target.value)}>
           {estOpts.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
+        <div className="flex flex-col gap-1">
+          <input className="input w-full" placeholder="Cód. Edición (ej: 0001)" value={editionCode} onChange={e => setEditionCode(e.target.value)} />
+        </div>
         <div className="flex flex-col gap-1">
           <span className="text-xs text-slate-500 font-medium">Solicitud desde</span>
           <input className="input w-full" type="date" value={reqFrom} onChange={e => setReqFrom(e.target.value)} />
@@ -157,7 +162,7 @@ export default function Publicaciones() {
           <span className="text-xs text-slate-500 font-medium">Publicación hasta</span>
           <input className="input w-full" type="date" value={pubTo} onChange={e => setPubTo(e.target.value)} />
         </div>
-        <div className="sm:col-span-2 lg:col-span-4 flex gap-2 mt-2">
+        <div className="sm:col-span-2 lg:col-span-5 flex gap-2 mt-2">
           <button className="btn btn-primary w-full sm:w-auto inline-flex items-center justify-center gap-2" onClick={reload} disabled={loading}>
             {loading ? <span className="animate-spin">⏳</span> : <IconSearch />}
             <span>{loading ? 'Cargando...' : 'Filtrar'}</span>
@@ -185,6 +190,7 @@ export default function Publicaciones() {
                 <th className="text-left px-4 py-2">Tipo de publicación</th>
                 <th className="text-left px-4 py-2">Razón social</th>
                 <th className="text-left px-4 py-2">Estado</th>
+                <th className="text-left px-4 py-2">Edición</th>
                 <th className="text-left px-4 py-2">Fecha de Verificación</th>
                 <th className="text-left px-4 py-2">Fecha de publicación</th>
                 <th className="text-right px-4 py-2">Acciones</th>
@@ -198,6 +204,7 @@ export default function Publicaciones() {
                   <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
                   <td className="px-4 py-2">{razonSocial(r)}</td>
                   <td className="px-4 py-2">{prettyStatus(r.status)}</td>
+                  <td className="px-4 py-2 font-mono text-slate-600">{(r as any).edition_code || '-'}</td>
                   <td className="px-4 py-2">{prettyDate(r.verification_date)}</td>
                   <td className="px-4 py-2">{prettyDate(r.publish_date)}</td>
                   <td className="px-4 py-2 text-right">

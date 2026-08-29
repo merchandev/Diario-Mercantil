@@ -227,7 +227,7 @@ export default function PublicacionDetalle() {
         </div>
         <div className="flex gap-2">
           {item.status === 'Publicada' && (
-            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: `${window.location.origin}/ediciones/${item.order_no || item.id}`, title: `Publicación ${item.order_no || item.id}` })}>
+            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: item.edition_code ? `${window.location.origin}/edicion/${item.edition_code}` : '', title: `Publicación ${item.order_no || item.id}` })}>
               <IconQrCode /> Código QR
             </button>
           )}

@@ -66,17 +66,17 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT * FROM legal_requests WHERE deleted_at IS NULL";
+    $sql = "SELECT l.* FROM legal_requests l WHERE l.deleted_at IS NULL";
     $params = [];
     
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
-        $sql .= " AND user_id = ?";
+        $sql .= " AND l.user_id = ?";
         $params[] = $uid;
     }
 
     $q = $_GET['q'] ?? '';
     if ($q !== '') {
-        $sql .= " AND (name LIKE ? OR order_no LIKE ? OR document LIKE ? OR id = ?)";
+        $sql .= " AND (l.name LIKE ? OR l.order_no LIKE ? OR l.document LIKE ? OR l.id = ?)";
         $params[] = "%$q%";
         $params[] = "%$q%";
         $params[] = "%$q%";
@@ -85,25 +85,59 @@ class LegalController {
 
     $status = $_GET['status'] ?? '';
     if ($status !== '') {
-        $sql .= " AND status = ?";
+        $sql .= " AND l.status = ?";
         $params[] = $status;
     }
-
-    $sql .= " ORDER BY id DESC LIMIT 500";
     
+    $editionCode = $_GET['edition_code'] ?? '';
+    if ($editionCode !== '') {
+        $sql .= " AND l.edition_code = ?";
+        $params[] = $editionCode;
+    }
+    
+    $reqFrom = $_GET['req_from'] ?? '';
+    if ($reqFrom !== '') {
+        $sql .= " AND l.created_at >= ?";
+        $params[] = $reqFrom . ' 00:00:00';
+    }
+    $reqTo = $_GET['req_to'] ?? '';
+    if ($reqTo !== '') {
+        $sql .= " AND l.created_at <= ?";
+        $params[] = $reqTo . ' 23:59:59';
+    }
+    
+    $pubFrom = $_GET['pub_from'] ?? '';
+    if ($pubFrom !== '') {
+        $sql .= " AND l.publish_date >= ?";
+        $params[] = $pubFrom . ' 00:00:00';
+    }
+    $pubTo = $_GET['pub_to'] ?? '';
+    if ($pubTo !== '') {
+        $sql .= " AND l.publish_date <= ?";
+        $params[] = $pubTo . ' 23:59:59';
+    }
+    
+    $sql .= " ORDER BY l.id DESC LIMIT 500";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    Response::json(['items' => $items]);
+    Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
+
 
   public function get($id){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
+    $s = $pdo->prepare('SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id = l.id LEFT JOIN editions e ON e.id = eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL'); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
+    
+    if (!empty($r['edition_file_id']) && !empty($r['edition_code'])) {
+        $r['edition_file_url'] = '/api/e/code/' . urlencode((string)$r['edition_code']) . '/download';
+    } else {
+        $r['edition_file_url'] = null;
+    }
+    unset($r['edition_file_id']);
     
     $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY date DESC'); $p->execute([$id]);
     $pay = $p->fetchAll(PDO::FETCH_ASSOC);
@@ -173,6 +207,12 @@ class LegalController {
         if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
             return Response::json(['error'=>'El tomo debe ser solo nÃºmeros (mÃ¡x 3)'], 400);
         }
+        if (!empty($m['tipo_registrador']) && !in_array(strtoupper($m['tipo_registrador']), ['TITULAR', 'SUPLENTE', 'AUXILIAR'])) {
+            return Response::json(['error'=>'Tipo de registrador inválido (TITULAR, SUPLENTE, AUXILIAR)'], 400);
+        }
+        if (!empty($m['letra']) && !preg_match('/^[A-E]$/i', $m['letra'])) {
+            return Response::json(['error'=>'La letra del tomo debe estar entre A y E'], 400);
+        }
         if (!empty($m['fecha_registro']) && strtotime($m['fecha_registro']) > time()) {
             return Response::json(['error'=>'La fecha de registro no puede ser futura'], 400);
         }
@@ -225,20 +265,34 @@ class LegalController {
      }
   }
 
-  public function returnToDraft($id){
-     $u = AuthController::requireAuth();
-     $this->requireAdmin($u);
-     $this->ensureMutable($id);
-     $pdo = Database::pdo();
-     
-     $machine = new LegalRequestStateMachine($pdo);
-     try {
-         $machine->returnToDraft($id);
-         Response::json(['ok'=>true]);
-     } catch (Exception $e) {
-         Response::json(['error'=>$e->getMessage()], 400);
-     }
-  }
+    public function returnToDraft($id){
+       $u = AuthController::requireAuth();
+       $this->requireAdmin($u);
+       $this->ensureMutable($id);
+       $pdo = Database::pdo();
+       
+       $machine = new LegalRequestStateMachine($pdo);
+       try {
+           $machine->returnToDraft($id);
+           Response::json(['ok'=>true]);
+       } catch (Exception $e) {
+           Response::json(['error'=>$e->getMessage()], 400);
+       }
+    }
+
+    public function unpublish($id){
+       $u = AuthController::requireAuth();
+       $this->requireAdmin($u);
+       $pdo = Database::pdo();
+       
+       $machine = new LegalRequestStateMachine($pdo);
+       try {
+           $machine->unpublish($id);
+           Response::json(['ok'=>true]);
+       } catch (Exception $e) {
+           Response::json(['error'=>$e->getMessage()], 400);
+       }
+    }
 
   public function reject($id){
      $u = AuthController::requireAuth();
@@ -339,7 +393,7 @@ class LegalController {
           $hash = hash('sha256', json_encode($in));
           $cached = IdempotencyService::check($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash);
           if ($cached) {
-              http_response_code($cached['status']);
+              http_responsedition_code($cached['status']);
               Response::json($cached['body']);
               return;
           }
@@ -366,8 +420,8 @@ class LegalController {
               throw new Exception('Solicitud no encontrada', 404);
           }
 
-          if (!in_array($req['status'], ['Borrador', 'Por verificar'])) {
-              throw new Exception('Solo se pueden agregar pagos en Borrador o Por verificar', 403);
+          if (!in_array($req['status'], ['Borrador', 'Por verificar', 'En trámite'])) {
+              throw new Exception('Solo se pueden agregar pagos en Borrador, Por verificar o En trámite', 403);
           }
 
           if (!is_numeric($req['total_bs']) || (float)$req['total_bs'] <= 0) {
@@ -375,31 +429,23 @@ class LegalController {
           }
 
           $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
-          $officialAmount = (float)$req['total_bs'];
+          if (($in['type'] ?? '') !== 'pago_movil') {
+              throw new Exception('Solo se aceptan pagos por Pago Móvil', 400);
+          }
+          if (empty($mobile_phone) || !preg_match('/^04(12|14|16|22|24|26)\d{7}$/', $mobile_phone)) {
+              throw new Exception('El teléfono móvil es inválido para Pago Móvil', 400);
+          }
+          $paymentAmount = isset($in['amount_bs']) ? (float)$in['amount_bs'] : (float)$req['total_bs'];
           
-          $upsert = "
-            INSERT INTO legal_payments(legal_request_id, ref, date, bank, type, amount_bs, status, mobile_phone, created_at)
+          $stmt = $pdo->prepare("
+            INSERT INTO legal_payments (legal_request_id, ref, date, bank, type, amount_bs, status, mobile_phone, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'Por verificar', ?, NOW())
-            ON DUPLICATE KEY UPDATE
-                ref = VALUES(ref),
-                date = VALUES(date),
-                bank = VALUES(bank),
-                type = VALUES(type),
-                mobile_phone = VALUES(mobile_phone),
-                amount_bs = VALUES(amount_bs),
-                status = IF(legal_payments.status = 'Aprobado', legal_payments.status, 'Por verificar')
-          ";
-          $pdo->prepare($upsert)->execute([
-              $id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $officialAmount, $mobile_phone
+          ");
+          $stmt->execute([
+              $id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $paymentAmount, $mobile_phone
           ]);
           
           $paymentId = $pdo->lastInsertId();
-          if ($paymentId == 0) {
-              // Si fue un UPDATE sin cambios, lastInsertId puede ser 0
-              $pStmt = $pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id = ?");
-              $pStmt->execute([$id]);
-              $paymentId = $pStmt->fetchColumn();
-          }
 
           // Audit
           $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
@@ -451,7 +497,7 @@ class LegalController {
       $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
       $r = $s->fetch(PDO::FETCH_ASSOC);
       if (!$r) {
-          http_response_code(404);
+          http_responsedition_code(404);
           die('Orden no encontrada');
       }
 
@@ -466,7 +512,7 @@ class LegalController {
       $role = strtolower($u['role'] ?? '');
       if (!RolePolicy::canManageLegalRequests($u)) {
           if ((int)$r['user_id'] !== (int)$u['id']) {
-              http_response_code(403);
+              http_responsedition_code(403);
               die('No tienes acceso a esta orden');
           }
       }
@@ -614,4 +660,6 @@ class LegalController {
       return Response::json(['ok'=>true, 'message'=>'Archivo recuperado exitosamente']);
   }
 }
+
+
 

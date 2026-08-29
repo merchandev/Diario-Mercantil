@@ -49,8 +49,19 @@ class EditionController {
 
   public function publicByCode($code){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' ORDER BY id DESC LIMIT 1");
-    $ed->execute([$code, '%'.$code]);
+    require_once __DIR__.'/AuthController.php';
+    $u = AuthController::userFromToken();
+    $isAdmin = $u && ($u['role'] === 'admin' || $u['role'] === 'superadmin');
+
+    if ($isAdmin) {
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) ORDER BY id DESC LIMIT 1");
+        $ed->execute([$code, '%'.$code]);
+    } else {
+        $today = gmdate('Y-m-d');
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' AND date <= ? ORDER BY id DESC LIMIT 1");
+        $ed->execute([$code, '%'.$code, $today]);
+    }
+    
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
     $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
@@ -71,11 +82,12 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) { http_response_code(404); echo 'Not found'; return; }
 
-    if ($edition['status'] !== 'Publicada') {
+    $today = gmdate('Y-m-d');
+    if ($edition['status'] !== 'Publicada' || $edition['date'] > $today) {
         require_once __DIR__.'/AuthController.php';
         $u = AuthController::userFromToken();
         if (!$u || ($u['role'] !== 'admin' && $u['role'] !== 'superadmin')) {
-            http_response_code(403); echo 'Acceso denegado'; return;
+            http_response_code(403); echo 'Acceso denegado (edición futura o no publicada)'; return;
         }
     }
 
@@ -104,8 +116,9 @@ class EditionController {
 
   public function downloadByCode($code){
     $pdo = Database::pdo();
-    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada'");
-    $ed->execute([$code]);
+    $today = gmdate('Y-m-d');
+    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada' AND date <= ?");
+    $ed->execute([$code, $today]);
     $id = (int)($ed->fetchColumn() ?: 0);
     if (!$id) { http_response_code(404); echo 'Not found'; return; }
     return $this->downloadById($id);
@@ -114,12 +127,100 @@ class EditionController {
   public function list(){
     $this->requireAdmin();
     $pdo = Database::pdo();
-    $stmt = $pdo->query('SELECT * FROM editions ORDER BY id DESC LIMIT 200');
+    $stmt = $pdo->query('
+        SELECT e.*, u.name as published_by_name 
+        FROM editions e 
+        LEFT JOIN users u ON e.published_by = u.id 
+        ORDER BY e.id DESC LIMIT 200
+    ');
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$row) {
-      $row['file_url'] = $row['file_id'] ? '/api/e/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
     }
     Response::json(['items'=>$items]);
+  }
+
+  public function listPublic(){
+    $pdo = Database::pdo();
+    $today = gmdate('Y-m-d');
+    $q = $_GET['q'] ?? '';
+    $from = $_GET['from'] ?? '';
+    $to = $_GET['to'] ?? '';
+
+    $sql = 'SELECT DISTINCT e.* FROM editions e ';
+    if ($q !== '') {
+        $sql .= 'LEFT JOIN edition_orders eo ON eo.edition_id = e.id ';
+        $sql .= 'LEFT JOIN legal_requests l ON l.id = eo.legal_request_id ';
+    }
+    $sql .= 'WHERE e.status = "Publicada" AND e.date <= ? ';
+    $params = [$today];
+
+    if ($q !== '') {
+        $sql .= 'AND (e.code LIKE ? OR l.name LIKE ? OR JSON_EXTRACT(l.meta, "$.razon_social") LIKE ?) ';
+        $params[] = "%$q%";
+        $params[] = "%$q%";
+        $params[] = "%$q%";
+    }
+
+    if ($from !== '') {
+        $sql .= 'AND e.date >= ? ';
+        $params[] = $from;
+    }
+    if ($to !== '') {
+        $sql .= 'AND e.date <= ? ';
+        $params[] = $to;
+    }
+    
+    $sql .= 'ORDER BY e.date DESC, e.id DESC LIMIT 50';
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$row) {
+      $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+    }
+    Response::json(['items'=>$items]);
+  }
+
+  public function exportCsv($id) {
+    $this->requireAdmin();
+    $pdo = Database::pdo();
+    
+    $edStmt = $pdo->prepare('SELECT code, date FROM editions WHERE id=?');
+    $edStmt->execute([$id]);
+    $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$edition) {
+        http_response_code(404);
+        echo "Edition not found";
+        return;
+    }
+    
+    $stmt = $pdo->prepare("SELECT l.order_no, l.name, u.name as applicant_name, u.email, l.status, l.total_bs FROM edition_orders eo JOIN legal_requests l ON eo.legal_request_id = l.id JOIN users u ON l.user_id = u.id WHERE eo.edition_id=? ORDER BY l.id");
+    $stmt->execute([$id]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    $filename = "Edicion_" . ($edition['code'] ?: $id) . ".csv";
+    
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    
+    $output = fopen('php://output', 'w');
+    // Add BOM for Excel UTF-8 support
+    fputs($output, "\xEF\xBB\xBF");
+    fputcsv($output, ['N° Orden', 'Razón / Denominación', 'Solicitante', 'Correo', 'Estado', 'Monto (Bs)']);
+    
+    foreach ($items as $row) {
+        fputcsv($output, [
+            $row['order_no'],
+            $row['name'],
+            $row['applicant_name'],
+            $row['email'],
+            $row['status'],
+            $row['total_bs']
+        ]);
+    }
+    fclose($output);
   }
 
   public function get($id){
@@ -129,10 +230,39 @@ class EditionController {
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
-    $edition['file_url'] = $edition['file_id'] ? '/api/e/'.urlencode((string)$edition['code']).'/download' : null;
-    $ord = $pdo->prepare('SELECT l.id, l.name, l.document, l.status, l.date FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id');
+    $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    $ord = $pdo->prepare('SELECT l.id, l.name, l.document, l.status, l.date, l.meta FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id');
     $ord->execute([$id]);
-    Response::json(['edition'=>$edition,'orders'=>$ord->fetchAll(PDO::FETCH_ASSOC)]);
+    $orders = $ord->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($orders as &$order) {
+        if (!empty($order['meta'])) {
+            $meta = json_decode($order['meta'], true) ?: [];
+            $order['company_name'] = $meta['razon_social'] ?? $meta['razon_denominacion_social'] ?? $order['name'];
+        } else {
+            $order['company_name'] = $order['name'];
+        }
+        unset($order['meta']);
+    }
+    Response::json(['edition'=>$edition, 'orders'=>$orders]);
+  }
+
+  private function generateCode($date, $edition_no) {
+      $year = (int) substr($date, 0, 4);
+      if ($year >= 2026) {
+          $map = ['M' => 1000, 'CM' => 900, 'D' => 500, 'CD' => 400, 'C' => 100, 'XC' => 90, 'L' => 50, 'XL' => 40, 'X' => 10, 'IX' => 9, 'V' => 5, 'IV' => 4, 'I' => 1];
+          $res = '';
+          $num = $year;
+          foreach ($map as $roman => $int) {
+              while ($num >= $int) {
+                  $res .= $roman;
+                  $num -= $int;
+              }
+          }
+          return $res . '-' . str_pad((string)$edition_no, 4, '0', STR_PAD_LEFT);
+      }
+      $dateObj = new DateTime($date);
+      $dateStrNum = $dateObj->format('dmY');
+      return "DMV-{$edition_no}{$dateStrNum}";
   }
 
   public function create(){
@@ -142,20 +272,39 @@ class EditionController {
     
     $status = 'Borrador';
     $date = trim($input['date'] ?? gmdate('Y-m-d'));
-    $edition_no = (int)($input['edition_no'] ?? 1);
+    $code = ''; // Generated below
     $orders = $input['orders'] ?? [];
     if (!is_array($orders)) $orders = [];
-
-    $dateObj = new DateTime($date);
-    $dateStrNum = $dateObj->format('dmY');
-    $code = "DMV-{$edition_no}{$dateStrNum}";
 
     $now = gmdate('c');
     
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare('INSERT INTO editions(code,status,date,edition_no,orders_count,created_at) VALUES(?,?,?,?,?,?)');
-        $stmt->execute([$code, $status, $date, $edition_no, 0, $now]);
+        $year = (int)substr($date, 0, 4);
+        
+        $lockName = 'diario_edition_counter_' . $year;
+        $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        if (!$isSqlite) {
+            $lock = $pdo->prepare('SELECT GET_LOCK(?, 10)');
+            $lock->execute([$lockName]);
+            if ((int)$lock->fetchColumn() !== 1) {
+                throw new RuntimeException('No se pudo bloquear el correlativo');
+            }
+        }
+
+        try {
+            $q = $pdo->prepare('SELECT MAX(edition_no) FROM editions WHERE publication_year = ?');
+            $q->execute([$year]);
+            $edition_no = ((int)$q->fetchColumn()) + 1;
+            
+            $code = $this->generateCode($date, $edition_no);
+
+            $stmt = $pdo->prepare('INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year) VALUES(?,?,?,?,?,?,?)');
+            $stmt->execute([$code, $status, $date, $edition_no, 0, $now, $year]);
+        } finally {
+            $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+            $release->execute([$lockName]);
+        }
         $editionId = (int)$pdo->lastInsertId();
 
         $orderService = new EditionOrderService($pdo);
@@ -265,14 +414,14 @@ class EditionController {
       $limit = (int)($in['limit'] ?? 100);
       
       try {
-          $s = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND id NOT IN (SELECT order_id FROM edition_orders) ORDER BY created_at ASC LIMIT " . max(1, $limit));
+          $s = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND id NOT IN (SELECT legal_request_id FROM edition_orders) ORDER BY created_at ASC LIMIT " . max(1, $limit));
           $s->execute();
           $ids = $s->fetchAll(PDO::FETCH_COLUMN);
           
           $cnt = 0;
           if (!empty($ids)) {
               // We should get existing orders and append these new ones
-              $exStmt = $pdo->prepare("SELECT order_id FROM edition_orders WHERE edition_id=?");
+              $exStmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
               $exStmt->execute([$id]);
               $existingIds = $exStmt->fetchAll(PDO::FETCH_COLUMN);
               
@@ -291,23 +440,76 @@ class EditionController {
       }
   }
   
-  public function publish($id){
-    $u = $this->requireAdmin();
-    $pdo = Database::pdo();
-    
-    require_once __DIR__ . '/Services/EditionPublicationService.php';
-    $service = new EditionPublicationService($pdo);
-    
-    try {
-        $service->publish($id, $u['id']);
-        Response::json(['ok'=>true]);
-    } catch (RuntimeException $e) {
-        $code = $e->getCode() ?: 500;
-        Response::json(['error'=>$e->getMessage()], $code);
-    } catch (Throwable $e) {
-        Response::json(['error'=>$e->getMessage()], 500);
+    public function publish($id){
+      $u = $this->requireAdmin();
+      $pdo = Database::pdo();
+      
+      require_once __DIR__ . '/Services/EditionPublicationService.php';
+      $service = new EditionPublicationService($pdo);
+      
+      // We will stream the progress back as SSE (Server-Sent Events)
+      // or JSON streaming if preferred. We'll use SSE.
+      header('Content-Type: text/event-stream');
+      header('Cache-Control: no-cache');
+      header('Connection: keep-alive');
+
+      try {
+          $service->publish($id, $u['id'], function($done, $total, $msg) {
+              $progress = $total > 0 ? floor(($done / $total) * 100) : 100;
+              echo "data: " . json_encode(['progress' => $progress, 'msg' => $msg]) . "\n\n";
+              if (ob_get_level() > 0) ob_flush();
+              flush();
+          });
+          echo "data: " . json_encode(['ok' => true]) . "\n\n";
+      } catch (RuntimeException $e) {
+          $code = $e->getCode() ?: 500;
+          echo "data: " . json_encode(['error' => $e->getMessage()]) . "\n\n";
+      } catch (Throwable $e) {
+          echo "data: " . json_encode(['error' => $e->getMessage()]) . "\n\n";
+      }
+      die();
     }
-  }
+
+    public function notify($id) {
+        $u = $this->requireAdmin();
+        $pdo = Database::pdo();
+        
+        $edStmt = $pdo->prepare('SELECT code, status FROM editions WHERE id=?');
+        $edStmt->execute([$id]);
+        $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$edition || $edition['status'] !== 'Publicada') {
+            return Response::json(['error' => 'Edición no encontrada o no publicada'], 400);
+        }
+        
+        $stmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
+        $stmt->execute([$id]);
+        $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if (count($orderIds) === 0) {
+            return Response::json(['error' => 'No hay publicaciones en esta edición'], 400);
+        }
+        
+        $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
+        $ownersStmt = $pdo->prepare("SELECT u.email, u.name, l.order_no FROM legal_requests l JOIN users u ON l.user_id = u.id WHERE l.id IN ($inQuery)");
+        $ownersStmt->execute($orderIds);
+        $owners = $ownersStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        require_once __DIR__ . '/Services/EmailService.php';
+        $sentCount = 0;
+        foreach ($owners as $owner) {
+            if ($owner['email']) {
+                try {
+                    EmailService::sendPublished($owner['email'], $owner['name'], $owner['order_no'] ?? 'N/A', $edition['code']);
+                    $sentCount++;
+                } catch (Throwable $e) {
+                    error_log("Failed to send published email to {$owner['email']}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        Response::json(['ok' => true, 'sent' => $sentCount]);
+    }
 
   public function uploadPdf($id){
     $u = $this->requireAdmin();
@@ -384,3 +586,4 @@ class EditionController {
     }
   }
 }
+
