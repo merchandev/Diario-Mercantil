@@ -42,6 +42,7 @@ require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
 require_once __DIR__."/../src/MetricsController.php";
 require_once __DIR__."/../src/UploadController.php";
+require_once __DIR__."/../src/DirectoryController.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
 
@@ -103,6 +104,8 @@ $router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $
 $router->delete('/api/legal/{id}/files/{fid}', [LegalController::class, 'detachFile'], $csrf);
 $router->post('/api/admin/legal/{id}/files/{fid}/repair', [LegalController::class, 'repairPdf'], $adminCsrf);
 $router->post('/api/legal/{id}/payments', [LegalController::class, 'addPayment'], $csrf);
+$router->post('/api/legal/{id}/payments/{paymentId}/verify', [LegalController::class, 'verifyPayment'], $adminCsrf);
+$router->post('/api/legal/{id}/payments/{paymentId}/reject', [LegalController::class, 'rejectPayment'], $adminCsrf);
 $router->delete('/api/legal/{id}/payments/{pid}', [LegalController::class, 'deletePayment'], $csrf);
 $router->get('/api/legal/public/check', [LegalController::class, 'getPublic']);
 $router->get('/api/legal/public/{id}', [LegalController::class, 'getPublic']);
@@ -119,6 +122,7 @@ $router->delete('/api/files/{id}', [FileController::class, 'softDelete'], $admin
 $router->post('/api/files/{id}/retry', [FileController::class, 'retry'], $adminCsrf);
 $router->get('/api/files', [FileController::class, 'list'], $admin);
 $router->post('/api/files', [UploadController::class, 'upload'], $csrf);
+$router->get('/api/events', [FileController::class, 'sse'], $auth);
 
 // EDITIONS
 $router->get('/api/editions', [EditionController::class, 'list'], $admin);
@@ -151,22 +155,33 @@ $router->delete('/api/payments/{id}', [PaymentController::class, 'delete'], $adm
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
 $router->get('/api/public/editions', [EditionController::class, 'listPublic']);
-$router->get('/api/public/pages', [SystemController::class, 'listPagesPublic']);
+$router->get('/api/public/pages', [PagesController::class, 'publicList']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
-$router->get('/api/publications', [SystemController::class, 'listPages'], $admin);
-$router->get('/api/publications/{id}', [SystemController::class, 'getPage'], $admin);
-$router->post('/api/publications', [SystemController::class, 'createPage'], $adminCsrf);
-$router->put('/api/publications/{id}', [SystemController::class, 'updatePage'], $adminCsrf);
-$router->delete('/api/publications/{id}', [SystemController::class, 'deletePage'], $adminCsrf);
-$router->get('/api/directory/profile', [SystemController::class, 'getDirectoryProfile']);
+$router->get('/api/pages', [PagesController::class, 'list'], $admin);
+$router->post('/api/pages', [PagesController::class, 'create'], $adminCsrf);
+$router->get('/api/pages/{id}', [PagesController::class, 'get'], $admin);
+$router->put('/api/pages/{id}', [PagesController::class, 'update'], $adminCsrf);
+$router->delete('/api/pages/{id}', [PagesController::class, 'delete'], $adminCsrf);
 
-// STUBS
-class StubController {
-    public function emptyList() { Response::json(['items'=>[]]); }
-}
-$router->get('/api/directory/areas', [StubController::class, 'emptyList']);
-$router->get('/api/directory/colleges', [StubController::class, 'emptyList']);
+// Alias temporal para clientes CMS anteriores.
+$router->get('/api/publications', [PagesController::class, 'list'], $admin);
+$router->get('/api/publications/{id}', [PagesController::class, 'get'], $admin);
+$router->post('/api/publications', [PagesController::class, 'create'], $adminCsrf);
+$router->put('/api/publications/{id}', [PagesController::class, 'update'], $adminCsrf);
+$router->delete('/api/publications/{id}', [PagesController::class, 'delete'], $adminCsrf);
+
+$router->get('/api/directory/profile', [DirectoryController::class, 'getProfile'], $auth);
+$router->post('/api/directory/profile', [DirectoryController::class, 'saveProfile'], $csrf);
+$router->post('/api/directory/profile/photo', [DirectoryController::class, 'setPhoto'], $csrf);
+$router->get('/api/directory/areas', [DirectoryController::class, 'listAreas'], $admin);
+$router->post('/api/directory/areas', [DirectoryController::class, 'createArea'], $adminCsrf);
+$router->put('/api/directory/areas/{id}', [DirectoryController::class, 'updateArea'], $adminCsrf);
+$router->delete('/api/directory/areas/{id}', [DirectoryController::class, 'deleteArea'], $adminCsrf);
+$router->get('/api/directory/colleges', [DirectoryController::class, 'listColleges'], $admin);
+$router->post('/api/directory/colleges', [DirectoryController::class, 'createCollege'], $adminCsrf);
+$router->put('/api/directory/colleges/{id}', [DirectoryController::class, 'updateCollege'], $adminCsrf);
+$router->delete('/api/directory/colleges/{id}', [DirectoryController::class, 'deleteCollege'], $adminCsrf);
 
 // HEALTH
 $router->get('/api/health/live', [HealthController::class, 'live']);
@@ -198,5 +213,3 @@ try {
     error_log((string)$e);
     Response::json(['error' => 'server_error', 'message' => 'Error interno del servidor'], 500);
 }
-
-

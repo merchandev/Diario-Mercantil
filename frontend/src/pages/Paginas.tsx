@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageBlock, PageDetail, PageRow, createPage, deletePage, getPage, listPages, updatePage } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 function BlockEditor({ block, onChange, onRemove, onMove }: { block: PageBlock; onChange: (b: PageBlock) => void; onRemove: () => void; onMove: (dir: -1 | 1) => void }) {
   if (block.type === 'heading') {
@@ -69,13 +70,14 @@ function BlocksPreview({ blocks }: { blocks: PageBlock[] }) {
         if (b.type === 'paragraph') {
           return <p key={b.id} className={{ left: 'text-left', center: 'text-center', right: 'text-right' }[b.props.align]}>{b.props.text}</p>
         }
-        return <img key={b.id} src={(b as any).props.url} alt={(b as any).props.alt || ''} className="max-w-full rounded" />
+        return (b as any).props.url ? <img key={b.id} src={(b as any).props.url} alt={(b as any).props.alt || ''} className="max-w-full rounded" /> : null
       })}
     </div>
   )
 }
 
 export default function Paginas() {
+  const { showAlert, confirmAction } = useDialog()
   const [rows, setRows] = useState<PageRow[]>([])
   const [selId, setSelId] = useState<number | undefined>()
   const [item, setItem] = useState<PageDetail | undefined>()
@@ -108,15 +110,15 @@ export default function Paginas() {
     try {
       await updatePage(item.id, { title: item.title, slug: item.slug, header_html: item.header_html || '', footer_html: item.footer_html || '', status: item.status, body_blocks: item.body_blocks })
       reload()
-      alert('Guardado')
+      await showAlert('Página guardada.', { title: 'Guardado' })
     } catch (e: any) {
       const msg = (e?.message || '').includes('slug_reserved') ? 'El slug "contacto" está reservado. Usa otro slug.' : 'Error al guardar'
-      alert(msg)
+      void showAlert(msg, { title: 'Error' })
     } finally { setLoading(false) }
   }
 
   const remove = async (id: number) => {
-    if (!confirm('¿Eliminar esta página?')) return
+    if (!(await confirmAction('¿Eliminar esta página?', { title: 'Eliminar página', danger: true }))) return
     await deletePage(id)
     setItem(undefined); setSelId(undefined); reload()
   }
@@ -126,7 +128,7 @@ export default function Paginas() {
     const id = Math.random().toString(36).slice(2, 10)
     const def: any = type === 'heading' ? { id, type, props: { text: 'Título', level: 2, align: 'left' } }
       : type === 'paragraph' ? { id, type, props: { text: 'Texto del párrafo', align: 'left' } }
-        : { id, type, props: { url: 'https://via.placeholder.com/800x400?text=Imagen', alt: '' } }
+        : { id, type, props: { url: '', alt: '' } }
     setItem({ ...item, body_blocks: [...(item.body_blocks || []), def] })
   }
 

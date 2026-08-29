@@ -33,9 +33,6 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   
   const res = await fetch(url, reqInit)
   if (res.status === 401 && !noRedirect) {
-      try { localStorage.removeItem('token'); } catch { }
-      try { localStorage.removeItem('superadmin_token'); } catch { }
-      try { sessionStorage.removeItem('token'); } catch { }
       if (typeof window !== 'undefined') {
         window.location.href = window.location.pathname.startsWith('/lotus/') ? '/lotus/' : '/login'
       }
@@ -125,7 +122,7 @@ export async function me() {
 }
 
 export async function logout() {
-  const res = await fetchAuth('/api/auth/logout', { method: 'POST' })
+  const res = await fetchAuth('/api/auth/logout', { method: 'POST' }, true)
   return res.json()
 }
 
@@ -415,6 +412,14 @@ export async function getLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}`)
   return res.json() as Promise<{ item: LegalRequest; payments: LegalPayment[] }>
 }
+export async function getPublicLegalByOrder(orderNo: string) {
+  const res = await fetch(getUrl(`/api/legal/public/${encodeURIComponent(orderNo)}`), { credentials: 'include' })
+  if (!res.ok) {
+    throw new ApiError('Publicación no disponible.', res.status)
+  }
+  const data = await res.json() as { item: { edition_code?: string } }
+  return data.item
+}
 export async function updateLegal(id: number, body: Partial<LegalRequest>) {
   const res = await fetchAuth(`/api/legal/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
@@ -445,7 +450,15 @@ export async function addLegalPayment(id: number, body: Partial<LegalPayment>, i
     headers['Idempotency-Key'] = idempotencyKey
   }
   const res = await fetchAuth(`/api/legal/${id}/payments`, { method: 'POST', headers, body: JSON.stringify(body) })
-  return res.json() as Promise<{ ok: true; payment_id: number }>
+  return res.json() as Promise<{ ok: true; payment_id: number; remaining_bs: number }>
+}
+export async function verifyLegalPayment(requestId: number, paymentId: number) {
+  const res = await fetchAuth(`/api/legal/${requestId}/payments/${paymentId}/verify`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; payment: LegalPayment }>
+}
+export async function rejectLegalPayment(requestId: number, paymentId: number) {
+  const res = await fetchAuth(`/api/legal/${requestId}/payments/${paymentId}/reject`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; payment: LegalPayment }>
 }
 export async function deleteLegalPayment(id: number, paymentId: number) {
   const res = await fetchAuth(`/api/legal/${id}/payments/${paymentId}`, { method: 'DELETE' })
@@ -696,5 +709,3 @@ export async function listPagesPublic() {
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ items: { slug: string; title: string }[] }>
 }
-
-
