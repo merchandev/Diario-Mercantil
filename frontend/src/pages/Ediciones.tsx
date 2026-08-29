@@ -6,8 +6,10 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import AlertDialog from '../components/AlertDialog'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import FlipbookViewer from '../components/FlipbookViewer'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Ediciones() {
+  const { confirmAction } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
   const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
@@ -323,24 +325,26 @@ export default function Ediciones() {
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Fecha de la Edición</span>
-                                <input className="input w-full" type="date" value={detail.edition.date} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
+                                <input className="input w-full" type="date" value={detail.edition.date} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Estado</span>
-                                <select className="input w-full" value={detail.edition.status} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, status: e.target.value } })}>
-                                  {['Publicada', 'Archivada'].map(s => <option key={s} value={s}>{s}</option>)}
+                                <select className="input w-full" value={detail.edition.status} disabled>
+                                  <option value={detail.edition.status}>{detail.edition.status}</option>
                                 </select>
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Numero de edicion</span>
-                                <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
+                                <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
                               </label>
                             </div>
 
                             <div className="flex flex-wrap gap-2 border-t pt-4">
-                              <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Cambios guardados', variant: 'success' }) }}>
-                                <IconSave className="w-4 h-4" /> <span>Guardar cambios</span>
-                              </button>
+                              {detail.edition.status !== 'Publicada' && (
+                                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Cambios guardados', variant: 'success' }) }}>
+                                  <IconSave className="w-4 h-4" /> <span>Guardar cambios</span>
+                                </button>
+                              )}
                               
                               {detail.edition.status === 'Publicada' && (
                                 <button className="btn btn-outline border-brand-200 text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2" onClick={async () => {
@@ -362,8 +366,7 @@ export default function Ediciones() {
                               )}
 
                               <button className="btn btn-outline border-slate-300 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-2" onClick={() => {
-                                const token = localStorage.getItem('token')
-                                window.open(`/api/editions/${selId}/export?token=${token}`, '_blank')
+                                window.open(`/api/editions/${selId}/export`, '_blank')
                               }}>
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -445,7 +448,7 @@ export default function Ediciones() {
                                         </div>
                                         {detail.edition.status === 'Borrador' && (
                                         <button className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors" title="Quitar publicación de esta edición" onClick={async () => {
-                                          if (confirm(`¿Quitar orden #${o.id} de esta edición?`)) {
+                                          if (await confirmAction(`¿Quitar orden #${o.id} de esta edición?`, { title: 'Quitar publicación', danger: true })) {
                                             const newOrders = detail.orders.filter(ord => ord.id !== o.id).map(ord => ord.id);
                                             await setEditionOrders(selId!, newOrders);
                                             const data = await getEdition(selId); setDetail(data);

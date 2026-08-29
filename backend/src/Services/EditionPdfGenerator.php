@@ -12,7 +12,7 @@ class EditionPdfGenerator {
         $this->pdo = $pdo;
     }
 
-    public function generate(int $editionId, array $orderIds, callable $progressCallback = null): string {
+    public function generate(int $editionId, array $orderIds, ?callable $progressCallback = null): string {
         $pdf = new Fpdi();
         $pdf->SetAutoPageBreak(false);
 
@@ -77,4 +77,3 @@ class EditionPdfGenerator {
         return $outputName;
     }
 }
-

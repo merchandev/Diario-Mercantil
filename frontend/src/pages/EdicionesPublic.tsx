@@ -143,6 +143,7 @@ export default function EdicionesPublic() {
                     <tr className="text-left border-b bg-brand-800 text-white">
                       <th className="p-3">Fecha de la Edición</th>
                       <th className="p-3">N° de Edición</th>
+                      <th className="p-3">Razón social</th>
                       <th className="p-3">Código de Verificación (CVE)</th>
                       <th className="p-3">Estado</th>
                       <th className="p-3 text-right">Acciones</th>
@@ -157,6 +158,7 @@ export default function EdicionesPublic() {
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
                           <td className="p-3">{ed.edition_no ? `N° ${ed.edition_no}` : '-'}</td>
+                          <td className="p-3">{ed.company_name || ed.name || '-'}</td>
                           <td className="p-3 font-mono text-xs">{ed.code || '-'}</td>
                           <td className="p-3">
                             <span className={`pill text-xs ${ed.status === 'Publicada' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>

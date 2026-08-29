@@ -9,7 +9,7 @@ class EditionPublicationService {
         $this->pdo = $pdo;
     }
 
-    public function publish(int $id, int $actorId, callable $progressCallback = null): void {
+    public function publish(int $id, int $actorId, ?callable $progressCallback = null): void {
         $now = gmdate('Y-m-d');
         
         $ownsTransaction = !$this->pdo->inTransaction();
@@ -18,8 +18,9 @@ class EditionPublicationService {
         }
         
         try {
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
             // Lock edition
-            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? AND deleted_at IS NULL FOR UPDATE');
+            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause);
             $edStmt->execute([$id]);
             $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -89,7 +90,7 @@ class EditionPublicationService {
             }
             
             $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
-            $statusStmt = $this->pdo->prepare("SELECT id, status, deleted_at FROM legal_requests WHERE id IN ($inQuery) FOR UPDATE");
+            $statusStmt = $this->pdo->prepare("SELECT id, status, deleted_at FROM legal_requests WHERE id IN ($inQuery)" . $lockClause);
             $statusStmt->execute($orderIds);
             $requests = $statusStmt->fetchAll(PDO::FETCH_ASSOC);
             

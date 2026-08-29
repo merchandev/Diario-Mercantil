@@ -147,6 +147,7 @@ class EditionController {
     $q = $_GET['q'] ?? '';
     $from = $_GET['from'] ?? '';
     $to = $_GET['to'] ?? '';
+    $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
 
     $sql = 'SELECT DISTINCT e.* FROM editions e ';
     if ($q !== '') {
@@ -157,8 +158,13 @@ class EditionController {
     $params = [$today];
 
     if ($q !== '') {
-        $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
-        for ($i=0; $i<5; $i++) $params[] = "%$q%";
+        if ($isSqlite) {
+            $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS TEXT) LIKE ? OR l.name LIKE ? OR l.meta LIKE ?) ';
+            for ($i=0; $i<4; $i++) $params[] = "%$q%";
+        } else {
+            $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
+            for ($i=0; $i<5; $i++) $params[] = "%$q%";
+        }
     }
 
     if ($from !== '') {
@@ -175,8 +181,22 @@ class EditionController {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $companyNames = [];
+    if ($items) {
+      $editionIds = array_map(static fn(array $row): int => (int)$row['id'], $items);
+      $in = implode(',', array_fill(0, count($editionIds), '?'));
+      $companiesStmt = $pdo->prepare("SELECT eo.edition_id, l.name, l.meta FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id IN ($in) ORDER BY l.id");
+      $companiesStmt->execute($editionIds);
+      foreach ($companiesStmt->fetchAll(PDO::FETCH_ASSOC) as $company) {
+        $meta = json_decode((string)($company['meta'] ?? ''), true);
+        if (!is_array($meta)) $meta = [];
+        $name = trim((string)($meta['razon_denominacion_social'] ?? $meta['razon_social'] ?? $meta['razon_social_convocatoria'] ?? $company['name'] ?? ''));
+        if ($name !== '') $companyNames[(int)$company['edition_id']][$name] = true;
+      }
+    }
     foreach ($items as &$row) {
       $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+      $row['company_name'] = implode(' · ', array_keys($companyNames[(int)$row['id']] ?? []));
     }
     Response::json(['items'=>$items]);
   }
@@ -413,7 +433,7 @@ class EditionController {
     $pdo = Database::pdo();
     
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
-    $ids = $in['order_ids'] ?? isset($in['orders']) ? ($in['orders'] ?? []) : [];
+    $ids = $in['order_ids'] ?? ($in['orders'] ?? []);
     if (!is_array($ids)) $ids = [];
     
     try {
@@ -460,9 +480,11 @@ class EditionController {
               ->execute([$u['id'], 'auto_select_edition_orders', 'edition', $id]);
               
           Response::json(['ok'=>true, 'count'=>count($ids), 'added'=>$ids]);
-      } catch (Exception $e) {
-          Response::json(['error'=>$e->getMessage()], 500);
-      }
+    } catch (Exception $e) {
+        $code = (int)$e->getCode();
+        if ($code < 400 || $code > 599) $code = 500;
+        Response::json(['error'=>$e->getMessage()], $code);
+    }
   }
   
     public function publish($id){
@@ -539,7 +561,8 @@ class EditionController {
   public function uploadPdf($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT status, code FROM editions WHERE id=? AND deleted_at IS NULL FOR UPDATE');
+    $lockClause = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+    $ed = $pdo->prepare('SELECT status, code FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause);
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
@@ -613,4 +636,3 @@ class EditionController {
     }
   }
 }
-
