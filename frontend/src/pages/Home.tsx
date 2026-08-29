@@ -1,89 +1,146 @@
-import React from 'react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import EditionPromoAside from '../components/EditionPromoAside'
-
-import { useEffect, useState } from 'react';
-import { getSettings } from '../lib/api';
+import { getSettings } from '../lib/api'
+import { IconDocs, IconSearch, IconUserCircle, IconClose } from '../components/icons'
 
 function BannerBox({ settingKey, className }: { settingKey: string; className?: string }) {
-  const [url, setUrl] = useState<string | undefined>();
-  useEffect(() => {
-    getSettings().then(r => {
-      const settings = r.settings as any;
-      if (settings[settingKey]) setUrl(settings[settingKey]);
-    });
-  }, [settingKey]);
+  const [url, setUrl] = useState<string>()
 
-  if (!url) return null;
+  useEffect(() => {
+    getSettings()
+      .then(r => {
+        const value = (r.settings as Record<string, unknown>)[settingKey]
+        if (typeof value === 'string' && value.trim()) setUrl(value)
+      })
+      .catch(() => setUrl(undefined))
+  }, [settingKey])
+
+  if (!url) return null
 
   return (
     <div className={`card overflow-hidden ${className || ''}`}>
-      <img src={url} alt="Banner" className="w-full h-full object-cover" />
+      <img src={url} alt="Promoción del Diario Mercantil" className="w-full h-full object-cover" />
     </div>
   )
 }
-export default function Home() {
-  // eslint-disable-next-line no-console
-  console.log('[Home] Component rendering')
+
+function PromoPopup() {
+  const [url, setUrl] = useState<string>()
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (sessionStorage.getItem('dm_promo_dismissed') === '1') return
+    getSettings()
+      .then(r => {
+        const value = r.settings?.promo_popup
+        if (typeof value === 'string' && value.trim()) {
+          setUrl(value)
+          setOpen(true)
+        }
+      })
+      .catch(() => undefined)
+  }, [])
+
+  if (!open || !url) return null
+
+  const close = () => {
+    sessionStorage.setItem('dm_promo_dismissed', '1')
+    setOpen(false)
+  }
+
   return (
-    <div>
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 md:py-8 grid gap-6 lg:grid-cols-[220px_1fr_300px] items-start">
-        <div className="space-y-6 order-2 lg:order-1">
-          <BannerBox settingKey="banner_sidebar" className="aspect-[9/20]" />
-          
-          
-        </div>
+    <div className="fixed inset-0 z-[80] bg-slate-950/60 backdrop-blur-sm grid place-items-center p-4" role="dialog" aria-modal="true" aria-label="Promoción">
+      <div className="relative max-w-3xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <button type="button" onClick={close} className="absolute right-3 top-3 z-10 w-10 h-10 rounded-full bg-white/95 border border-slate-200 shadow flex items-center justify-center text-slate-700 hover:text-brand-700" aria-label="Cerrar promoción">
+          <IconClose className="w-5 h-5" />
+        </button>
+        <img src={url} alt="Promoción" className="w-full max-h-[75vh] object-contain bg-slate-50" />
+      </div>
+    </div>
+  )
+}
 
-        <section className="order-1 lg:order-2 space-y-6">
-          <BannerBox settingKey="banner_main_1" className="aspect-[16/9] sm:aspect-[21/9]" />
-          <div className="grid sm:grid-cols-2 gap-6">
-            <article className="card p-4">
-              <div className="aspect-video rounded-xl bg-slate-100 mb-3" />
-              <h3 className="font-semibold text-lg mb-1">Titular destacado</h3>
-              <p className="text-slate-600 text-sm">Resumen breve de la noticia para invitar a leer más.</p>
-            </article>
-            <article className="card p-4">
-              <div className="aspect-video rounded-xl bg-slate-100 mb-3" />
-              <h3 className="font-semibold text-lg mb-1">Otra noticia relevante</h3>
-              <p className="text-slate-600 text-sm">Resumen breve de la noticia para invitar a leer más.</p>
-            </article>
+const services = [
+  {
+    title: 'Publicar documento legal',
+    description: 'Carga el documento protocolizado, completa los datos registrales y reporta tu Pago Móvil desde un flujo guiado.',
+    to: '/solicitante/documento',
+    icon: IconDocs,
+    action: 'Iniciar solicitud',
+  },
+  {
+    title: 'Consultar ediciones',
+    description: 'Busca ediciones publicadas por CVE, fecha o razón social y consulta el PDF oficial disponible.',
+    to: '/ediciones',
+    icon: IconSearch,
+    action: 'Ver ediciones',
+  },
+  {
+    title: 'Directorio legal',
+    description: 'Accede a la sección del Directorio Legal y a la información profesional publicada en el portal.',
+    to: '/p/directorio-legal',
+    icon: IconUserCircle,
+    action: 'Abrir directorio',
+  },
+]
+
+export default function Home() {
+  return (
+    <div className="bg-slate-50/60 min-h-screen">
+      <PromoPopup />
+
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-7 md:py-10 space-y-8">
+        <BannerBox settingKey="banner_main_1" className="aspect-[16/6] md:aspect-[21/7]" />
+
+        <section className="grid lg:grid-cols-[1fr_310px] gap-7 items-start">
+          <div className="space-y-7">
+            <div className="card p-6 md:p-8 bg-white border border-slate-200">
+              <p className="text-xs font-bold tracking-[0.18em] uppercase text-brand-700 mb-3">Diario Mercantil de Venezuela</p>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 max-w-3xl">Publicaciones legales y ediciones digitales en un solo lugar</h1>
+              <p className="text-slate-600 mt-4 max-w-3xl leading-relaxed">
+                Gestiona solicitudes de publicación, consulta su estado y accede a las ediciones publicadas mediante su Código de Verificación Electrónica (CVE).
+              </p>
+              <div className="flex flex-wrap gap-3 mt-6">
+                <Link to="/register" className="btn btn-primary">Crear cuenta</Link>
+                <Link to="/ediciones" className="btn btn-outline">Consultar ediciones</Link>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {services.map(({ title, description, to, icon: Icon, action }) => (
+                <article key={title} className="card p-5 bg-white border border-slate-200 flex flex-col">
+                  <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center mb-4">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                  <h2 className="font-semibold text-lg text-slate-900">{title}</h2>
+                  <p className="text-sm text-slate-600 mt-2 leading-relaxed flex-1">{description}</p>
+                  <Link to={to} className="text-sm font-semibold text-brand-700 hover:text-brand-900 mt-5">{action} →</Link>
+                </article>
+              ))}
+            </div>
           </div>
+
+          <aside className="space-y-5 lg:sticky lg:top-24">
+            <EditionPromoAside />
+            <div className="card p-5 bg-white border border-slate-200">
+              <h2 className="font-semibold text-slate-900">Última edición disponible</h2>
+              <p className="text-sm text-slate-600 mt-2">Consulta el archivo digital, el CVE y descarga el PDF de la edición publicada.</p>
+              <Link to="/ediciones" className="btn btn-primary w-full mt-4 justify-center">Ver ediciones</Link>
+            </div>
+            <BannerBox settingKey="banner_sidebar" className="aspect-[3/5]" />
+          </aside>
         </section>
-
-        <aside className="order-3 space-y-6 lg:sticky lg:top-28">
-          <EditionPromoAside />
-          <div className="card p-4 bg-gradient-to-br from-brand-50 to-white">
-            <h3 className="font-semibold mb-2">¡Consulta nuestra última edición!</h3>
-            <p className="text-sm text-slate-600 mb-3">Accede al PDF completo de hoy.</p>
-            <button className="btn btn-primary w-full">Ver edición</button>
-          </div>
-          
-          
-        </aside>
       </main>
 
-      <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
-            <article key={i} className="card p-4">
-              <div className="aspect-[4/3] rounded-xl bg-slate-100 mb-3" />
-              <h3 className="font-semibold">Nota #{i}</h3>
-              <p className="text-sm text-slate-600">Descripción breve de la nota para ver estilo de tarjetas.</p>
-            </article>
-          ))}
-        </div>
-      </section>
-      <footer className="bg-white border-t border-slate-200">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 grid md:grid-cols-2 gap-6 items-center">
-          <div className="text-center md:text-left">
-            <div className="text-lg font-semibold">Suscríbete al boletín</div>
-            <p className="text-sm text-slate-600">Recibe lo más importante cada mañana.</p>
+      <footer className="bg-white border-t border-slate-200 mt-8">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-2 md:items-center md:justify-between text-sm text-slate-500">
+          <span>© 2026 Diario Mercantil. Todos los derechos reservados.</span>
+          <div className="flex gap-4">
+            <Link to="/p/preguntas-frecuentes" className="hover:text-brand-700">Preguntas frecuentes</Link>
+            <Link to="/contacto" className="hover:text-brand-700">Contacto</Link>
           </div>
-          <form className="flex flex-col sm:flex-row gap-2">
-            <input type="email" placeholder="tu@correo.com" className="input flex-1" />
-            <button className="btn btn-primary">Suscribirme</button>
-          </form>
         </div>
-        <div className="text-center text-xs text-slate-500 py-4">© 2026 Diario Mercantil Todos los derechos reservados</div>
       </footer>
     </div>
   )

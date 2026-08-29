@@ -5,6 +5,7 @@ import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import { IconTrash, IconDownload, IconSave, IconClose, IconPlus, IconArrowLeft, IconQrCode } from '../components/icons'
 import QRCodeModal from '../components/QRCodeModal'
 import LegalRequestDetails from '../components/LegalRequestDetails'
+import { BANCOS_VENEZUELA } from '../constants/banks'
 
 export default function PublicacionDetalle() {
   const { id } = useParams()
@@ -123,15 +124,27 @@ export default function PublicacionDetalle() {
     if (!item) return
     const form = e.target as HTMLFormElement
     const fd = new FormData(form)
+    const prefix = String(fd.get('mobile_prefix') || '')
+    const phone = String(fd.get('mobile_phone') || '').replace(/\D/g, '')
+    const ref = String(fd.get('ref') || '').replace(/\D/g, '')
+    const date = String(fd.get('date') || new Date().toISOString().slice(0, 10))
+    const amount = Number(fd.get('amount_bs') || 0)
+    if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
+      alert('Referencia, teléfono o monto inválidos. Revise los datos del Pago Móvil.')
+      return
+    }
+    if (date > new Date().toISOString().slice(0, 10)) {
+      alert('La fecha del pago no puede ser futura.')
+      return
+    }
     const body: any = {
-      ref: fd.get('ref') || '',
-      date: fd.get('date') || new Date().toISOString().slice(0, 10),
-      bank: fd.get('bank') || '',
-      type: fd.get('type') || '',
-      amount_bs: Number(fd.get('amount_bs') || 0),
-      status: fd.get('pstatus') || 'Verificado',
-      mobile_phone: fd.get('mobile_phone') || '',
-      comment: fd.get('comment') || ''
+      ref,
+      date,
+      bank: String(fd.get('bank') || ''),
+      type: 'pago_movil',
+      amount_bs: amount,
+      mobile_phone: prefix + phone,
+      comment: String(fd.get('comment') || '')
     }
     try {
       await addLegalPayment(item.id, body)
@@ -194,6 +207,17 @@ export default function PublicacionDetalle() {
     if (s === 'Publicada' || s === 'Publicado') return 'Publicado'
     return s
   }
+  const paymentStatusText = (payment?: LegalPayment) => {
+    if (!payment) return 'Aún no reportado'
+    switch (payment.status) {
+      case 'Aprobado':
+      case 'Verificado': return 'Pago verificado'
+      case 'Rechazado': return 'Pago rechazado'
+      case 'Por verificar':
+      case 'Pendiente': return 'Pendiente de verificación'
+      default: return payment.status || 'Sin estado'
+    }
+  }
 
   if (loading) {
     return (
@@ -226,32 +250,34 @@ export default function PublicacionDetalle() {
           <h1 className="text-xl font-semibold">Orden de servicio #{item.order_no || item.id}</h1>
         </div>
         <div className="flex gap-2">
-          {item.status === 'Publicada' && (
-            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: item.edition_code ? `${window.location.origin}/edicion/${item.edition_code}` : '', title: `Publicación ${item.order_no || item.id}` })}>
+          {item.status === 'Publicada' && item.edition_code && (
+            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: `${window.location.origin}/edicion/${encodeURIComponent(item.edition_code!)}`, title: `Edición ${item.edition_code}` })}>
               <IconQrCode /> Código QR
             </button>
           )}
           <button className="btn" onClick={download}>
             <IconDownload /> Descargar PDF
           </button>
-          <button className="btn btn-primary" onClick={onSave} disabled={saving}>
-            <IconSave /> {saving ? 'Guardando...' : 'Guardar Cambios'}
-          </button>
+          {item.status !== 'Publicada' && (
+            <button className="btn btn-primary" onClick={onSave} disabled={saving}>
+              <IconSave /> {saving ? 'Guardando...' : 'Guardar Cambios'}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Quick Actions */}
-      {['Por verificar', 'En tr�mite'].includes(item.status) && (
+      {['Por verificar', 'En trámite'].includes(item.status) && (
         <div className="card p-4 bg-amber-50 border-amber-200">
-          <p className="font-semibold text-amber-900 mb-3">?? Acciones de Verificaci�n</p>
+          <p className="font-semibold text-amber-900 mb-3">Acciones de Verificación</p>
           <div className="flex gap-2">
             {item.status === 'Por verificar' && (
               <button className="btn bg-green-600 text-white hover:bg-green-700" onClick={onApprove}>
-                ? Verificar publicaci�n
+                Verificar publicación
               </button>
             )}
             <button className="btn bg-red-600 text-white hover:bg-red-700" onClick={onReject}>
-              ? Rechazar
+              Rechazar
             </button>
             <button className="btn bg-slate-600 text-white hover:bg-slate-700" onClick={onReturnToDraft}>
               Devolver a Borrador
@@ -267,17 +293,13 @@ export default function PublicacionDetalle() {
 
         {/* Column 2: Solicitante Info (Editable) */}
         <div className="card p-4 space-y-4">
-          <h3 className="font-semibold text-lg border-b pb-2">Datos del Solicitante (Editar)</h3>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Folios</label>
-            <input
-              className="input w-full"
-              type="number"
-              min="1"
-              value={item.folios || 1}
-              onChange={e => setItem({ ...item, folios: Number(e.target.value) })}
-            />
+          <div className="flex items-center justify-between gap-3 border-b pb-2">
+            <h3 className="font-semibold text-lg">Datos del Solicitante (Editar)</h3>
+            {item.user_id && (
+              <button type="button" className="text-sm font-semibold text-brand-700 hover:underline" onClick={() => navigate(`/dashboard/usuarios/${item.user_id}`)}>
+                Ver ficha completa
+              </button>
+            )}
           </div>
 
           <div>
@@ -285,6 +307,7 @@ export default function PublicacionDetalle() {
             <input
               className="input w-full"
               value={item.name || ''}
+              disabled={item.status === 'Publicada'}
               onChange={e => setItem({ ...item, name: e.target.value })}
             />
           </div>
@@ -294,6 +317,7 @@ export default function PublicacionDetalle() {
             <input
               className="input w-full"
               value={item.document || ''}
+              disabled={item.status === 'Publicada'}
               onChange={e => setItem({ ...item, document: e.target.value })}
             />
           </div>
@@ -303,6 +327,7 @@ export default function PublicacionDetalle() {
             <input
               className="input w-full"
               value={item.phone || ''}
+              disabled={item.status === 'Publicada'}
               onChange={e => setItem({ ...item, phone: e.target.value })}
             />
           </div>
@@ -313,6 +338,7 @@ export default function PublicacionDetalle() {
               className="input w-full"
               type="email"
               value={item.email || ''}
+              disabled={item.status === 'Publicada'}
               onChange={e => setItem({ ...item, email: e.target.value })}
             />
           </div>
@@ -323,7 +349,7 @@ export default function PublicacionDetalle() {
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-lg text-emerald-900">Pago reportado</h3>
             <span className="text-xs px-2 py-1 rounded-full bg-white text-emerald-800 border border-emerald-200">
-              {latestPayment ? 'Pendiente de verificación' : 'Aún no reportado'}
+              {paymentStatusText(latestPayment)}
             </span>
           </div>
           {latestPayment ? (
@@ -331,7 +357,7 @@ export default function PublicacionDetalle() {
               <div className="flex justify-between"><span className="font-medium">Referencia:</span><span>{latestPayment.ref}</span></div>
               <div className="flex justify-between"><span className="font-medium">Fecha:</span><span>{prettyDate(latestPayment.date)}</span></div>
               <div className="flex justify-between"><span className="font-medium">Banco:</span><span>{latestPayment.bank}</span></div>
-              <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{latestPayment.type}</span></div>
+              <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{latestPayment.type === 'pago_movil' ? 'Pago Móvil' : latestPayment.type}</span></div>
               <div className="flex justify-between"><span className="font-medium">Monto:</span><span className="font-mono">{Number(latestPayment.amount_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.</span></div>
               {latestPayment.mobile_phone && (
                 <div className="flex justify-between"><span className="font-medium">Telf. Pago Móvil:</span><span>{latestPayment.mobile_phone}</span></div>
@@ -358,42 +384,33 @@ export default function PublicacionDetalle() {
       </div>
 
       {/* Add Payment Form */}
-      <form onSubmit={onAddPayment} className="border-t pt-4">
-        <h4 className="font-medium mb-3">Agregar Nuevo Pago</h4>
-        <div className="grid md:grid-cols-4 gap-3">
-          <input className="input" name="ref" placeholder="Referencia" required />
-          <input
-            className="input"
-            type="date"
-            name="date"
-            defaultValue={new Date().toISOString().slice(0, 10)}
-            required
-          />
-          <input className="input" name="bank" placeholder="Banco" required />
-          <input className="input" name="type" placeholder="Tipo" required />
-          <input
-            className="input"
-            name="amount_bs"
-            type="number"
-            step="0.01"
-            placeholder="Monto Bs."
-            required
-          />
-          <select className="input" name="pstatus" defaultValue="Verificado">
-            <option>Verificado</option>
-            <option>Pendiente</option>
-          </select>
-          <input className="input" name="mobile_phone" placeholder="Telf. Pago Móvil (Opcional)" />
-          <input
-            className="input md:col-span-2"
-            name="comment"
-            placeholder="Comentario (opcional)"
-          />
-        </div>
-        <button className="btn btn-primary mt-3">
-          <IconPlus /> Agregar Pago
-        </button>
-      </form>
+      {item.status === 'En trámite' && (
+        <form onSubmit={onAddPayment} className="card p-4 border border-slate-200 space-y-3">
+          <div>
+            <h4 className="font-semibold text-slate-800">Agregar Pago Móvil adicional</h4>
+            <p className="text-xs text-slate-500 mt-1">Registre únicamente pagos móviles. El monto puede ser parcial y quedará pendiente de verificación.</p>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <input className="input" name="ref" inputMode="numeric" maxLength={4} pattern="\d{4}" placeholder="Últimos 4 dígitos" required />
+            <input className="input" type="date" name="date" max={new Date().toISOString().slice(0, 10)} defaultValue={new Date().toISOString().slice(0, 10)} required />
+            <select className="input" name="bank" required defaultValue="">
+              <option value="" disabled>Banco emisor</option>
+              {BANCOS_VENEZUELA.map(bank => (
+                <option key={bank} value={bank}>{bank}</option>
+              ))}
+            </select>
+            <input className="input" name="amount_bs" type="number" min="0.01" step="0.01" placeholder="Monto parcial Bs." required />
+            <select className="input" name="mobile_prefix" defaultValue="0412" required>
+              {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
+            </select>
+            <input className="input" name="mobile_phone" inputMode="numeric" maxLength={7} pattern="\d{7}" placeholder="7 dígitos del teléfono" required />
+            <input className="input md:col-span-2" name="comment" placeholder="Comentario (opcional)" />
+          </div>
+          <button className="btn btn-primary">
+            <IconPlus /> Agregar Pago
+          </button>
+        </form>
+      )}
 
       {/* Files Section */}
       {

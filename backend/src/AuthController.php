@@ -462,7 +462,6 @@ final class AuthController {
             self::setSessionCookies($plainToken);
 
             Response::json([
-                "token" => $plainToken,
                 "superadmin" => [ 
                     "id" => (int)$user["id"], 
                     "username" => $user["username"]
@@ -477,7 +476,7 @@ final class AuthController {
 
     public function verifySuperAdmin(): void {
         try {
-            $token = self::sessionToken() ?? str_replace('Bearer ', '', $_SERVER['HTTP_AUTHORIZATION'] ?? '');
+            $token = self::sessionToken();
             if (!$token) throw new Exception();
 
             $pdo = Database::pdo();

@@ -33,6 +33,7 @@ require_once __DIR__."/../src/AuthController.php";
 require_once __DIR__."/../src/UserController.php";
 require_once __DIR__."/../src/LegalController.php";
 require_once __DIR__."/../src/SystemController.php";
+require_once __DIR__."/../src/PaymentController.php";
 require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/RateController.php";
 require_once __DIR__."/../src/PagesController.php";
@@ -56,16 +57,17 @@ $router->post('/api/auth/register', [AuthController::class, 'register']);
 $router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 $router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
 $router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
-$router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
+$router->post('/api/auth/logout', [AuthController::class, 'logout'], $csrf);
 $router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 $router->get('/api/superadmin/verify', [AuthController::class, 'verifySuperAdmin']);
-$router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $auth);
+$router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $csrf);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);
 $router->post('/api/users', [UserController::class, 'create'], $adminCsrf);
 $router->put('/api/users/{id}', [UserController::class, 'update'], $csrf);
 $router->delete('/api/users/{id}', [UserController::class, 'delete'], $adminCsrf);
+$router->get('/api/admin/users/{id}', [UserController::class, 'get'], $admin);
 $router->post('/api/admin/users/{id}/suspend', [UserController::class, 'suspend'], $adminCsrf);
 $router->post('/api/admin/users/{id}/restore', [UserController::class, 'restore'], $adminCsrf);
 $router->post('/api/admin/users/{id}/role', [UserController::class, 'changeRole'], $adminCsrf);
@@ -95,7 +97,6 @@ $router->post('/api/legal/{id}/reject', [LegalController::class, 'reject'], $adm
 $router->post('/api/legal/{id}/submit', [LegalController::class, 'submit'], $csrf);
 $router->post('/api/legal/{id}/verify', [LegalController::class, 'verify'], $adminCsrf);
 $router->post('/api/legal/{id}/return-to-draft', [LegalController::class, 'returnToDraft'], $adminCsrf);
-$router->post('/api/legal/{id}/unpublish', [LegalController::class, 'unpublish'], $adminCsrf);
 $router->get('/api/legal/{id}/download', [LegalController::class, 'download'], $auth);
 $router->get('/api/legal/{id}/files', [LegalController::class, 'listFiles'], $auth);
 $router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $csrf);
@@ -145,6 +146,8 @@ $router->post('/api/settings', [SystemController::class, 'saveSettings'], $admin
 $router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $admin);
 $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
+$router->post('/api/payments', [PaymentController::class, 'create'], $adminCsrf);
+$router->delete('/api/payments/{id}', [PaymentController::class, 'delete'], $adminCsrf);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
 $router->get('/api/public/editions', [EditionController::class, 'listPublic']);

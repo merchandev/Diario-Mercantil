@@ -5,6 +5,8 @@ import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRat
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 import ProtectedPdfViewer from '../../components/ProtectedPdfViewer'
+import { BANCOS_VENEZUELA } from '../../constants/banks'
+import QRCode from 'qrcode.react'
 
 const ESTADOS_VENEZUELA = [
   'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes',
@@ -411,29 +413,20 @@ const TRAMITES_POR_TIPO: Record<string, string[]> = {
   ]
 }
 
+
+const formatExpediente = (raw: string) => {
+  const digits = raw.replace(/\D/g, '').slice(0, 11)
+  return digits.length <= 3 ? digits : `${digits.slice(0, 3)}-${digits.slice(3)}`
+}
+
+const formatPlanilla = (raw: string) => {
+  const digits = raw.replace(/\D/g, '').slice(0, 14)
+  const parts = [digits.slice(0, 3), digits.slice(3, 7), digits.slice(7, 8), digits.slice(8, 14)]
+  return parts.filter(Boolean).join('.')
+}
+
 type Step = 1 | 2 | 3
 
-const BANCOS_VENEZUELA = [
-  "0134 - Banesco",
-  "0105 - Mercantil",
-  "0108 - BBVA Provincial",
-  "0191 - Banco Nacional de Crédito (BNC)",
-  "0172 - Bancamiga",
-  "0114 - Bancaribe",
-  "0115 - Banco Exterior",
-  "0151 - Banco Fondo Común (BFC)",
-  "0104 - Banco Venezolano de Crédito",
-  "0171 - Banco Activo",
-  "0174 - Banplus",
-  "0138 - Banco Plaza",
-  "0156 - 100% Banco",
-  "0157 - DelSur",
-  "0102 - Banco de Venezuela (BDV)",
-  "0163 - Banco del Tesoro",
-  "0175 - Banco Digital de los Trabajadores (Antiguo Bicentenario)",
-  "0177 - Banco de la Fuerza Armada Nacional Bolivariana (BANFANB)",
-  "0166 - Banco Agrícola de Venezuela"
-]
 
 export default function Documento() {
   const navigate = useNavigate()
@@ -488,6 +481,9 @@ export default function Documento() {
         // Pre-fill payment info if exists
         if (data.payments && data.payments.length > 0) {
           const last = data.payments[0];
+          const storedMobile = String(last.mobile_phone || '').replace(/\D/g, '')
+          const storedPrefix = /^04(12|14|16|22|24|26)/.test(storedMobile) ? storedMobile.slice(0, 4) : '0414'
+          const storedSuffix = storedMobile.length >= 11 ? storedMobile.slice(4, 11) : storedMobile.slice(0, 7)
           setPay(prev => ({
             ...prev,
             type: 'pago_movil',
@@ -495,7 +491,8 @@ export default function Documento() {
             ref: last.ref || '',
             date: last.date || new Date().toISOString().slice(0, 10),
             amount_bs: last.amount_bs,
-            mobile_phone: last.mobile_phone || ''
+            mobile_phone_prefix: storedPrefix,
+            mobile_phone: storedSuffix
           }));
         }
       })
@@ -709,8 +706,13 @@ export default function Documento() {
   const submitStep3 = async () => {
     if (!req || !pdfAnalysis) return
 
-    if (!pay.bank || !pay.ref) {
-      setAlertDialog({ isOpen: true, title: 'Datos incompletos', message: 'Por favor complete todos los datos del pago (banco y referencia) antes de continuar.', variant: 'warning' })
+    if (!pay.bank || !/^\d{4}$/.test(pay.ref) || !/^\d{7}$/.test(pay.mobile_phone)) {
+      setAlertDialog({ isOpen: true, title: 'Datos incompletos', message: 'Seleccione el banco, indique exactamente los últimos 4 dígitos de la referencia y los 7 dígitos del teléfono de Pago Móvil.', variant: 'warning' })
+      return
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    if (!pay.date || pay.date > today) {
+      setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: 'La fecha del pago no puede ser futura.', variant: 'warning' })
       return
     }
 
@@ -910,7 +912,7 @@ export default function Documento() {
           </div>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número **</span>
-            <input className="input w-full" placeholder="000" value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '') })} />
+            <input className="input w-full" placeholder="000" maxLength={3} value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Año *</span>
@@ -927,7 +929,7 @@ export default function Documento() {
                    maxLength={12} 
                    pattern="^\d{3}-\d{1,8}$" 
                    title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" 
-                   value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
+                   value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: formatExpediente(e.target.value) })} />
             <p className="text-[10px] text-brand-600 mt-1">Debe permitir solo números. La nomenclatura es 3 dígitos seguido de un guion y luego permitir hasta 8 dígitos</p>
           </label>
           <label className="block">
@@ -947,7 +949,7 @@ export default function Documento() {
                    maxLength={17} 
                    pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" 
                    title="Formato: 000.0000.0.000000" 
-                   value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: e.target.value.toUpperCase() })} />
+                   value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: formatPlanilla(e.target.value) })} />
             <p className="text-[10px] text-brand-600 mt-1">** Debe admitir solo números. La nomenclatura es 3 dígitos seguido de un punto, 4 dígitos, punto, 1 dígito, punto y luego permitir hasta 6 dígitos</p>
           </label>
           <div className="md:col-span-2 flex gap-3 pt-4">
@@ -1013,7 +1015,7 @@ export default function Documento() {
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-brand-600 mt-0.5">✓</span>
-                      <span><strong>Precio:</strong> ${settings.price_per_folio_usd || '1.50'} USD por folio + IVA ({settings.iva_percent || '16'}%)</span>
+                      <span><strong>Precio:</strong> ${Number(settings.price_per_folio_usd || 1.5).toFixed(2)} USD por folio</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-brand-600 mt-0.5">✓</span>
@@ -1210,15 +1212,53 @@ export default function Documento() {
                 Por favor realice el pago a una de las siguientes cuentas bancarias antes de registrar su referencia:
               </p>
               <div className="grid md:grid-cols-2 gap-4">
-                {paymentMethods.map(pm => (
-                  <div key={pm.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 text-sm">
-                    <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
-                    <div className="flex justify-between"><span className="text-slate-500">Tipo:</span> <span className="font-medium">{pm.type}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Cuenta/Tel:</span> <span className="font-mono font-medium">{pm.account || pm.phone}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Titular:</span> <span className="font-medium">{pm.holder}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
-                  </div>
-                ))}
+                {paymentMethods.map(pm => {
+                  const amountText = pdfAnalysis
+                    ? `VES ${pdfAnalysis.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    : 'Monto indicado en la orden'
+                  const paymentData = [
+                    `Pago Móvil - Diario Mercantil`,
+                    `Banco destino: ${pm.bank || '-'}`,
+                    `RIF: ${pm.rif || '-'}`,
+                    `Teléfono: ${pm.phone || '-'}`,
+                    `Monto: ${amountText}`
+                  ].join('\n')
+
+                  return (
+                    <div key={pm.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 text-sm space-y-3">
+                      <div>
+                        <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
+                        <div className="flex justify-between"><span className="text-slate-500">Tipo:</span> <span className="font-medium">Pago Móvil</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Teléfono:</span> <span className="font-mono font-medium">{pm.phone || '-'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Titular:</span> <span className="font-medium">{pm.holder}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Monto:</span> <span className="font-semibold text-brand-700">{amountText}</span></div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-blue-100">
+                        <div className="bg-white p-2 rounded border border-slate-200 shrink-0" aria-label={`QR de Pago Móvil ${pm.bank}`}>
+                          <QRCode value={paymentData} size={112} level="M" renderAs="canvas" />
+                        </div>
+                        <div className="flex-1 w-full">
+                          <p className="text-xs text-slate-500 mb-2">Escanee el QR o copie los datos para realizar el Pago Móvil.</p>
+                          <button
+                            type="button"
+                            className="btn btn-outline w-full justify-center text-sm"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(paymentData)
+                                setAlertDialog({ isOpen: true, title: 'Datos copiados', message: 'Los datos de Pago Móvil se copiaron al portapapeles.', variant: 'success' })
+                              } catch {
+                                setAlertDialog({ isOpen: true, title: 'No se pudo copiar', message: paymentData, variant: 'info' })
+                              }
+                            }}
+                          >
+                            Copiar datos
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
                 {paymentMethods.length === 0 && <p className="text-slate-500 italic">No hay métodos de pago configurados.</p>}
               </div>
             </div>
@@ -1285,8 +1325,8 @@ export default function Documento() {
                   <div className="flex justify-between items-center py-2 px-1">
                     <span className="text-slate-600">Precio por folio:</span>
                     <div className="text-right">
-                      <div className="font-semibold text-green-700">Bs. {(pdfAnalysis.total_bs / pdfAnalysis.folios).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-[10px] text-slate-400">Equivalente a $1.50 USD / folio</div>
+                      <div className="font-semibold text-green-700">Bs. {(((pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)) * bcv) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="text-[10px] text-slate-400">Equivalente a ${(pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)).toFixed(2)} USD / folio</div>
                     </div>
                   </div>
                   {/* Detalles ocultos a petición del cliente:
@@ -1370,7 +1410,7 @@ export default function Documento() {
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha del pago *</span>
-                  <input className="input w-full" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+                  <input className="input w-full" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
                    <p className="text-[10px] text-brand-600 mt-1">* No debe admitir fechas futuras al día de la solicitud</p>
                 </label>
                 {pay.type === 'pago_movil' && (
@@ -1404,7 +1444,7 @@ export default function Documento() {
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked={accept} onChange={e => setAccept(e.target.checked)} />
                 <span className="text-sm text-slate-700">
-                  Al hacer clic en <strong>"REPORTAR Y PUBLICAR"</strong>, confirmo que he realizado el pago por el monto exacto indicado y acepto los <span className="text-brand-600 font-medium">Términos y Condiciones</span> del Diario Mercantil de Venezuela.
+                  Al hacer clic en <strong>REPORTAR SOLICITUD</strong>, confirmo que acepto y cumplo con los <span className="text-brand-600 font-medium">Términos y Condiciones</span> del Diario Mercantil de Venezuela.
                 </span>
               </label>
             </div>

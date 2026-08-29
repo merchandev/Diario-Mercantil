@@ -50,6 +50,18 @@ final class RolePolicy {
     }
 
     /**
+     * Can the actor manage users and view complete user profiles?
+     */
+    public static function canManageUsers(array $actor): bool {
+        try {
+            $role = Role::from(strtolower($actor['role'] ?? ''));
+        } catch (ValueError) {
+            return false;
+        }
+        return in_array($role, [Role::SUPERADMIN, Role::ADMIN], true);
+    }
+
+    /**
      * Can the actor manage legal requests (verify, reject, return-to-draft, etc.)?
      * Superadmin has full access; admin/staff/manager have operational access.
      */

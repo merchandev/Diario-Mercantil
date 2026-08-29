@@ -88,7 +88,7 @@ export async function login(body: { document: string; password: string }) {
     }
     throw new Error(errorMsg);
   }
-  return res.json() as Promise<{ token: string; user: { id: number; document: string; name: string; role: string } }>
+  return res.json() as Promise<{ user: { id: number; document: string; name: string; role: string } }>
 }
 
 // ========== SUPERADMIN API ==========
@@ -104,30 +104,18 @@ export async function superadminLogin(body: { username: string; password: string
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error || 'invalid_credentials')
   }
-  return res.json() as Promise<{ token: string; superadmin: { id: number; username: string } }>
+  return res.json() as Promise<{ superadmin: { id: number; username: string } }>
 }
 
 export async function verifySuperAdmin() {
-  const token = localStorage.getItem('superadmin_token')
-  if (!token) throw new Error('No token')
-
-  const res = await fetch(getUrl('/api/superadmin/verify'), {
-    headers: { 'Authorization': `Bearer ${token}` },
-    credentials: 'include'
-  })
+  const res = await fetch(getUrl('/api/superadmin/verify'), { credentials: 'include' })
   if (!res.ok) throw new Error('Unauthorized')
-  return res.json() as Promise<{ valid: boolean; superadmin: { id: number; username: string } }>
+  return res.json() as Promise<{ ok: boolean; superadmin: { id: number; username: string } }>
 }
 
 export async function superadminLogout() {
-  const token = localStorage.getItem('superadmin_token')
-  if (!token) return
-
-  await fetch(getUrl('/api/superadmin/logout'), {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
-    credentials: 'include'
-  })
+  const res = await fetchAuth('/api/superadmin/logout', { method: 'POST' }, true)
+  return res.json()
 }
 
 
@@ -361,6 +349,9 @@ export type LegalRequest = {
   document: string;
   date: string;
   order_no?: string;
+  user_id?: number;
+  created_at?: string;
+  submitted_at?: string;
   publish_date?: string;
   verification_date?: string;
   phone?: string;
@@ -403,6 +394,7 @@ export async function listLegal(params?: { q?: string; status?: string; req_from
     if (params.pub_to && params.pub_to !== 'undefined') cleanParams.pub_to = params.pub_to
     if (params.limit) cleanParams.limit = String(params.limit)
     if (params.pub_type) cleanParams.pub_type = params.pub_type
+    if (params.user_id !== undefined && params.user_id !== null && String(params.user_id) !== '') cleanParams.user_id = String(params.user_id)
   }
 
   const qs = new URLSearchParams(cleanParams)
@@ -535,7 +527,7 @@ export async function createUser(body: { document: string; name: string; passwor
   return res.json() as Promise<{ id: number }>
 }
 export async function updateUser(id: number, body: { name?: string; role?: string; email?: string; status?: string; password?: string; phone?: string; person_type?: string }) {
-  const res = await fetchAuth(`/api/admin/users/`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const res = await fetchAuth(`/api/admin/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }
 export async function changeUserRole(id: number, role: string) {
@@ -552,7 +544,7 @@ export async function setUserPassword(id: number, password: string) {
   return res.json() as Promise<{ ok: true }>
 }
 export async function deleteUser(id: number) {
-  const res = await fetchAuth(`/api/admin/users/`, { method: 'DELETE' })
+  const res = await fetchAuth(`/api/users/${id}`, { method: 'DELETE' })
   return res.json()
 }
 

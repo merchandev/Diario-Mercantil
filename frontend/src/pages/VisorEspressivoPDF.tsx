@@ -38,7 +38,7 @@ export default function VisorEspressivoPDF() {
 
   const pdfUrl = useMemo(() => {
     if (!edition) return ''
-    return edition.file_url || `/api/e/${encodeURIComponent(edition.code)}/download`
+    return edition.file_url || `/api/e/code/${encodeURIComponent(edition.code)}/download`
   }, [edition])
 
   const dateStr = edition?.date

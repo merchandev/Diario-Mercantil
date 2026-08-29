@@ -54,11 +54,11 @@ class EditionController {
     $isAdmin = $u && ($u['role'] === 'admin' || $u['role'] === 'superadmin');
 
     if ($isAdmin) {
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) ORDER BY id DESC LIMIT 1");
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
         $ed->execute([$code, '%'.$code]);
     } else {
         $today = gmdate('Y-m-d');
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' AND date <= ? ORDER BY id DESC LIMIT 1");
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' AND date <= ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
         $ed->execute([$code, '%'.$code, $today]);
     }
     
@@ -73,10 +73,10 @@ class EditionController {
   public function downloadById($idOrCode){
     $pdo = Database::pdo();
     if (is_numeric($idOrCode)) {
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE id=?");
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE id=? AND deleted_at IS NULL");
         $ed->execute([$idOrCode]);
     } else {
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE code=?");
+        $ed = $pdo->prepare("SELECT * FROM editions WHERE code=? AND deleted_at IS NULL");
         $ed->execute([$idOrCode]);
     }
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
@@ -117,7 +117,7 @@ class EditionController {
   public function downloadByCode($code){
     $pdo = Database::pdo();
     $today = gmdate('Y-m-d');
-    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada' AND date <= ?");
+    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada' AND date <= ? AND deleted_at IS NULL");
     $ed->execute([$code, $today]);
     $id = (int)($ed->fetchColumn() ?: 0);
     if (!$id) { http_response_code(404); echo 'Not found'; return; }
@@ -131,6 +131,7 @@ class EditionController {
         SELECT e.*, u.name as published_by_name 
         FROM editions e 
         LEFT JOIN users u ON e.published_by = u.id 
+        WHERE e.deleted_at IS NULL
         ORDER BY e.id DESC LIMIT 200
     ');
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -152,14 +153,12 @@ class EditionController {
         $sql .= 'LEFT JOIN edition_orders eo ON eo.edition_id = e.id ';
         $sql .= 'LEFT JOIN legal_requests l ON l.id = eo.legal_request_id ';
     }
-    $sql .= 'WHERE e.status = "Publicada" AND e.date <= ? ';
+    $sql .= 'WHERE e.status = "Publicada" AND e.date <= ? AND e.deleted_at IS NULL ';
     $params = [$today];
 
     if ($q !== '') {
-        $sql .= 'AND (e.code LIKE ? OR l.name LIKE ? OR JSON_EXTRACT(l.meta, "$.razon_social") LIKE ?) ';
-        $params[] = "%$q%";
-        $params[] = "%$q%";
-        $params[] = "%$q%";
+        $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
+        for ($i=0; $i<5; $i++) $params[] = "%$q%";
     }
 
     if ($from !== '') {
@@ -186,7 +185,7 @@ class EditionController {
     $this->requireAdmin();
     $pdo = Database::pdo();
     
-    $edStmt = $pdo->prepare('SELECT code, date FROM editions WHERE id=?');
+    $edStmt = $pdo->prepare('SELECT code, date FROM editions WHERE id=? AND deleted_at IS NULL');
     $edStmt->execute([$id]);
     $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
     
@@ -226,7 +225,7 @@ class EditionController {
   public function get($id){
     $this->requireAdmin();
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT * FROM editions WHERE id=?');
+    $ed = $pdo->prepare('SELECT * FROM editions WHERE id=? AND deleted_at IS NULL');
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
@@ -269,80 +268,106 @@ class EditionController {
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
-    
+
     $status = 'Borrador';
-    $date = trim($input['date'] ?? gmdate('Y-m-d'));
-    $code = ''; // Generated below
+    $date = trim((string)($input['date'] ?? gmdate('Y-m-d')));
     $orders = $input['orders'] ?? [];
     if (!is_array($orders)) $orders = [];
 
-    $now = gmdate('c');
-    
-    $pdo->beginTransaction();
+    $dateObj = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if (!$dateObj || $dateObj->format('Y-m-d') !== $date) {
+        Response::json(['error'=>'Fecha de edición inválida. Use YYYY-MM-DD.'], 422);
+    }
+
+    $year = (int)$dateObj->format('Y');
+    $now = gmdate('Y-m-d H:i:s');
+    $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+    $lockName = 'diario_edition_counter_' . $year;
+    $lockAcquired = false;
+    $responseCode = 200;
+    $responseBody = [];
+
     try {
-        $year = (int)substr($date, 0, 4);
-        
-        $lockName = 'diario_edition_counter_' . $year;
-        $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        // Acquire the yearly advisory lock BEFORE starting the MySQL transaction and
+        // keep it until after commit. This prevents two concurrent requests from
+        // reading the same MAX(edition_no).
         if (!$isSqlite) {
             $lock = $pdo->prepare('SELECT GET_LOCK(?, 10)');
             $lock->execute([$lockName]);
             if ((int)$lock->fetchColumn() !== 1) {
-                throw new RuntimeException('No se pudo bloquear el correlativo');
+                throw new RuntimeException('No se pudo bloquear el correlativo anual de ediciones.', 503);
             }
+            $lockAcquired = true;
+            $pdo->beginTransaction();
+        } else {
+            // SQLite development fallback: reserve the writer lock up front.
+            $pdo->exec('BEGIN IMMEDIATE TRANSACTION');
         }
 
-        try {
-            $q = $pdo->prepare('SELECT MAX(edition_no) FROM editions WHERE publication_year = ?');
-            $q->execute([$year]);
-            $edition_no = ((int)$q->fetchColumn()) + 1;
-            
-            $code = $this->generateCode($date, $edition_no);
+        $q = $pdo->prepare('SELECT MAX(edition_no) FROM editions WHERE publication_year = ?');
+        $q->execute([$year]);
+        $editionNo = ((int)$q->fetchColumn()) + 1;
+        $code = $this->generateCode($date, $editionNo);
 
-            $stmt = $pdo->prepare('INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year) VALUES(?,?,?,?,?,?,?)');
-            $stmt->execute([$code, $status, $date, $edition_no, 0, $now, $year]);
-        } finally {
-            $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
-            $release->execute([$lockName]);
-        }
+        $stmt = $pdo->prepare(
+            'INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year) '
+            . 'VALUES(?,?,?,?,?,?,?)'
+        );
+        $stmt->execute([$code, $status, $date, $editionNo, 0, $now, $year]);
         $editionId = (int)$pdo->lastInsertId();
 
         $orderService = new EditionOrderService($pdo);
         $orderService->setOrdersForEdition($editionId, $orders);
 
-        // Audit
-        $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
-            ->execute([$u['id'], 'create_edition', 'edition', $editionId]);
+        $pdo->prepare(
+            'INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)'
+        )->execute([$u['id'], 'create_edition', 'edition', $editionId]);
 
-        $pdo->commit();
-        Response::json(['ok'=>true, 'id'=>$editionId, 'code'=>$code]);
+        if ($pdo->inTransaction()) $pdo->commit();
+        $responseBody = ['ok'=>true, 'id'=>$editionId, 'code'=>$code, 'edition_no'=>$editionNo];
     } catch (PDOException $e) {
-        $pdo->rollBack();
-        if ($e->getCode() == 23000) {
-            Response::json(['error'=>'Ya existe una edición con el código generado ('.$code.') o el número de edición está duplicado.'], 400);
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        if ((string)$e->getCode() === '23000') {
+            $responseCode = 409;
+            $responseBody = ['error'=>'El correlativo o CVE de la edición ya existe. Intente crear la edición nuevamente.'];
         } else {
-            Response::json(['error'=>'Database error: '.$e->getMessage()], 500);
+            error_log('Edition create database error: ' . $e->getMessage());
+            $responseCode = 500;
+            $responseBody = ['error'=>'No se pudo crear la edición por un error de base de datos.'];
         }
     } catch (Throwable $e) {
-        $pdo->rollBack();
-        $codeResp = $e->getCode() ?: 500;
-        if ($codeResp < 400 || $codeResp > 599) $codeResp = 500;
-        Response::json(['error'=>$e->getMessage()], $codeResp);
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $responseCode = (int)$e->getCode();
+        if ($responseCode < 400 || $responseCode > 599) $responseCode = 500;
+        $responseBody = ['error'=>$e->getMessage() ?: 'No se pudo crear la edición.'];
+    } finally {
+        if ($lockAcquired) {
+            try {
+                $release = $pdo->prepare('SELECT RELEASE_LOCK(?)');
+                $release->execute([$lockName]);
+            } catch (Throwable $releaseError) {
+                error_log('No se pudo liberar el bloqueo de correlativo: ' . $releaseError->getMessage());
+            }
+        }
     }
+
+    Response::json($responseBody, $responseCode);
   }
 
   public function delete($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
     
-    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
-    if ($s->fetchColumn() === 'Publicada') {
-        Response::json(['error'=>'No se puede eliminar una edición publicada'], 409);
-        exit;
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
+    $status = $s->fetchColumn();
+    if (!$status) { Response::json(['error'=>'not_found'], 404); exit; }
+    if ($status === 'Publicada') {
+        // Preserve legal traceability: published editions are retired logically, never destroyed.
+        $pdo->prepare('UPDATE editions SET deleted_at=NOW() WHERE id=?')->execute([$id]);
+    } else {
+        $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
+        $pdo->prepare('DELETE FROM editions WHERE id=?')->execute([$id]);
     }
-    
-    $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
-    $pdo->prepare('DELETE FROM editions WHERE id=?')->execute([$id]);
     
     $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
         ->execute([$u['id'], 'delete_edition', 'edition', $id]);
@@ -354,7 +379,7 @@ class EditionController {
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
     
-    $s = $pdo->prepare('SELECT status FROM editions WHERE id=?'); $s->execute([$id]);
+    $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
     if ($s->fetchColumn() === 'Publicada') {
         Response::json(['error'=>'No se puede modificar una edición publicada'], 409);
         exit;
@@ -474,7 +499,7 @@ class EditionController {
         $u = $this->requireAdmin();
         $pdo = Database::pdo();
         
-        $edStmt = $pdo->prepare('SELECT code, status FROM editions WHERE id=?');
+        $edStmt = $pdo->prepare('SELECT code, status FROM editions WHERE id=? AND deleted_at IS NULL');
         $edStmt->execute([$id]);
         $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
         
@@ -514,7 +539,7 @@ class EditionController {
   public function uploadPdf($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
-    $ed = $pdo->prepare('SELECT status, code FROM editions WHERE id=? FOR UPDATE');
+    $ed = $pdo->prepare('SELECT status, code FROM editions WHERE id=? AND deleted_at IS NULL FOR UPDATE');
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
@@ -581,7 +606,9 @@ class EditionController {
       Response::json(['ok'=>true,'file_id'=>$fileId,'file_name'=>$name]);
     } catch (Throwable $e) {
       if ($pdo->inTransaction()) $pdo->rollBack();
-      @unlink($dest);
+      if (isset($dest) && is_file($dest) && !unlink($dest)) {
+        error_log('No se pudo limpiar el PDF de edición tras el rollback: ' . $dest);
+      }
       Response::json(['error'=>'Error guardando PDF: '.$e->getMessage()],500);
     }
   }

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { IconSearch, IconTrash, IconDownload, IconClose, IconPlus, IconSave, IconQrCode } from '../components/icons'
-import { listLegal, type LegalRequest, getLegal, updateLegal, rejectLegal, addLegalPayment, deleteLegalPayment, type LegalPayment, downloadLegal, deleteLegal } from '../lib/api'
+import { listLegal, type LegalRequest, getLegal, updateLegal, verifyLegal, rejectLegal, addLegalPayment, deleteLegalPayment, type LegalPayment, downloadLegal, deleteLegal } from '../lib/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QRCodeModal from '../components/QRCodeModal'
+import { BANCOS_VENEZUELA } from '../constants/banks'
 
 const estOpts = ['Todos', 'Pendiente', 'Por verificar', 'En trámite', 'Publicado', 'Rechazado']
 const mapFilterStatus = (s: string) => s === 'Pendiente' ? 'Borrador' : (s === 'Publicado' ? 'Publicada' : s)
@@ -98,11 +99,33 @@ export default function Publicaciones() {
     return s
   }
   const totalPaid = useMemo(() => payments.reduce((s, p) => s + Number(p.amount_bs || 0), 0), [payments])
-  const onAddPayment = async (e: any) => {
+  const onAddPayment = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const fd = new FormData(e.target as HTMLFormElement)
-    const body: any = { ref: fd.get('ref') || '', date: fd.get('date') || new Date().toISOString().slice(0, 10), bank: fd.get('bank') || '', type: fd.get('type') || '', amount_bs: Number(fd.get('amount_bs') || 0), status: fd.get('pstatus') || 'Verificado', comment: fd.get('comment') || '' }
-    const r = await addLegalPayment(sel!.id, body); void r; const d = await getLegal(sel!.id); setSel(d.item); setPayments(d.payments); (e.target as HTMLFormElement).reset()
+    if (!sel || sel.status !== 'En trámite') return
+    const form = e.currentTarget
+    const fd = new FormData(form)
+    const ref = String(fd.get('ref') || '').replace(/\D/g, '').slice(0, 4)
+    const prefix = String(fd.get('mobile_prefix') || '0412')
+    const phone = String(fd.get('mobile_phone') || '').replace(/\D/g, '').slice(0, 7)
+    const amount = Number(fd.get('amount_bs') || 0)
+    if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
+      alert('Revise referencia, operadora, teléfono y monto del Pago Móvil.')
+      return
+    }
+    await addLegalPayment(sel.id, {
+      ref,
+      date: String(fd.get('date') || new Date().toISOString().slice(0, 10)),
+      bank: String(fd.get('bank') || ''),
+      type: 'pago_movil',
+      amount_bs: amount,
+      status: 'Pendiente',
+      mobile_phone: prefix + phone,
+      comment: String(fd.get('comment') || '')
+    })
+    const d = await getLegal(sel.id)
+    setSel(d.item)
+    setPayments(d.payments)
+    form.reset()
   }
   const download = async (id: number) => {
     const blob = await downloadLegal(id)
@@ -211,9 +234,13 @@ export default function Publicaciones() {
                     <div className="flex items-center justify-end gap-3">
                       {/* QR Button removed - QR is now edition-based */}
                       <button className="text-brand-700 hover:underline inline-flex items-center gap-1" onClick={() => navigate(`/dashboard/publicaciones/${r.id}`)}><IconSave /> <span>Detalles</span></button>
-                      <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = prompt('Motivo del rechazo:'); if (reason === null) return; await rejectLegal(r.id, reason || ''); reload() }}><IconClose /> <span>Rechazar</span></button>
+                      {['Por verificar', 'En trámite'].includes(r.status) && (
+                        <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = prompt('Motivo del rechazo:'); if (reason === null) return; await rejectLegal(r.id, reason || ''); reload() }}><IconClose /> <span>Rechazar</span></button>
+                      )}
                       <button className="text-emerald-700 hover:underline inline-flex items-center gap-1" onClick={() => download(r.id)}><IconDownload /> <span>Descargar</span></button>
-                      <button className="text-red-700 hover:underline inline-flex items-center gap-1" onClick={() => handleDelete(r.id)}><IconTrash /> <span>Eliminar</span></button>
+                      {r.status !== 'Publicada' && (
+                        <button className="text-red-700 hover:underline inline-flex items-center gap-1" onClick={() => handleDelete(r.id)}><IconTrash /> <span>Eliminar</span></button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -283,16 +310,23 @@ export default function Publicaciones() {
                   </tfoot>
                 </table>
               </div>
-              <form onSubmit={onAddPayment} className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
-                <input className="input w-full" name="ref" placeholder="Ref." />
-                <input className="input w-full" type="date" name="date" defaultValue={new Date().toISOString().slice(0, 10)} />
-                <input className="input w-full" name="bank" placeholder="Banco" />
-                <input className="input w-full" name="type" placeholder="Tipo" />
-                <input className="input w-full" name="amount_bs" type="number" step="0.01" placeholder="Monto Bs." />
-                <select className="input w-full" name="pstatus" defaultValue="Verificado"><option>Verificado</option><option>Pendiente</option></select>
-                <input className="input w-full sm:col-span-2 md:col-span-3" name="comment" placeholder="Comentario (opcional)" />
-                <button className="btn btn-primary w-full sm:col-span-2 md:col-span-3 inline-flex items-center justify-center gap-2"><IconPlus /> <span>Agregar pago</span></button>
-              </form>
+              {sel.status === 'En trámite' && (
+                <form onSubmit={onAddPayment} className="mt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 items-end">
+                  <input className="input w-full" name="ref" inputMode="numeric" maxLength={4} pattern="\d{4}" placeholder="Últimos 4 dígitos" required />
+                  <input className="input w-full" type="date" name="date" max={new Date().toISOString().slice(0, 10)} defaultValue={new Date().toISOString().slice(0, 10)} required />
+                  <select className="input w-full" name="bank" required defaultValue="">
+                    <option value="" disabled>Banco emisor</option>
+                    {BANCOS_VENEZUELA.map(bank => <option key={bank} value={bank}>{bank}</option>)}
+                  </select>
+                  <input className="input w-full" name="amount_bs" type="number" min="0.01" step="0.01" placeholder="Monto parcial Bs." required />
+                  <select className="input w-full" name="mobile_prefix" defaultValue="0412" required>
+                    {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
+                  </select>
+                  <input className="input w-full" name="mobile_phone" inputMode="numeric" maxLength={7} pattern="\d{7}" placeholder="7 dígitos del teléfono" required />
+                  <input className="input w-full sm:col-span-2 md:col-span-3" name="comment" placeholder="Comentario (opcional)" />
+                  <button className="btn btn-primary w-full sm:col-span-2 md:col-span-3 inline-flex items-center justify-center gap-2"><IconPlus /> <span>Agregar Pago Móvil</span></button>
+                </form>
+              )}
             </div>
             <div>
               <h3 className="font-semibold mb-2">Detalles de la Orden de Servicio</h3>
@@ -307,30 +341,19 @@ export default function Publicaciones() {
               <div className="grid grid-cols-2 gap-2 mt-3">
                 <label className="block"><span className="text-sm">Folios</span><input className="input w-full" type="number" min={1} value={sel.folios || 1} onChange={e => setSel({ ...sel, folios: +e.target.value })} /></label>
                 <label className="block"><span className="text-sm">Estado</span>
-                  <select className="input w-full" value={sel.status}
-                    onChange={e => {
-                      const v = e.target.value
-                      setSel({ ...sel, status: v })
-                    }}>
-                    {[
-                      { label: 'Pendiente', value: 'Borrador' },
-                      { label: 'Por verificar', value: 'Por verificar' },
-                      { label: 'Verificada', value: 'Verificada' },
-                      { label: 'Publicado', value: 'Publicada' },
-                      { label: 'Rechazado', value: 'Rechazado' },
-                    ].map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
+                  <div className="input w-full bg-slate-50 text-slate-700 cursor-default">{prettyStatus(sel.status)}</div>
+                  <p className="text-xs text-slate-500 mt-1">El estado cambia únicamente mediante las acciones del flujo de verificación y publicación.</p>
                 </label>
-                <label className="block"><span className="text-sm">Fecha de Verificación</span><input className="input w-full" type="date" value={sel.verification_date || ''} onChange={e => setSel({ ...sel, verification_date: e.target.value })} /></label>
-                <label className="block col-span-2"><span className="text-sm">Fecha de publicación ({sel.status === 'Publicada' ? 'Visible' : 'Oculta en PDF'})</span><input className="input w-full" type="date" value={sel.publish_date || ''} onChange={e => setSel({ ...sel, publish_date: e.target.value })} /></label>
+                <label className="block"><span className="text-sm">Fecha de Verificación</span><input className="input w-full bg-slate-50" type="date" value={sel.verification_date || ''} readOnly /></label>
+                <label className="block col-span-2"><span className="text-sm">Fecha de publicación</span><input className="input w-full bg-slate-50" type="date" value={sel.publish_date || ''} readOnly /></label>
               </div>
 
               {/* Acciones rápidas */}
-              {sel.status === 'Por verificar' && (
+              {['Por verificar', 'En trámite'].includes(sel.status) && (
                 <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
                   <p className="text-sm font-semibold text-amber-900">⚠️ Solicitud pendiente de verificación</p>
                   <div className="flex gap-2">
-                    <button
+                    {sel.status === 'Por verificar' && <button
                       className="btn bg-green-600 text-white hover:bg-green-700 flex-1"
                       onClick={() => {
                         setConfirmDialog({
@@ -339,10 +362,7 @@ export default function Publicaciones() {
                           message: '¿Marcar esta solicitud como En trámite?\n\nSe registrará la fecha de hoy como fecha de verificación. La publicación quedará pendiente de ser incorporada a una edición del diario.',
                           variant: 'info',
                           onConfirm: async () => {
-                            await updateLegal(sel.id, {
-                              status: 'En trámite',
-                              verification_date: new Date().toISOString().slice(0, 10)
-                            })
+                            await verifyLegal(sel.id)
                             reload()
                             setSel(null)
                           }
@@ -350,7 +370,7 @@ export default function Publicaciones() {
                       }}
                     >
                       ✓ Verificar (Aprobado)
-                    </button>
+                    </button>}
                     <button
                       className="btn bg-red-600 text-white hover:bg-red-700 flex-1"
                       onClick={async () => {
@@ -369,7 +389,7 @@ export default function Publicaciones() {
               )}
 
               <div className="flex gap-2 mt-3">
-                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateLegal(sel.id, { status: sel.status, folios: sel.folios, publish_date: sel.publish_date }); const d = await getLegal(sel.id); setSel(d.item); alert('Cambios guardados') }}><IconSave /> <span>Guardar cambios</span></button>
+                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateLegal(sel.id, { folios: sel.folios }); const d = await getLegal(sel.id); setSel(d.item); alert('Cambios guardados') }}><IconSave /> <span>Guardar cambios</span></button>
                 <button className="btn inline-flex items-center gap-2" onClick={() => download(sel.id)}><IconDownload /> <span>Descargar detalle</span></button>
               </div>
             </div>

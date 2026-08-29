@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../Database.php';
+require_once __DIR__ . '/../Http/StoragePath.php';
 
 class EditionPublicationService {
     private PDO $pdo;
@@ -18,7 +19,7 @@ class EditionPublicationService {
         
         try {
             // Lock edition
-            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? FOR UPDATE');
+            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? AND deleted_at IS NULL FOR UPDATE');
             $edStmt->execute([$id]);
             $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -46,8 +47,8 @@ class EditionPublicationService {
                 require_once __DIR__ . '/EditionPdfGenerator.php';
                 $generator = new EditionPdfGenerator($this->pdo);
                 $outputName = $generator->generate($id, $orderIds, $progressCallback);
-                $storageRoot = realpath(__DIR__ . '/../../storage/uploads');
-                $physicalPath = $storageRoot . '/' . $outputName;
+                $storageRoot = StoragePath::getUploadsDir();
+                $physicalPath = StoragePath::getFile($outputName);
                 
                 $size = filesize($physicalPath);
                 $checksum = hash_file('sha256', $physicalPath);
@@ -70,11 +71,11 @@ class EditionPublicationService {
                     throw new RuntimeException("El archivo físico asociado a la edición no existe o no es válido.", 422);
                 }
                 
-                $storageRoot = realpath(__DIR__ . '/../../storage/uploads');
-                $physicalPath = realpath($storageRoot . '/' . $fileData['path']);
-                
-                if ($physicalPath === false || !str_starts_with($physicalPath, $storageRoot . DIRECTORY_SEPARATOR)) {
-                    throw new DomainException('Ruta de archivo inválida. Posible path traversal.', 422);
+                $storageRoot = StoragePath::getUploadsDir();
+                try {
+                    $physicalPath = StoragePath::getFile((string)$fileData['path']);
+                } catch (RuntimeException $e) {
+                    throw new RuntimeException('El archivo PDF asociado no se encuentra en el almacenamiento configurado.', 422, $e);
                 }
                 
                 if (!file_exists($physicalPath) || !is_readable($physicalPath)) {
@@ -97,14 +98,14 @@ class EditionPublicationService {
             }
             
             foreach ($requests as $req) {
-                if (($req['status'] !== 'En trámite' && $req['status'] !== 'Por verificar') || $req['deleted_at'] !== null) {
-                    throw new RuntimeException("La solicitud {$req['id']} no está en estado 'En trámite' o 'Por verificar', o fue eliminada.", 400);
+                if ($req['status'] !== 'En trámite' || $req['deleted_at'] !== null) {
+                    throw new RuntimeException("La solicitud {$req['id']} debe estar verificada y en estado 'En trámite', y no puede estar eliminada.", 400);
                 }
             }
 
             // Date chronology validation
             $editionDate = $edition['date'] ?: $now;
-            $lastEdStmt = $this->pdo->query("SELECT MAX(date) FROM editions WHERE status='Publicada'");
+            $lastEdStmt = $this->pdo->query("SELECT MAX(date) FROM editions WHERE status='Publicada' AND deleted_at IS NULL");
             $lastEdDate = $lastEdStmt->fetchColumn();
             if ($lastEdDate && $editionDate <= $lastEdDate) {
                 throw new RuntimeException("La fecha de esta edición ($editionDate) debe ser posterior a la última edición publicada ($lastEdDate).", 400);
@@ -112,7 +113,7 @@ class EditionPublicationService {
             
             // Execute Publication
             $params = array_merge([$editionDate], $orderIds);
-            $updReqs = $this->pdo->prepare("UPDATE legal_requests SET status='Publicada', publish_date=? WHERE id IN ($inQuery) AND (status='En trámite' OR status='Por verificar')");
+            $updReqs = $this->pdo->prepare("UPDATE legal_requests SET status='Publicada', publish_date=? WHERE id IN ($inQuery) AND status='En trámite'");
             $updReqs->execute($params);
             
             if ($updReqs->rowCount() !== count($orderIds)) {

@@ -39,7 +39,7 @@ class LegalController {
       $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?');
       $s->execute([$reqId]);
       if ($s->fetchColumn() === 'Publicada') {
-          Response::json(['error'=>'conflict', 'message'=>'No se puede modificar una solicitud que ya estÃ¡ publicada.'], 409);
+          Response::json(['error'=>'conflict', 'message'=>'No se puede modificar una solicitud que ya está publicada.'], 409);
           exit;
       }
   }
@@ -66,7 +66,7 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT l.* FROM legal_requests l WHERE l.deleted_at IS NULL";
+    $sql = "SELECT l.*, COALESCE(e.code, l.edition_code) AS edition_code FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id LEFT JOIN editions e ON e.id=eo.edition_id AND e.deleted_at IS NULL WHERE l.deleted_at IS NULL";
     $params = [];
     
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
@@ -91,7 +91,8 @@ class LegalController {
     
     $editionCode = $_GET['edition_code'] ?? '';
     if ($editionCode !== '') {
-        $sql .= " AND l.edition_code = ?";
+        $sql .= " AND (e.code = ? OR l.edition_code = ?)";
+        $params[] = $editionCode;
         $params[] = $editionCode;
     }
     
@@ -123,7 +124,8 @@ class LegalController {
         $params[] = $pubTo . ' 23:59:59';
     }
     
-    $sql .= " ORDER BY l.id DESC LIMIT 500";
+    $limit = max(1, min(500, (int)($_GET['limit'] ?? 500)));
+    $sql .= " ORDER BY l.id DESC LIMIT " . $limit;
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -198,7 +200,7 @@ class LegalController {
     
     if (isset($in['meta']) && is_array($in['meta'])) {
         $m = $in['meta'];
-        if (isset($m['aÃ±o'])) { $m['anio'] = $m['aÃ±o']; unset($m['aÃ±o']); }
+        if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
         if (isset($m['fecha'])) { $m['fecha_registro'] = $m['fecha']; unset($m['fecha']); }
         if (isset($m['razon_denominacion_social'])) { $m['razon_social'] = $m['razon_denominacion_social']; unset($m['razon_denominacion_social']); }
         if (isset($m['expediente'])) { $m['numero_expediente'] = $m['expediente']; unset($m['expediente']); }
@@ -211,7 +213,16 @@ class LegalController {
             return Response::json(['error'=>'La planilla debe tener formato 000.0000.0.000000'], 400);
         }
         if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
-            return Response::json(['error'=>'El tomo debe ser solo nÃºmeros (mÃ¡x 3)'], 400);
+            return Response::json(['error'=>'El tomo debe ser solo números (máx 3)'], 400);
+        }
+        if (!empty($m['numero']) && !preg_match('/^\d{1,3}$/', (string)$m['numero'])) {
+            return Response::json(['error'=>'El número mercantil debe contener entre 1 y 3 dígitos'], 400);
+        }
+        if (!empty($m['anio'])) {
+            $year = (string)$m['anio'];
+            if (!preg_match('/^\d{4}$/', $year) || (int)$year > (int)gmdate('Y')) {
+                return Response::json(['error'=>'El año registral debe ser válido y no puede ser superior al año actual'], 400);
+            }
         }
         if (!empty($m['tipo_registrador']) && !in_array(strtoupper($m['tipo_registrador']), ['TITULAR', 'SUPLENTE', 'AUXILIAR'])) {
             return Response::json(['error'=>'Tipo de registrador inválido (TITULAR, SUPLENTE, AUXILIAR)'], 400);
@@ -221,6 +232,11 @@ class LegalController {
         }
         if (!empty($m['fecha_registro']) && strtotime($m['fecha_registro']) > time()) {
             return Response::json(['error'=>'La fecha de registro no puede ser futura'], 400);
+        }
+        foreach (['tipo_sociedad','tipo_acto','razon_social','estado','oficina','registrador','tipo_registrador','letra'] as $key) {
+            if (isset($m[$key]) && is_string($m[$key])) {
+                $m[$key] = mb_strtoupper(trim($m[$key]), 'UTF-8');
+            }
         }
         $in['meta'] = $m;
     }
@@ -399,17 +415,29 @@ class LegalController {
           $hash = hash('sha256', json_encode($in));
           $cached = IdempotencyService::check($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash);
           if ($cached) {
-              http_responsedition_code($cached['status']);
+              http_response_code($cached['status']);
               Response::json($cached['body']);
               return;
           }
       }
 
-      if (!preg_match('/^\d{4}$/', $in['ref'] ?? '')) {
-          return Response::json(['error'=>'La referencia debe tener exactamente 4 dÃ­gitos'], 400);
+      $ref = preg_replace('/\D+/', '', (string)($in['ref'] ?? ''));
+      if (!preg_match('/^\d{4}$/', $ref)) {
+          return Response::json(['error'=>'La referencia debe tener exactamente 4 dígitos'], 400);
       }
-      if (strtotime($in['date']) > time()) {
+
+      $paymentDate = trim((string)($in['date'] ?? ''));
+      $paymentDateObj = DateTimeImmutable::createFromFormat('!Y-m-d', $paymentDate);
+      if (!$paymentDateObj || $paymentDateObj->format('Y-m-d') !== $paymentDate) {
+          return Response::json(['error'=>'La fecha de pago es inválida. Use YYYY-MM-DD'], 400);
+      }
+      if ($paymentDate > gmdate('Y-m-d')) {
           return Response::json(['error'=>'La fecha de pago no puede ser futura'], 400);
+      }
+
+      $bank = trim((string)($in['bank'] ?? ''));
+      if ($bank === '' || mb_strlen($bank, 'UTF-8') > 100) {
+          return Response::json(['error'=>'Seleccione un banco emisor válido'], 400);
       }
 
       $ownsTransaction = !$pdo->inTransaction();
@@ -431,7 +459,7 @@ class LegalController {
           }
 
           if (!is_numeric($req['total_bs']) || (float)$req['total_bs'] <= 0) {
-              throw new Exception('La orden no tiene un monto total vÃ¡lido. Cotice la solicitud primero.', 400);
+              throw new Exception('La orden no tiene un monto total válido. Cotice la solicitud primero.', 400);
           }
 
           $mobile_phone = isset($in['mobile_phone']) ? $in['mobile_phone'] : null;
@@ -441,14 +469,15 @@ class LegalController {
           if (empty($mobile_phone) || !preg_match('/^04(12|14|16|22|24|26)\d{7}$/', $mobile_phone)) {
               throw new Exception('El teléfono móvil es inválido para Pago Móvil', 400);
           }
-          $paymentAmount = isset($in['amount_bs']) ? (float)$in['amount_bs'] : (float)$req['total_bs'];
+          $paymentAmount = RolePolicy::canManageLegalRequests($u) && isset($in['amount_bs']) ? (float)$in['amount_bs'] : (float)$req['total_bs'];
+          if ($paymentAmount <= 0) { throw new Exception('El monto del pago debe ser mayor que cero', 400); }
           
           $stmt = $pdo->prepare("
             INSERT INTO legal_payments (legal_request_id, ref, date, bank, type, amount_bs, status, mobile_phone, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'Por verificar', ?, NOW())
           ");
           $stmt->execute([
-              $id, $in['ref'], $in['date'], $in['bank'] ?? 'N/A', $in['type'] ?? 'N/A', $paymentAmount, $mobile_phone
+              $id, $ref, $paymentDate, $bank, 'pago_movil', $paymentAmount, $mobile_phone
           ]);
           
           $paymentId = $pdo->lastInsertId();
@@ -486,7 +515,7 @@ class LegalController {
       $reqStatus = $s->fetchColumn();
       
       if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
-          return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya estÃ¡ en trÃ¡mite'], 403);
+          return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya está en trámite'], 403);
       }
       
       $pdo->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
@@ -503,7 +532,7 @@ class LegalController {
       $s = $pdo->prepare('SELECT * FROM legal_requests WHERE id=?'); $s->execute([$id]);
       $r = $s->fetch(PDO::FETCH_ASSOC);
       if (!$r) {
-          http_responsedition_code(404);
+          http_response_code(404);
           die('Orden no encontrada');
       }
 
@@ -518,7 +547,7 @@ class LegalController {
       $role = strtolower($u['role'] ?? '');
       if (!RolePolicy::canManageLegalRequests($u)) {
           if ((int)$r['user_id'] !== (int)$u['id']) {
-              http_responsedition_code(403);
+              http_response_code(403);
               die('No tienes acceso a esta orden');
           }
       }
@@ -584,7 +613,7 @@ class LegalController {
     $s = $pdo->prepare("SELECT COUNT(*) FROM legal_files WHERE file_id=? AND legal_request_id!=?");
     $s->execute([$fileId, $id]);
     if ($s->fetchColumn() > 0) {
-        return Response::json(['error'=>'El archivo ya estÃ¡ adjunto a otra solicitud'], 400);
+        return Response::json(['error'=>'El archivo ya está adjunto a otra solicitud'], 400);
     }
     
     $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $kind]);

@@ -167,8 +167,8 @@ final class UploadController
                 if ($pdo->inTransaction()) {
                     $pdo->rollBack();
                 }
-                if ($saved && is_file($absolutePath)) {
-                    @unlink($absolutePath);
+                if ($saved && is_file($absolutePath) && !unlink($absolutePath)) {
+                    error_log('[file-upload] No se pudo limpiar el archivo tras el rollback: ' . $absolutePath);
                 }
                 error_log('[file-upload] ' . $e->getMessage());
                 $created[] = ['name' => $name, 'status' => 'upload_failed', 'error' => 'No se pudo procesar el archivo'];

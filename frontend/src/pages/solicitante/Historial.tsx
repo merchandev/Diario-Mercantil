@@ -239,8 +239,8 @@ export default function Historial() {
                         )}
                         <button className="text-brand-700 hover:underline" onClick={() => navigate(`/solicitante/publicaciones/${r.id}`)}>Ver detalles</button>
                         <button className="text-blue-600 hover:underline" onClick={async () => { const b = await downloadLegal(r.id); const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `orden-servicio-${r.id}.pdf`; a.click(); URL.revokeObjectURL(url) }}>Descargar orden</button>
-                        {r.status === 'Publicada' && (r.edition_code || r.order_no) && (
-                          <a href={`/api/e/code/${encodeURIComponent(r.edition_code || r.order_no || '')}/download?download=1`} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
+                        {r.status === 'Publicada' && r.edition_code && (
+                          <a href={`/api/e/code/${encodeURIComponent(r.edition_code)}/download?download=1`} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
                             Descargar publicación
                           </a>
                         )}

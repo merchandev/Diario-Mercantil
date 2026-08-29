@@ -48,6 +48,7 @@ const Papelera = lazyImport(() => import('./pages/Papelera'))
 const MediosPago = lazyImport(() => import('./pages/MediosPago'))
 const DirectorioLegal = lazyImport(() => import('./pages/DirectorioLegal'))
 const Usuarios = lazyImport(() => import('./pages/Usuarios'))
+const UsuarioDetalle = lazyImport(() => import('./pages/UsuarioDetalle'))
 const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
 const FileManager = lazyImport(() => import('./pages/FileManager'))
@@ -211,6 +212,7 @@ export default function App() {
                         <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
                         <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
                         <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
+                        <Route path="usuarios/:id" element={<RequireAdmin><LazyRoute><UsuarioDetalle /></LazyRoute></RequireAdmin>} />
                         <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
                         <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
                         <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />

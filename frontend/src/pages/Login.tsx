@@ -22,26 +22,20 @@ export default function Login() {
     try {
       const raw = (docNumber || '').trim()
       const document = /[^0-9]/.test(raw) ? raw : `${docPrefix}${raw}`
-      const { token, user } = await apiLogin({ document, password })
-      console.log('🔐 Login exitoso:', { user: user.name, role: user.role, token: token ? token.substring(0, 20) + '...' : 'HTTPOnly' })
+      const { user } = await apiLogin({ document, password })
 
       if (remember) {
-        if (token) localStorage.setItem('token', token)
         localStorage.setItem('user_name', user.name || '')
         localStorage.setItem('user_role', user.role || '')
         localStorage.setItem('user_doc', user.document || '')
-        console.log('💾 Token guardado en localStorage:', token ? token.substring(0, 20) + '...' : 'HTTPOnly')
       } else {
         // Always use localStorage for persistence across tabs
-        if (token) localStorage.setItem('token', token)
         localStorage.setItem('user_name', user.name || '')
         localStorage.setItem('user_role', user.role || '')
         localStorage.setItem('user_doc', user.document || '')
 
         // Remove from sessionStorage just in case
         sessionStorage.removeItem('token')
-
-        console.log('💾 Token guardado en localStorage:', token ? token.substring(0, 20) + '...' : 'HTTPOnly')
       }
 
       // Refresh auth context with user data

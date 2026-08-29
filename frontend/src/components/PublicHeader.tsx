@@ -232,7 +232,7 @@ export default function PublicHeader() {
             ) : (
               <>
                 <Link to="/login" className="btn btn-outline h-9 text-xs">Iniciar sesión</Link>
-                <Link to="/login" className="btn btn-primary h-9 text-xs">Crear cuenta</Link>
+                <Link to="/register" className="btn btn-primary h-9 text-xs">Crear cuenta</Link>
               </>
             )}
           </div>

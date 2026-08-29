@@ -15,7 +15,7 @@ export default function EdicionesPublic() {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await listPublicEditions()
+      const r = await listPublicEditions({ q: q || undefined, from: from || undefined, to: to || undefined })
       setRows(r.items ?? [])
     } catch {
       setRows([])
@@ -34,7 +34,7 @@ export default function EdicionesPublic() {
   }, [filtered, showList, q, from, to])
 
   const latestPdfUrl = latestEdition?.file_url
-    || (latestEdition?.code ? `/api/e/${encodeURIComponent(latestEdition.code)}/download` : '')
+    || (latestEdition?.code ? `/api/e/code/${encodeURIComponent(latestEdition.code)}/download` : '')
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -118,7 +118,7 @@ export default function EdicionesPublic() {
           <>
             <div className="card p-4 grid md:grid-cols-[1fr,auto,auto,auto] gap-3 items-end">
               <label className="text-sm">Buscar
-                <input className="input w-full mt-1" placeholder="Código, número o estado" value={q} onChange={e => setQ(e.target.value)} />
+                <input className="input w-full mt-1" placeholder="CVE o razón social" value={q} onChange={e => setQ(e.target.value)} />
               </label>
               <label className="text-sm">Desde
                 <input type="date" className="input mt-1" value={from} onChange={e => setFrom(e.target.value)} />
@@ -151,7 +151,7 @@ export default function EdicionesPublic() {
                   <tbody>
                     {filtered.map((ed: any) => {
                       const dateTxt = ed.date || ed.created_at
-                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/${encodeURIComponent(ed.code)}/download` : '')
+                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/code/${encodeURIComponent(ed.code)}/download` : '')
                       const hasPdf = Boolean(ed.file_id || ed.file_url)
                       return (
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">

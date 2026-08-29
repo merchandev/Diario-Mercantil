@@ -31,6 +31,11 @@ export default function Promo() {
 
     const handleSelectImage = async (file: FileRow) => {
         if (!currentKey) return
+        const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+        if (!imageTypes.includes(String(file.type || '').toLowerCase())) {
+            alert('Seleccione un archivo de imagen válido (JPG, PNG, WEBP o GIF).')
+            return
+        }
 
         // We store the full URL or just the relative path? 
         // Let's store the full API URL for simplicity in frontend usage, or just the file ID?

@@ -97,7 +97,7 @@ class SystemController {
     
     public function getPublicSettings(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT `key`, value FROM settings WHERE `key` IN ('bcv_rate', 'price_per_folio_usd', 'convocatoria_usd', 'iva_percent')");
+        $stmt = $pdo->query("SELECT `key`, value FROM settings WHERE `key` IN ('bcv_rate', 'price_per_folio_usd', 'convocatoria_usd', 'iva_percent', 'unit_tax_bs', 'instructions_documents_text', 'instructions_documents_image_url', 'instructions_convocatorias_text', 'banner_main_1', 'banner_sidebar', 'promo_popup')");
         $settings = [];
         while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
         Response::json(["settings"=>$settings]);
@@ -110,6 +110,11 @@ class SystemController {
             $validatedValue = SettingSchema::validate((string)$k, $v);
             $pdo->prepare('INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, NOW()) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()')
                 ->execute([$k, $validatedValue]);
+
+            if (in_array((string)$k, ['banner_main_1', 'banner_sidebar', 'promo_popup'], true)
+                && preg_match('#/api/uploads/(\d+)#', (string)$validatedValue, $m)) {
+                $pdo->prepare('UPDATE files SET is_public=1 WHERE id=?')->execute([(int)$m[1]]);
+            }
         }
         Response::json(["ok"=>true]);
     }
