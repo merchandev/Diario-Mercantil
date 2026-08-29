@@ -3,8 +3,10 @@ import type React from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, type LegalRequest, listLegal, updateLegal, uploadFiles } from '../lib/api'
 import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, TIPOS_TRAMITE, BANCOS_VENEZUELA } from '../lib/constants'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function PublicarDocumento() {
+  const { showAlert } = useDialog()
   const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [requestId, setRequestId] = useState<number | null>(null)
@@ -52,7 +54,7 @@ export default function PublicarDocumento() {
   // Step 2 files count -> folios
   const [folios, setFolios] = useState<number>(1)
   // Step 3 payment fields
-  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'transferencia', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_operator: '0414' })
+  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'pago_movil', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_operator: '0414' })
   const [accepted, setAccepted] = useState(false)
   const priceUsd = Number(settings.price_per_folio_usd || 0)
   const unitBs = rate ? +(priceUsd * rate).toFixed(2) : undefined
@@ -98,7 +100,7 @@ export default function PublicarDocumento() {
       }
       setStep(2)
     } catch (e: any) {
-      alert('Error al crear solicitud: ' + (e.message || 'Error desconocido'))
+      void showAlert('Error al crear solicitud: ' + (e.message || 'Error desconocido'), { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -114,9 +116,9 @@ export default function PublicarDocumento() {
       const fileIds = (up.created || []).map((it: any) => it.fileId)
       for (const id of fileIds) { await attachLegalFile(requestId, id, 'folio') }
       setFolios(prev => Math.max(prev, fileIds.length))
-      alert('Folios adjuntados correctamente.')
+      await showAlert('Folios adjuntados correctamente.', { title: 'Archivos cargados' })
     } catch (e: any) {
-      alert('Error al subir archivos: ' + e.message)
+      void showAlert('Error al subir archivos: ' + e.message, { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -124,7 +126,7 @@ export default function PublicarDocumento() {
 
   const submitPayment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!accepted) { alert('Debe aceptar los Términos y Condiciones.'); return }
+    if (!accepted) { void showAlert('Debe aceptar los Términos y Condiciones.', { title: 'Aceptación requerida' }); return }
     if (!requestId) return
     if (busy) return
     setBusy(true)
@@ -147,14 +149,14 @@ export default function PublicarDocumento() {
         ref: pay.ref,
         date: pay.date,
         bank: pay.banco,
-        type: pay.tipo_operacion,
+        type: 'pago_movil',
         amount_bs: Number(pay.amount_bs || total || 0),
-        mobile_phone: pay.tipo_operacion?.toLowerCase?.() === 'pago móvil' ? `${pay.mobile_operator || '0414'}${pay.mobile_phone}` : undefined,
+        mobile_phone: `${pay.mobile_operator || '0414'}${pay.mobile_phone}`,
         status: 'Por verificar'
       })
-      alert('¡Tu solicitud fue enviada! Está Por verificar.')
+      await showAlert('¡Tu solicitud fue enviada! Está Por verificar.', { title: 'Solicitud enviada' })
     } catch (e: any) {
-      alert('Error al enviar solicitud: ' + e.message)
+      void showAlert('Error al enviar solicitud: ' + e.message, { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -233,7 +235,7 @@ export default function PublicarDocumento() {
                 </div>
               </div>
               <input className="input" placeholder="Tomo" maxLength={3} pattern="^\d{1,3}$" title="Debe ingresar hasta 3 números" value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.replace(/\D/g, '') })} />
-              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '') })} />
+              <input className="input" placeholder="Número" maxLength={3} value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
               <input className="input" placeholder="Letra" value={f1.letra} onChange={e => setF1({ ...f1, letra: e.target.value })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
               <input className="input" placeholder="Número de expediente" maxLength={12} pattern="^\d{3}-\d{1,8}$" title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" value={f1.expediente} onChange={e => setF1({ ...f1, expediente: e.target.value.toUpperCase() })} />
@@ -304,8 +306,10 @@ export default function PublicarDocumento() {
                   <div><input className="input w-20" type="number" min={1} value={folios} onChange={e => setFolios(Math.max(1, Number(e.target.value || 1)))} /></div>
                   <div>{unitBs !== undefined ? unitBs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
                   <div>{subTotal !== undefined ? subTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
-                  <div className="col-span-3">IVA ({ivaPct}%)</div>
-                  <div>{ivaAmt !== undefined ? ivaAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
+                  <div className="hidden">
+                    <div className="col-span-3">IVA ({ivaPct}%)</div>
+                    <div>{ivaAmt !== undefined ? ivaAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
+                  </div>
                   <div className="col-span-3 font-semibold">TOTAL</div>
                   <div className="font-semibold">{total !== undefined ? total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</div>
                 </div>
@@ -321,26 +325,21 @@ export default function PublicarDocumento() {
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
-                  <select className="input" value={pay.tipo_operacion} onChange={e => setPay({ ...pay, tipo_operacion: e.target.value })}>
-                    <option>transferencia</option>
-                    <option>pago móvil</option>
-                    <option>depósito</option>
-                  </select>
-                  <input className="input" placeholder="Referencia" value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value })} />
-                  <input className="input" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+                  <input className="input bg-slate-50" value="Pago Móvil" readOnly />
+                  <input className="input" placeholder="Referencia (4 dígitos)" maxLength={4} value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} />
+                  <input className="input" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
                   <input className="input" type="number" step="0.01" placeholder="Monto (Bs.)" value={pay.amount_bs} onChange={e => setPay({ ...pay, amount_bs: e.target.value })} />
-                  {pay.tipo_operacion === 'pago móvil' && (
-                    <div className="md:col-span-3 flex gap-2">
+                  <div className="md:col-span-3 flex gap-2">
                       <select className="input w-32" value={pay.mobile_operator || '0414'} onChange={e => setPay({ ...pay, mobile_operator: e.target.value })}>
                         <option>0414</option>
                         <option>0424</option>
                         <option>0412</option>
                         <option>0416</option>
+                        <option>0422</option>
                         <option>0426</option>
                       </select>
                       <input className="input flex-1" placeholder="Número de teléfono desde donde realizó el pago móvil" maxLength={7} value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '').slice(0, 7) })} />
                     </div>
-                  )}
                 </div>
                 <label className="mt-3 flex items-start gap-2 text-sm">
                   <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)} />
@@ -348,7 +347,7 @@ export default function PublicarDocumento() {
                 </label>
                 <div className="mt-3 flex gap-2">
                   <button type="button" className="btn" onClick={() => setStep(2)} disabled={busy}>Atrás</button>
-                  <button className="btn btn-primary uppercase" disabled={busy}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
+                  <button className="btn btn-primary uppercase" disabled={busy || !accepted || !pay.banco || pay.ref.length !== 4 || !pay.date || pay.mobile_phone.length !== 7}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
                 </div>
               </div>
             </div>

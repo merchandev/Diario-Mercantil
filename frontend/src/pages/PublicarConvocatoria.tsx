@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type React from 'react'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegal, updateLegal, uploadFiles, type LegalRequest } from '../lib/api'
 import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, BANCOS_VENEZUELA } from '../lib/constants'
+import { useDialog } from '../contexts/DialogContext'
 
 const TIPO_CONV_OPTS = [
   'Asamblea Ordinaria de accionistas o socios',
@@ -10,6 +11,7 @@ const TIPO_CONV_OPTS = [
 ]
 
 export default function PublicarConvocatoria() {
+  const { showAlert } = useDialog()
   const [step, setStep] = useState(1)
   const [requestId, setRequestId] = useState<number | null>(null)
   const [settings, setSettings] = useState<any>({})
@@ -57,7 +59,7 @@ export default function PublicarConvocatoria() {
 
   // Step 3 payment
   const [folios, setFolios] = useState(1)
-  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'transferencia', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '' })
+  const [pay, setPay] = useState<any>({ a_nombre: '', rif: '', telefono: '', email: '', direccion: '', fecha_solicitud: new Date().toISOString().slice(0, 10), tipo_operacion: 'pago_movil', banco: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_operator: '0414' })
   const [accepted, setAccepted] = useState(false)
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export default function PublicarConvocatoria() {
       }
       setStep(2)
     } catch (e: any) {
-      alert('Error: ' + e.message)
+      void showAlert('Error: ' + e.message, { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -105,7 +107,7 @@ export default function PublicarConvocatoria() {
       await attachLegalFile(requestId, fid, kind)
       setUpState(s => ({ ...s, [kind === 'convocatoria_imagen' ? 'img' : (kind === 'convocatoria_texto' ? 'doc' : 'logo')]: fid }))
     } catch (e: any) {
-      alert('Error subiendo archivo: ' + e.message)
+      void showAlert('Error subiendo archivo: ' + e.message, { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -114,7 +116,7 @@ export default function PublicarConvocatoria() {
   const submitPayment = async (e: React.FormEvent) => {
     // ...
     e.preventDefault()
-    if (!accepted) { alert('Debe aceptar los Términos y Condiciones.'); return }
+    if (!accepted) { void showAlert('Debe aceptar los Términos y Condiciones.', { title: 'Aceptación requerida' }); return }
     if (!requestId) return
     setBusy(true)
     try {
@@ -134,14 +136,14 @@ export default function PublicarConvocatoria() {
         ref: pay.ref,
         date: pay.date,
         bank: pay.banco,
-        type: pay.tipo_operacion,
+        type: 'pago_movil',
         amount_bs: Number(pay.amount_bs || total || 0),
-        mobile_phone: pay.tipo_operacion?.toLowerCase?.() === 'pago móvil' ? pay.mobile_phone : undefined,
+        mobile_phone: `${pay.mobile_operator || '0414'}${pay.mobile_phone}`,
         status: 'Por verificar'
       })
-      alert('¡Tu solicitud fue enviada! Está Por verificar.')
+      await showAlert('¡Tu solicitud fue enviada! Está Por verificar.', { title: 'Solicitud enviada' })
     } catch (e: any) {
-      alert('Error enviando solicitud: ' + e.message)
+      void showAlert('Error enviando solicitud: ' + e.message, { title: 'Error' })
     } finally {
       setBusy(false)
     }
@@ -192,7 +194,7 @@ export default function PublicarConvocatoria() {
                      pattern="^\d{1,3}$"
                      title="Debe ingresar hasta 3 números"
                      value={f1.tomo} onChange={e => setF1({ ...f1, tomo: e.target.value.replace(/\D/g, '') })} />
-              <input className="input" placeholder="Número" value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '') })} />
+              <input className="input" placeholder="Número" maxLength={3} value={f1.numero} onChange={e => setF1({ ...f1, numero: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
               <input className="input" placeholder="Año" value={f1.anio} onChange={e => setF1({ ...f1, anio: e.target.value })} />
               <input className="input" placeholder="Número de expediente" 
                      maxLength={12} 
@@ -302,18 +304,17 @@ export default function PublicarConvocatoria() {
                       <option key={b} value={b}>{b}</option>
                     ))}
                   </select>
-                  <select className="input" value={pay.tipo_operacion} onChange={e => setPay({ ...pay, tipo_operacion: e.target.value })}>
-                    <option>transferencia</option>
-                    <option>pago móvil</option>
-                    <option>depósito</option>
-                  </select>
+                  <input className="input bg-slate-50" value="Pago Móvil" readOnly />
                   <input className="input" placeholder="Referencia (4 dígitos)" maxLength={4} value={pay.ref} onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} />
-                  <input className="input" type="date" value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+                  <input className="input" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
                   {/* pay.amount_bs hidden logic since amount is implicitly total: */}
                   <input type="hidden" value={pay.amount_bs} />
-                  {pay.tipo_operacion === 'pago móvil' && (
-                    <input className="input md:col-span-3" placeholder="Celular Ej: 04XXXXXXXX (7 dígitos)" maxLength={7} value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} />
-                  )}
+                  <div className="md:col-span-3 flex gap-2">
+                    <select className="input w-28" value={pay.mobile_operator} onChange={e => setPay({ ...pay, mobile_operator: e.target.value })}>
+                      {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix}>{prefix}</option>)}
+                    </select>
+                    <input className="input flex-1" placeholder="7 dígitos" maxLength={7} value={pay.mobile_phone} onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '').slice(0, 7) })} />
+                  </div>
                 </div>
 
                 <label className="mt-3 flex items-start gap-2 text-sm">
@@ -323,7 +324,7 @@ export default function PublicarConvocatoria() {
 
                 <div className="mt-3 flex gap-2">
                   <button type="button" className="btn" onClick={() => setStep(2)} disabled={busy}>Atrás</button>
-                  <button className="btn btn-primary uppercase" disabled={busy || !accepted || !pay.ref || pay.ref.length < 4 || !pay.date || (pay.tipo_operacion === 'pago móvil' && (!pay.mobile_phone || pay.mobile_phone.length < 7))}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
+                  <button className="btn btn-primary uppercase" disabled={busy || !accepted || pay.ref.length !== 4 || !pay.date || pay.mobile_phone.length !== 7}>{busy ? 'Enviando...' : 'REPORTAR Y PUBLICAR'}</button>
                 </div>
               </div>
             </div>

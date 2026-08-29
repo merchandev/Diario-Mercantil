@@ -1131,7 +1131,7 @@ export default function Documento() {
                           a.click();
                           URL.revokeObjectURL(url);
                         } catch(e) {
-                          alert('Error al descargar orden');
+                          setAlertDialog({ isOpen: true, title: 'Error', message: 'Error al descargar orden.', variant: 'error' });
                         }
                       }}
                       className="btn btn-outline text-brand-700 border-brand-200 hover:bg-brand-50 gap-2"
@@ -1473,26 +1473,6 @@ export default function Documento() {
                   </>
                 )}
               </button>
-              {req && (
-                <button
-                  className="btn bg-slate-100 hover:bg-slate-200 text-slate-700 h-12"
-                  onClick={async () => {
-                    const b = await downloadLegal(req.id);
-                    const url = URL.createObjectURL(b);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `orden-servicio-${req.id}.pdf`;
-                    a.click();
-                    URL.revokeObjectURL(url)
-                  }}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Descargar Orden
-                </button>
-
-              )}
             </div>
           </div>
         )}
@@ -1508,5 +1488,3 @@ export default function Documento() {
     </section>
   )
 }
-
-

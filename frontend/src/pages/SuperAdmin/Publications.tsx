@@ -18,10 +18,13 @@ import {
 import ConfirmDialog from '../../components/ConfirmDialog'
 import QRCodeModal from '../../components/QRCodeModal'
 import { BANCOS_VENEZUELA } from '../../constants/banks'
+import { useDialog } from '../../contexts/DialogContext'
+import { formatCaracasDateTime } from '../../components/LegalRequestDetails'
 
 const statusOptions = ['Todos', 'Pendiente', 'Por verificar', 'En trámite', 'Publicado', 'Rechazado']
 
 export default function Publications() {
+    const { showAlert, requestText } = useDialog()
     const [submissions, setSubmissions] = useState<LegalRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -93,10 +96,10 @@ export default function Publications() {
     }
 
     async function handleReject(id: number) {
-        const reason = prompt('Motivo del rechazo:')
+        const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
         if (reason === null) return
 
-        await rejectLegal(id, reason || 'No especificado')
+        await rejectLegal(id, reason)
         loadSubmissions()
         setSelected(null)
     }
@@ -137,7 +140,7 @@ export default function Publications() {
         const phone = String(formData.get('mobile_phone') || '').replace(/\D/g, '').slice(0, 7)
         const amount = Number(formData.get('amount_bs') || 0)
         if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
-            alert('Revise referencia, operadora, teléfono y monto del Pago Móvil.')
+            void showAlert('Revise referencia, operadora, teléfono y monto del Pago Móvil.', { title: 'Datos inválidos' })
             return
         }
         const paymentData = {
@@ -522,7 +525,7 @@ export default function Publications() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Fecha de Solicitud:</span>
-                                        <span className="text-white">{prettyDate((selected as any).created_at?.slice(0, 10) || selected.date)}</span>
+                                        <span className="text-white">{formatCaracasDateTime((selected as any).created_at || selected.date)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Estado:</span>

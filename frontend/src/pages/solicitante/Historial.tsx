@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listLegal, type LegalRequest, downloadLegal, me, deleteLegal } from '../../lib/api'
 import AdvertisingSlider from '../../components/AdvertisingSlider'
+import { useDialog } from '../../contexts/DialogContext'
+import { formatCaracasDateTime } from '../../components/LegalRequestDetails'
 
 const STATUS_OPTS = ['Todos', 'Borrador', 'Por verificar', 'En trámite', 'Publicada', 'Rechazado']
 
 export default function Historial() {
+  const { showAlert, confirmAction } = useDialog()
   const navigate = useNavigate()
   const [rows, setRows] = useState<LegalRequest[]>([])
   const [allRows, setAllRows] = useState<LegalRequest[]>([])
@@ -63,14 +66,6 @@ export default function Historial() {
   const notifications = allRows
     .filter(r => r.status === 'Publicada' && !dismissedNotifs.includes(r.id))
     .slice(0, 3)
-
-  // Format: use created_at if available, fallback to date
-  const prettyDate = (r: LegalRequest) => {
-    const raw = (r as any).created_at || r.date
-    if (!raw) return '-'
-    const d = raw.slice(0, 10)
-    return d.split('-').reverse().join('/')
-  }
 
   // Razón social from meta, fallback to r.name
   const razonSocial = (r: LegalRequest) => {
@@ -205,7 +200,7 @@ export default function Historial() {
                     <td className="px-4 py-2 font-mono">{r.order_no || r.id}</td>
                     <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
                     <td className="px-4 py-2">{razonSocial(r)}</td>
-                    <td className="px-4 py-2">{prettyDate(r)}</td>
+                    <td className="px-4 py-2">{formatCaracasDateTime((r as any).created_at || r.date)}</td>
                     <td className="px-4 py-2">
                       {r.status === 'Publicada' && r.publish_date ? r.publish_date : '-'}
                     </td>
@@ -228,9 +223,9 @@ export default function Historial() {
                             <button
                               className="text-rose-600 hover:underline"
                               onClick={async () => {
-                                if (!window.confirm('¿Está seguro de eliminar esta publicación en borrador?')) return;
+                                if (!(await confirmAction('¿Está seguro de eliminar esta publicación en borrador?', { title: 'Eliminar borrador', danger: true }))) return;
                                 try { setLoading(true); await deleteLegal(r.id); load(); }
-                                catch (e: any) { alert(e.message || 'Error al eliminar'); setLoading(false); }
+                                catch (e: any) { void showAlert(e.message || 'Error al eliminar', { title: 'Error' }); setLoading(false); }
                               }}
                             >
                               Borrar
@@ -256,6 +251,4 @@ export default function Historial() {
     </section>
   )
 }
-
-
 

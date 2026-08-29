@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { addLegalPayment, downloadLegal, listPayments, type PaymentMethod, uploadLegalPdf } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function PublicarDocumentoPDF() {
+  const { showAlert } = useDialog()
   const [step, setStep] = useState<1 | 2>(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -50,7 +52,7 @@ export default function PublicarDocumentoPDF() {
 
   const submitPayment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!accepted) { alert('Debe aceptar los Términos y Condiciones.'); return }
+    if (!accepted) { void showAlert('Debe aceptar los Términos y Condiciones.', { title: 'Aceptación requerida' }); return }
     if (!requestId) return
     setBusy(true)
     try {
@@ -63,9 +65,9 @@ export default function PublicarDocumentoPDF() {
         mobile_phone: pay.type === 'pago móvil' ? (pay.mobile_phone || '') : undefined,
         status: 'Por verificar'
       })
-      alert('Pago reportado. Su solicitud está por verificar.')
+      await showAlert('Pago reportado. Su solicitud está por verificar.', { title: 'Pago reportado' })
     } catch (e: any) {
-      alert(e.message || 'No se pudo reportar el pago')
+      void showAlert(e.message || 'No se pudo reportar el pago', { title: 'Error' })
     } finally { setBusy(false) }
   }
 
@@ -98,7 +100,7 @@ export default function PublicarDocumentoPDF() {
               <div>N.º de folios: <span className="font-medium">{folios}</span></div>
               <div>Precio unitario (Bs.): <span className="font-medium">{pricing?.unit_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               <div>Subtotal (Bs.): <span className="font-medium">{pricing?.subtotal_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-              <div>IVA ({pricing?.iva_percent}%): <span className="font-medium">{pricing?.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              <div className="hidden">IVA ({pricing?.iva_percent}%): <span className="font-medium">{pricing?.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               <div className="md:col-span-2">TOTAL (Bs.): <span className="font-semibold">{pricing?.total_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
             </div>
             <div className="mt-3">

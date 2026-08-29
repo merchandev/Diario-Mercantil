@@ -5,6 +5,8 @@ import { listLegal, type LegalRequest, getLegal, updateLegal, verifyLegal, rejec
 import ConfirmDialog from '../components/ConfirmDialog'
 import QRCodeModal from '../components/QRCodeModal'
 import { BANCOS_VENEZUELA } from '../constants/banks'
+import { useDialog } from '../contexts/DialogContext'
+import { formatCaracasDateTime } from '../components/LegalRequestDetails'
 
 const estOpts = ['Todos', 'Pendiente', 'Por verificar', 'En trámite', 'Publicado', 'Rechazado']
 const mapFilterStatus = (s: string) => s === 'Pendiente' ? 'Borrador' : (s === 'Publicado' ? 'Publicada' : s)
@@ -12,6 +14,7 @@ const mapFilterStatus = (s: string) => s === 'Pendiente' ? 'Borrador' : (s === '
 export default function Publicaciones() {
   const location = useLocation()
   const navigate = useNavigate()
+  const { showAlert, requestText } = useDialog()
   const [rows, setRows] = useState<LegalRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -109,7 +112,7 @@ export default function Publicaciones() {
     const phone = String(fd.get('mobile_phone') || '').replace(/\D/g, '').slice(0, 7)
     const amount = Number(fd.get('amount_bs') || 0)
     if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
-      alert('Revise referencia, operadora, teléfono y monto del Pago Móvil.')
+      void showAlert('Revise referencia, operadora, teléfono y monto del Pago Móvil.', { title: 'Datos inválidos' })
       return
     }
     await addLegalPayment(sel.id, {
@@ -143,7 +146,7 @@ export default function Publicaciones() {
           await deleteLegal(id)
           reload()
         } catch (e: any) {
-          alert('Error: ' + (e.message || 'No se pudo eliminar'))
+          void showAlert('Error: ' + (e.message || 'No se pudo eliminar'), { title: 'Error' })
         }
       }
     })
@@ -223,7 +226,7 @@ export default function Publicaciones() {
               {rows.map(r => (
                 <tr key={r.id} className="border-t">
                   <td className="px-4 py-2 font-mono">{r.order_no || r.id}</td>
-                  <td className="px-4 py-2">{prettyDate((r as any).created_at || r.date)}</td>
+                  <td className="px-4 py-2">{formatCaracasDateTime((r as any).created_at || r.date)}</td>
                   <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
                   <td className="px-4 py-2">{razonSocial(r)}</td>
                   <td className="px-4 py-2">{prettyStatus(r.status)}</td>
@@ -235,7 +238,7 @@ export default function Publicaciones() {
                       {/* QR Button removed - QR is now edition-based */}
                       <button className="text-brand-700 hover:underline inline-flex items-center gap-1" onClick={() => navigate(`/dashboard/publicaciones/${r.id}`)}><IconSave /> <span>Detalles</span></button>
                       {['Por verificar', 'En trámite'].includes(r.status) && (
-                        <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = prompt('Motivo del rechazo:'); if (reason === null) return; await rejectLegal(r.id, reason || ''); reload() }}><IconClose /> <span>Rechazar</span></button>
+                        <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true }); if (reason === null) return; await rejectLegal(r.id, reason); reload() }}><IconClose /> <span>Rechazar</span></button>
                       )}
                       <button className="text-emerald-700 hover:underline inline-flex items-center gap-1" onClick={() => download(r.id)}><IconDownload /> <span>Descargar</span></button>
                       {r.status !== 'Publicada' && (
@@ -335,7 +338,7 @@ export default function Publicaciones() {
                 <div><span className="font-semibold">Teléfono:</span> {sel.phone || '-'}</div>
                 <div><span className="font-semibold">Dirección:</span> {sel.address || '-'}</div>
                 <div><span className="font-semibold">CI/RIF:</span> {sel.document}</div>
-                <div><span className="font-semibold">Fecha de Solicitud:</span> {prettyDate((sel as any).created_at || sel.date)}</div>
+                <div><span className="font-semibold">Fecha de Solicitud:</span> {formatCaracasDateTime((sel as any).created_at || sel.date)}</div>
                 <div className="mt-3"><span className="font-semibold">Descripción:</span> Servicio de publicación electrónica en el Diario Mercantil de Venezuela</div>
               </div>
               <div className="grid grid-cols-2 gap-2 mt-3">
@@ -374,10 +377,10 @@ export default function Publicaciones() {
                     <button
                       className="btn bg-red-600 text-white hover:bg-red-700 flex-1"
                       onClick={async () => {
-                        const reason = prompt('Motivo del rechazo:')
+                        const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
                         if (reason === null) return
-                        await rejectLegal(sel.id, reason || 'No especificado')
-                        alert('Solicitud rechazada')
+                        await rejectLegal(sel.id, reason)
+                        await showAlert('Solicitud rechazada', { title: 'Solicitud actualizada' })
                         reload()
                         setSel(null)
                       }}
@@ -389,7 +392,7 @@ export default function Publicaciones() {
               )}
 
               <div className="flex gap-2 mt-3">
-                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateLegal(sel.id, { folios: sel.folios }); const d = await getLegal(sel.id); setSel(d.item); alert('Cambios guardados') }}><IconSave /> <span>Guardar cambios</span></button>
+                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateLegal(sel.id, { folios: sel.folios }); const d = await getLegal(sel.id); setSel(d.item); await showAlert('Cambios guardados', { title: 'Guardado' }) }}><IconSave /> <span>Guardar cambios</span></button>
                 <button className="btn inline-flex items-center gap-2" onClick={() => download(sel.id)}><IconDownload /> <span>Descargar detalle</span></button>
               </div>
             </div>

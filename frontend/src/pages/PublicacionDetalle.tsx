@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getLegal, updateLegal, rejectLegal, verifyLegal, returnToDraftLegal, addLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
+import { getLegal, updateLegal, rejectLegal, verifyLegal, returnToDraftLegal, addLegalPayment, verifyLegalPayment, rejectLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import { IconTrash, IconDownload, IconSave, IconClose, IconPlus, IconArrowLeft, IconQrCode } from '../components/icons'
 import QRCodeModal from '../components/QRCodeModal'
 import LegalRequestDetails from '../components/LegalRequestDetails'
 import { BANCOS_VENEZUELA } from '../constants/banks'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function PublicacionDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { showAlert, confirmAction, requestText } = useDialog()
   const [loading, setLoading] = useState(true)
   const [item, setItem] = useState<LegalRequest | null>(null)
   const [payments, setPayments] = useState<LegalPayment[]>([])
@@ -20,6 +22,8 @@ export default function PublicacionDetalle() {
   const [currentPdfUrl, setCurrentPdfUrl] = useState<string>('')
   const [currentPdfName, setCurrentPdfName] = useState<string>('')
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; url: string; title: string }>({ isOpen: false, url: '', title: '' })
+  const [paymentError, setPaymentError] = useState('')
+  const [processingPaymentId, setProcessingPaymentId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!id) return
@@ -47,7 +51,7 @@ export default function PublicacionDetalle() {
       setFiles(filesData.items)
     } catch (err) {
       console.error('Error loading data:', err)
-      alert('Error al cargar los datos')
+      void showAlert('Error al cargar los datos', { title: 'Error' })
     } finally {
       setLoading(false)
     }
@@ -69,11 +73,11 @@ export default function PublicacionDetalle() {
         address: item.address,
         comment: item.comment
       })
-      alert('✅ Cambios guardados correctamente')
+      await showAlert('Cambios guardados correctamente', { title: 'Guardado' })
       loadData()
     } catch (err) {
       console.error('Error saving:', err)
-      alert('❌ Error al guardar cambios')
+      void showAlert('Error al guardar cambios', { title: 'Error' })
     } finally {
       setSaving(false)
     }
@@ -81,41 +85,41 @@ export default function PublicacionDetalle() {
 
   const onReject = async () => {
     if (!item) return
-    const reason = prompt('Motivo del rechazo:')
+    const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
     if (reason === null) return
     try {
-      await rejectLegal(item.id, reason || 'No especificado')
-      alert('❌ Solicitud rechazada')
+      await rejectLegal(item.id, reason)
+      await showAlert('Solicitud rechazada', { title: 'Solicitud actualizada' })
       navigate('/dashboard/publicaciones')
     } catch (err) {
       console.error('Error rejecting:', err)
-      alert('Error al rechazar')
+      void showAlert('Error al rechazar', { title: 'Error' })
     }
   }
 
   const onApprove = async () => {
     if (!item) return
-    if (!confirm('¿Verificar esta solicitud y marcarla como En trámite?')) return
+    if (!(await confirmAction('¿Verificar esta solicitud y marcarla como En trámite?', { title: 'Verificar solicitud' }))) return
     try {
       await verifyLegal(item.id)
-      alert('✅ Solicitud verificada y en trámite')
+      await showAlert('Solicitud verificada y en trámite', { title: 'Solicitud actualizada' })
       loadData()
     } catch (err: any) {
       console.error('Error approving:', err)
-      alert(err.message || 'Error al aprobar')
+      void showAlert(err.message || 'Error al aprobar', { title: 'Error' })
     }
   }
 
   const onReturnToDraft = async () => {
     if (!item) return
-    if (!confirm('¿Devolver esta solicitud a Borrador?')) return
+    if (!(await confirmAction('¿Devolver esta solicitud a Borrador?', { title: 'Devolver solicitud' }))) return
     try {
       await returnToDraftLegal(item.id)
-      alert('✅ Solicitud devuelta a Borrador')
+      await showAlert('Solicitud devuelta a Borrador', { title: 'Solicitud actualizada' })
       loadData()
     } catch (err: any) {
       console.error('Error returning to draft:', err)
-      alert(err.message || 'Error al devolver a borrador')
+      void showAlert(err.message || 'Error al devolver a borrador', { title: 'Error' })
     }
   }
 
@@ -130,11 +134,15 @@ export default function PublicacionDetalle() {
     const date = String(fd.get('date') || new Date().toISOString().slice(0, 10))
     const amount = Number(fd.get('amount_bs') || 0)
     if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
-      alert('Referencia, teléfono o monto inválidos. Revise los datos del Pago Móvil.')
+      void showAlert('Referencia, teléfono o monto inválidos. Revise los datos del Pago Móvil.', { title: 'Datos inválidos' })
+      return
+    }
+    if (amount > remainingBalance + 0.005) {
+      setPaymentError(`El monto supera el saldo pendiente de ${formatBs(remainingBalance)} Bs.`)
       return
     }
     if (date > new Date().toISOString().slice(0, 10)) {
-      alert('La fecha del pago no puede ser futura.')
+      void showAlert('La fecha del pago no puede ser futura.', { title: 'Fecha inválida' })
       return
     }
     const body: any = {
@@ -147,26 +155,50 @@ export default function PublicacionDetalle() {
       comment: String(fd.get('comment') || '')
     }
     try {
+      setPaymentError('')
       await addLegalPayment(item.id, body)
       form.reset()
       loadData()
-      alert('✅ Pago agregado')
-    } catch (err) {
+      await showAlert('Pago agregado', { title: 'Pago registrado' })
+    } catch (err: any) {
       console.error('Error adding payment:', err)
-      alert('Error al agregar pago')
+      const serverRemaining = Number(err?.data?.remaining_bs)
+      setPaymentError(
+        err?.message === 'payment_exceeds_remaining' && Number.isFinite(serverRemaining)
+          ? `El monto supera el saldo pendiente de ${formatBs(serverRemaining)} Bs.`
+          : err?.message || 'Error al agregar pago'
+      )
+    }
+  }
+
+  const updatePaymentStatus = async (paymentId: number, action: 'verify' | 'reject') => {
+    if (!item || processingPaymentId !== null) return
+    setProcessingPaymentId(paymentId)
+    setPaymentError('')
+    try {
+      if (action === 'verify') {
+        await verifyLegalPayment(item.id, paymentId)
+      } else {
+        await rejectLegalPayment(item.id, paymentId)
+      }
+      await loadData()
+    } catch (err: any) {
+      setPaymentError(err?.message || 'No se pudo actualizar el pago.')
+    } finally {
+      setProcessingPaymentId(null)
     }
   }
 
   const onDeletePayment = async (paymentId: number) => {
     if (!item) return
-    if (!confirm('¿Eliminar este pago?')) return
+    if (!(await confirmAction('¿Eliminar este pago?', { title: 'Eliminar pago', danger: true }))) return
     try {
       await deleteLegalPayment(item.id, paymentId)
       loadData()
-      alert('✅ Pago eliminado')
+      await showAlert('Pago eliminado', { title: 'Pago actualizado' })
     } catch (err) {
       console.error('Error deleting payment:', err)
-      alert('Error al eliminar pago')
+      void showAlert('Error al eliminar pago', { title: 'Error' })
     }
   }
 
@@ -182,7 +214,7 @@ export default function PublicacionDetalle() {
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Error downloading:', err)
-      alert('Error al descargar')
+      void showAlert('Error al descargar', { title: 'Error' })
     }
   }
 
@@ -198,15 +230,16 @@ export default function PublicacionDetalle() {
     setCurrentPdfName('')
   }
 
-  const totalPaid = payments.reduce((s, p) => s + Number(p.amount_bs || 0), 0)
-  const latestPayment = payments[0]
+  const approvedTotal = payments
+    .filter(payment => ['Aprobado', 'Verificado'].includes(payment.status || ''))
+    .reduce((sum, payment) => sum + Number(payment.amount_bs || 0), 0)
+  const reportedTotal = payments
+    .filter(payment => ['Aprobado', 'Verificado', 'Por verificar', 'Pendiente'].includes(payment.status || ''))
+    .reduce((sum, payment) => sum + Number(payment.amount_bs || 0), 0)
+  const orderTotal = Number(item?.total_bs || 0)
+  const remainingBalance = Math.max(0, orderTotal - reportedTotal)
+  const formatBs = (amount: number) => amount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const prettyDate = (s?: string) => s ? s.split('-').reverse().join('/') : '-'
-  const prettyStatus = (s?: string) => {
-    if (!s) return '-'
-    if (s === 'Borrador' || s === 'Pendiente') return 'Pendiente'
-    if (s === 'Publicada' || s === 'Publicado') return 'Publicado'
-    return s
-  }
   const paymentStatusText = (payment?: LegalPayment) => {
     if (!payment) return 'Aún no reportado'
     switch (payment.status) {
@@ -344,47 +377,44 @@ export default function PublicacionDetalle() {
           </div>
         </div>
 
-        {/* Column 4: Pago reportado */}
+        {/* Column 4: Pagos reportados */}
         <div className="card p-4 space-y-3 bg-emerald-50 border-emerald-200">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg text-emerald-900">Pago reportado</h3>
-            <span className="text-xs px-2 py-1 rounded-full bg-white text-emerald-800 border border-emerald-200">
-              {paymentStatusText(latestPayment)}
-            </span>
+          <h3 className="font-semibold text-lg text-emerald-900">Pagos reportados</h3>
+          <div className="grid gap-2 text-sm rounded-lg bg-white p-3 border border-emerald-100">
+            <div className="flex justify-between"><span>Total de la orden:</span><strong>{formatBs(orderTotal)} Bs.</strong></div>
+            <div className="flex justify-between"><span>Pagado:</span><strong>{formatBs(approvedTotal)} Bs.</strong></div>
+            <div className="flex justify-between"><span>Pagado / reportado:</span><strong>{formatBs(reportedTotal)} Bs.</strong></div>
+            <div className="flex justify-between text-emerald-900"><span>Saldo pendiente:</span><strong>{formatBs(remainingBalance)} Bs.</strong></div>
           </div>
-          {latestPayment ? (
-            <div className="space-y-2 text-sm text-slate-800">
-              <div className="flex justify-between"><span className="font-medium">Referencia:</span><span>{latestPayment.ref}</span></div>
-              <div className="flex justify-between"><span className="font-medium">Fecha:</span><span>{prettyDate(latestPayment.date)}</span></div>
-              <div className="flex justify-between"><span className="font-medium">Banco:</span><span>{latestPayment.bank}</span></div>
-              <div className="flex justify-between"><span className="font-medium">Tipo:</span><span>{latestPayment.type === 'pago_movil' ? 'Pago Móvil' : latestPayment.type}</span></div>
-              <div className="flex justify-between"><span className="font-medium">Monto:</span><span className="font-mono">{Number(latestPayment.amount_bs || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.</span></div>
-              {latestPayment.mobile_phone && (
-                <div className="flex justify-between"><span className="font-medium">Telf. Pago Móvil:</span><span>{latestPayment.mobile_phone}</span></div>
-              )}
-              <div className="flex justify-between"><span className="font-medium">Estado:</span>
-                <span className={`px-2 py-1 rounded text-xs ${latestPayment.status === 'Verificado' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                  {latestPayment.status}
+          {payments.length > 0 ? payments.map(payment => (
+            <div key={payment.id} className="space-y-2 text-sm text-slate-800 rounded-lg bg-white p-3 border border-emerald-100">
+              <div className="flex justify-between"><span className="font-medium">Monto:</span><span className="font-mono">{formatBs(Number(payment.amount_bs || 0))} Bs.</span></div>
+              <div className="flex justify-between"><span className="font-medium">Banco:</span><span className="text-right">{payment.bank || '-'}</span></div>
+              <div className="flex justify-between"><span className="font-medium">Referencia:</span><span>{payment.ref || '-'}</span></div>
+              <div className="flex justify-between"><span className="font-medium">Teléfono:</span><span>{payment.mobile_phone || '-'}</span></div>
+              <div className="flex justify-between"><span className="font-medium">Fecha:</span><span>{prettyDate(payment.date)}</span></div>
+              <div className="flex justify-between items-center"><span className="font-medium">Estado:</span>
+                <span className={`px-2 py-1 rounded text-xs ${['Aprobado', 'Verificado'].includes(payment.status || '') ? 'bg-green-100 text-green-800' : payment.status === 'Rechazado' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'}`}>
+                  {paymentStatusText(payment)}
                 </span>
               </div>
-              {latestPayment.comment && (
-                <div>
-                  <span className="font-medium block">Comentario:</span>
-                  <p className="text-slate-700">{latestPayment.comment}</p>
+              {payment.comment && <p className="text-slate-600">{payment.comment}</p>}
+              {payment.status === 'Por verificar' && (
+                <div className="flex gap-2 pt-1">
+                  <button type="button" className="btn btn-primary text-xs" disabled={processingPaymentId !== null} onClick={() => updatePaymentStatus(payment.id, 'verify')}>Aprobar pago</button>
+                  <button type="button" className="btn bg-rose-600 text-white text-xs" disabled={processingPaymentId !== null} onClick={() => updatePaymentStatus(payment.id, 'reject')}>Rechazar pago</button>
                 </div>
               )}
             </div>
-          ) : (
+          )) : (
             <p className="text-sm text-slate-600">No hay pagos cargados por el solicitante.</p>
           )}
-          <div className="border-t pt-3 text-xs text-slate-600">
-            Desde aquí el administrador valida el pago y puede aprobar/rechazar en la sección superior.
-          </div>
+          {paymentError && <p className="text-sm text-rose-700" role="alert">{paymentError}</p>}
         </div>
       </div>
 
       {/* Add Payment Form */}
-      {item.status === 'En trámite' && (
+      {item.status === 'En trámite' && remainingBalance > 0 && (
         <form onSubmit={onAddPayment} className="card p-4 border border-slate-200 space-y-3">
           <div>
             <h4 className="font-semibold text-slate-800">Agregar Pago Móvil adicional</h4>
@@ -399,7 +429,7 @@ export default function PublicacionDetalle() {
                 <option key={bank} value={bank}>{bank}</option>
               ))}
             </select>
-            <input className="input" name="amount_bs" type="number" min="0.01" step="0.01" placeholder="Monto parcial Bs." required />
+            <input className="input" name="amount_bs" type="number" min="0.01" max={remainingBalance} step="0.01" placeholder="Monto parcial Bs." required />
             <select className="input" name="mobile_prefix" defaultValue="0412" required>
               {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
             </select>
@@ -409,6 +439,7 @@ export default function PublicacionDetalle() {
           <button className="btn btn-primary">
             <IconPlus /> Agregar Pago
           </button>
+          {paymentError && <p className="text-sm text-rose-700" role="alert">{paymentError}</p>}
         </form>
       )}
 

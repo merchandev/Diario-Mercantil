@@ -17,7 +17,8 @@ final class LegalRequestStateMachine {
 
         try {
             // Lock row
-            $stmt = $this->pdo->prepare('SELECT * FROM legal_requests WHERE id=? FOR UPDATE');
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+            $stmt = $this->pdo->prepare('SELECT * FROM legal_requests WHERE id=?' . $lockClause);
             $stmt->execute([$id]);
             $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -93,7 +94,8 @@ final class LegalRequestStateMachine {
             }
 
             // Lock associated payments FOR UPDATE to prevent race conditions
-            $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=? FOR UPDATE")->execute([$id]);
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+            $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=?" . $lockClause)->execute([$id]);
             
             $now = gmdate('Y-m-d H:i:s');
             
