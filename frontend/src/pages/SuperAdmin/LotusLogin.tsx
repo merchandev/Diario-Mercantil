@@ -17,7 +17,6 @@ export default function LotusLogin() {
 
         try {
             const res = await superadminLogin({ username, password })
-            localStorage.setItem('superadmin', JSON.stringify(res.superadmin))
             navigate('/lotus/dashboard')
         } catch (err: any) {
             // SECURITY: Never expose server errors to prevent information leakage

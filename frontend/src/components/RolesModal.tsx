@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import { getSettings, saveSettings } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function RolesModal({ open, onClose }:{ open:boolean; onClose:()=>void }){
+  const { showAlert } = useDialog()
   const [loading, setLoading] = useState(false)
   const [defaultRole, setDefaultRole] = useState<string>('solicitante')
 
@@ -9,7 +11,7 @@ export default function RolesModal({ open, onClose }:{ open:boolean; onClose:()=
 
   const onSave = async()=>{
     setLoading(true)
-    try{ await saveSettings({ default_user_role: defaultRole }) ; alert('Guardado') }catch(e){ alert('Error al guardar') }finally{ setLoading(false); onClose() }
+    try{ await saveSettings({ default_user_role: defaultRole }); await showAlert('Configuración guardada.', { title: 'Guardado' }) }catch(e){ void showAlert('Error al guardar.', { title: 'Error' }) }finally{ setLoading(false); onClose() }
   }
 
   if (!open) return null
