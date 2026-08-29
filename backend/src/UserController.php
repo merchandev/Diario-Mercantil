@@ -17,6 +17,18 @@ class UserController {
           ->execute([$actorId, $action, $type, $resId, $bJson, $aJson, $ip]);
   }
 
+  
+  public function get($id) {
+    $u = AuthController::requireAuth();
+    if (!RolePolicy::canManageUsers($u)) return Response::json(['error'=>'forbidden'],403);
+    $pdo = Database::pdo();
+    $s = $pdo->prepare('SELECT id, name, document, phone, email, role, status, person_type, created_at, updated_at, avatar_url, avatar_updated_at FROM users WHERE id=?');
+    $s->execute([$id]);
+    $user = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$user) return Response::json(['error'=>'not_found'],404);
+    return Response::json($user);
+  }
+
   public function list(){
     $u = AuthController::requireAuth(); 
     if ($u['role'] !== RolePolicy::ADMIN && $u['role'] !== RolePolicy::SUPERADMIN) {

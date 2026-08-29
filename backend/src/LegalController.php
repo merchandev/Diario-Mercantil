@@ -95,6 +95,12 @@ class LegalController {
         $params[] = $editionCode;
     }
     
+    $userIdFilter = $_GET['user_id'] ?? '';
+    if ($userIdFilter !== '' && RolePolicy::canManageLegalRequests($u)) {
+        $sql .= " AND l.user_id = ?";
+        $params[] = $userIdFilter;
+    }
+    
     $reqFrom = $_GET['req_from'] ?? '';
     if ($reqFrom !== '') {
         $sql .= " AND l.created_at >= ?";

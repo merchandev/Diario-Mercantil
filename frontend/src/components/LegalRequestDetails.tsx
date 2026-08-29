@@ -1,3 +1,17 @@
+export function formatCaracasDateTime(value?: string) {
+  if (!value) return '-'
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T') + 'Z'
+  return new Intl.DateTimeFormat('es-VE', {
+    timeZone: 'America/Caracas',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).format(new Date(normalized))
+}
+
 import type { LegalRequest } from '../lib/api'
 import type React from 'react'
 

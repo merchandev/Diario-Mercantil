@@ -241,15 +241,17 @@ export default function PublicacionDetalle() {
       </div>
 
       {/* Quick Actions */}
-      {item.status === 'Por verificar' && (
+      {['Por verificar', 'En tr�mite'].includes(item.status) && (
         <div className="card p-4 bg-amber-50 border-amber-200">
-          <p className="font-semibold text-amber-900 mb-3">⚠️ Solicitud pendiente de verificación</p>
+          <p className="font-semibold text-amber-900 mb-3">?? Acciones de Verificaci�n</p>
           <div className="flex gap-2">
-            <button className="btn bg-green-600 text-white hover:bg-green-700" onClick={onApprove}>
-              ✓ Verificar publicación
-            </button>
+            {item.status === 'Por verificar' && (
+              <button className="btn bg-green-600 text-white hover:bg-green-700" onClick={onApprove}>
+                ? Verificar publicaci�n
+              </button>
+            )}
             <button className="btn bg-red-600 text-white hover:bg-red-700" onClick={onReject}>
-              ✗ Rechazar
+              ? Rechazar
             </button>
             <button className="btn bg-slate-600 text-white hover:bg-slate-700" onClick={onReturnToDraft}>
               Devolver a Borrador
