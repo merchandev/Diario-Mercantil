@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { getSettings, getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Configuracion() {
+  const { showAlert, confirmAction, requestText } = useDialog()
   const [s, setS] = useState<Partial<Settings>>({})
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState<'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
   const [areas, setAreas] = useState<{ id: number; name: string }[]>([])
   const [colleges, setColleges] = useState<{ id: number; name: string }[]>([])
+  const [selectedAreaId, setSelectedAreaId] = useState(0)
+  const [selectedCollegeId, setSelectedCollegeId] = useState(0)
 
   useEffect(() => { getAdminSettings().then(r => setS(r.settings)).catch(() => { }) }, [])
   const loadDir = async () => {
@@ -20,6 +24,9 @@ export default function Configuracion() {
     setSaving(true)
     try {
       await saveSettings(s)
+      await showAlert('Configuración guardada.', { title: 'Guardado' })
+    } catch (error: any) {
+      void showAlert(error?.message || 'No se pudo guardar la configuración.', { title: 'Error' })
     } finally {
       setSaving(false)
     }
@@ -101,30 +108,30 @@ export default function Configuracion() {
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2"><div className="font-medium">Áreas de Ejercicio Profesional</div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={() => {
-                    const sel = (document.getElementById('areas-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (!id) return; const cur = areas.find(a => a.id === id); const name = prompt('Modificar área', cur?.name || ''); if (name && name.trim()) updateDirArea(id, name.trim()).then(loadDir)
+                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={async () => {
+                    if (!selectedAreaId) return; const cur = areas.find(a => a.id === selectedAreaId); const name = await requestText('Nombre del área profesional.', { title: 'Modificar área', initialValue: cur?.name || '' }); if (name) { await updateDirArea(selectedAreaId, name); await loadDir() }
                   }}>Modificar</button>
-                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={() => { const name = prompt('Nueva área'); if (name && name.trim()) createDirArea(name.trim()).then(loadDir) }}>Nueva Área</button>
+                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={async () => { const name = await requestText('Nombre del área profesional.', { title: 'Nueva área' }); if (name) { await createDirArea(name); await loadDir() } }}>Nueva Área</button>
                 </div>
               </div>
-              <select id="areas-list" multiple className="w-full h-64 border rounded p-2" size={12}>
+              <select id="areas-list" className="w-full h-64 border rounded p-2" size={12} value={selectedAreaId || ''} onChange={event => setSelectedAreaId(Number(event.target.value))}>
                 {areas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
-              <div className="mt-2 text-right"><button className="text-rose-700 hover:underline" onClick={() => { const sel = (document.getElementById('areas-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (id && confirm('¿Eliminar área?')) deleteDirArea(id).then(loadDir) }}>Eliminar</button></div>
+              <div className="mt-2 text-right"><button className="text-rose-700 hover:underline" onClick={async () => { if (selectedAreaId && await confirmAction('¿Eliminar el área seleccionada?', { title: 'Eliminar área', danger: true })) { await deleteDirArea(selectedAreaId); setSelectedAreaId(0); await loadDir() } }}>Eliminar</button></div>
             </div>
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2"><div className="font-medium">Colegios</div>
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={() => {
-                    const sel = (document.getElementById('colegios-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (!id) return; const cur = colleges.find(c => c.id === id); const name = prompt('Modificar colegio', cur?.name || ''); if (name && name.trim()) updateDirCollege(id, name.trim()).then(loadDir)
+                  <button className="btn btn-outline flex-1 sm:flex-none" onClick={async () => {
+                    if (!selectedCollegeId) return; const cur = colleges.find(c => c.id === selectedCollegeId); const name = await requestText('Nombre del colegio profesional.', { title: 'Modificar colegio', initialValue: cur?.name || '' }); if (name) { await updateDirCollege(selectedCollegeId, name); await loadDir() }
                   }}>Modificar</button>
-                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={() => { const name = prompt('Nuevo colegio'); if (name && name.trim()) createDirCollege(name.trim()).then(loadDir) }}>Nuevo Colegio</button>
+                  <button className="btn btn-primary flex-1 sm:flex-none" onClick={async () => { const name = await requestText('Nombre del colegio profesional.', { title: 'Nuevo colegio' }); if (name) { await createDirCollege(name); await loadDir() } }}>Nuevo Colegio</button>
                 </div>
               </div>
-              <select id="colegios-list" multiple className="w-full h-64 border rounded p-2" size={12}>
+              <select id="colegios-list" className="w-full h-64 border rounded p-2" size={12} value={selectedCollegeId || ''} onChange={event => setSelectedCollegeId(Number(event.target.value))}>
                 {colleges.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <div className="mt-2 text-right"><button className="text-rose-700 hover:underline" onClick={() => { const sel = (document.getElementById('colegios-list') as HTMLSelectElement); const id = Number(sel?.value || 0); if (id && confirm('¿Eliminar colegio?')) deleteDirCollege(id).then(loadDir) }}>Eliminar</button></div>
+              <div className="mt-2 text-right"><button className="text-rose-700 hover:underline" onClick={async () => { if (selectedCollegeId && await confirmAction('¿Eliminar el colegio seleccionado?', { title: 'Eliminar colegio', danger: true })) { await deleteDirCollege(selectedCollegeId); setSelectedCollegeId(0); await loadDir() } }}>Eliminar</button></div>
             </div>
           </div>
         )}

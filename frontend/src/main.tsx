@@ -5,6 +5,7 @@ import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
 import './setupLogging'
 import './index.css'
+import { DialogProvider } from './contexts/DialogContext'
 
 // Diagnostic: Force cache invalidation (Nov 18, 2025 02:58 UTC)
 console.log('🚀 [main.tsx] Module loaded, mounting React app...')
@@ -19,7 +20,9 @@ createRoot(document.getElementById('root')!).render(
           v7_relativeSplatPath: true,
         }}
       >
-        <App />
+        <DialogProvider>
+          <App />
+        </DialogProvider>
       </BrowserRouter>
     </ErrorBoundary>
   </React.StrictMode>

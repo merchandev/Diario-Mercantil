@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { getSettings, saveSettings } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Settings(){
+  const { showAlert } = useDialog()
   const [s, setS] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string|null>(null)
@@ -15,9 +17,16 @@ export default function Settings(){
       }) 
   },[])
   const onSave = async(e:React.FormEvent)=>{
-    e.preventDefault(); setSaving(true)
-    await saveSettings(s); setSaving(false)
-    alert('Guardado')
+    e.preventDefault(); setSaving(true); setError(null)
+    try {
+      await saveSettings(s)
+      await showAlert('Configuración guardada.', { title: 'Guardado' })
+    } catch (err: any) {
+      setError(err?.message || 'No se pudo guardar la configuración')
+      void showAlert(err?.message || 'No se pudo guardar la configuración.', { title: 'Error' })
+    } finally {
+      setSaving(false)
+    }
   }
   return (
     <form onSubmit={onSave} className="card p-6 space-y-4">

@@ -33,8 +33,6 @@ export default function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) 
     } catch (err) {
       console.error('Error en logout:', err)
     }
-    localStorage.removeItem('token')
-    sessionStorage.removeItem('token')
     location.href = '/login'
   }
 

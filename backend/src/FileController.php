@@ -5,6 +5,8 @@ require_once __DIR__.'/UploadController.php';
 require_once __DIR__."/Http/StoragePath.php";
 
 class FileController {
+  private const PUBLIC_MEDIA_SETTINGS = ['banner_main_1', 'banner_sidebar', 'promo_popup'];
+
   private function requireAdmin() {
       require_once __DIR__.'/AuthController.php';
       $u = AuthController::requireAuth();
@@ -75,6 +77,14 @@ class FileController {
   public function softDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    $references = $this->publicSettingReferences($pdo, (int)$id);
+    if ($references) {
+      Response::json([
+        'error'=>'file_in_use',
+        'message'=>'No se puede eliminar este archivo porque actualmente está siendo utilizado como banner.',
+        'settings'=>$references,
+      ], 409);
+    }
     $pdo->prepare('UPDATE files SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
   }
@@ -103,6 +113,14 @@ class FileController {
   public function permanentDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    $references = $this->publicSettingReferences($pdo, (int)$id);
+    if ($references) {
+      Response::json([
+        'error'=>'file_in_use',
+        'message'=>'No se puede eliminar este archivo porque actualmente está siendo utilizado como banner.',
+        'settings'=>$references,
+      ], 409);
+    }
     $f = $pdo->prepare('SELECT path FROM files WHERE id=?');
     $f->execute([$id]);
     $file = $f->fetch(PDO::FETCH_ASSOC);
@@ -144,6 +162,10 @@ class FileController {
     $count = 0;
     $failed = [];
     foreach ($files as $f) {
+        if ($this->publicSettingReferences($pdo, (int)$f['id'])) {
+            $failed[] = (int)$f['id'];
+            continue;
+        }
         if (!empty($f['path'])) {
             try {
                 $fullPath = StoragePath::getFile($f['path']);
@@ -172,28 +194,48 @@ class FileController {
     Response::json(['ok'=>count($failed)===0, 'count'=>$count, 'failed'=>$failed]);
   }
 
+  private function publicSettingReferences(PDO $pdo, int $fileId): array {
+    $placeholders = implode(',', array_fill(0, count(self::PUBLIC_MEDIA_SETTINGS), '?'));
+    $sql = "SELECT `key`, value FROM settings WHERE `key` IN ($placeholders)";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(self::PUBLIC_MEDIA_SETTINGS);
+
+    $references = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      if (preg_match('~/api/uploads/(\d+)(?:$|[/?#])~', (string)($row['value'] ?? ''), $matches)
+          && (int)$matches[1] === $fileId) {
+        $references[] = (string)$row['key'];
+      }
+    }
+    return $references;
+  }
+
   public function sse(): never {
-    // Auth via Authorization: Bearer or token query
     AuthController::requireAuth();
     Response::sseHeaders();
+    set_time_limit(0);
+    ignore_user_abort(false);
     $retry = (int) (getenv('SSE_RETRY_MS') ?: 2000);
     echo "retry: $retry\n\n";
     $pdo = Database::pdo();
-    $lastId = 0;
-    while (true) {
-      $stmt = $pdo->query('SELECT e.id, e.file_id, e.ts, e.type, e.message FROM file_events e ORDER BY e.id DESC LIMIT 20');
+    $lastId = max(0, (int)($_SERVER['HTTP_LAST_EVENT_ID'] ?? 0));
+    $startedAt = time();
+    while (!connection_aborted() && time() - $startedAt < 25) {
+      $stmt = $pdo->prepare('SELECT e.id, e.file_id, e.ts, e.type, e.message FROM file_events e WHERE e.id > ? ORDER BY e.id ASC LIMIT 20');
+      $stmt->execute([$lastId]);
       $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      foreach (array_reverse($rows) as $row) {
-        if ($row['id'] <= $lastId) continue;
+      foreach ($rows as $row) {
         $lastId = $row['id'];
         $data = json_encode($row);
         echo "id: {$row['id']}\n";
         echo "event: file_event\n";
         echo "data: $data\n\n";
       }
+      if (!$rows) echo ": keep-alive\n\n";
       @ob_flush(); @flush();
       sleep(2);
     }
+    exit;
   }
 
 
@@ -286,5 +328,3 @@ class FileController {
     exit;
   }
 }
-
-

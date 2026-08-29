@@ -106,14 +106,31 @@ class SystemController {
     public function saveSettings(){
         $in = json_decode(file_get_contents('php://input'), true);
         $pdo = Database::pdo();
+        $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
+        $now = gmdate('Y-m-d H:i:s');
         foreach($in as $k=>$v){
             $validatedValue = SettingSchema::validate((string)$k, $v);
-            $pdo->prepare('INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, NOW()) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = NOW()')
-                ->execute([$k, $validatedValue]);
+            $bannerFileId = null;
+            if (in_array((string)$k, ['banner_main_1', 'banner_sidebar', 'promo_popup'], true) && $validatedValue !== '') {
+                if (!preg_match('~/api/uploads/(\d+)(?:$|[/?#])~', (string)$validatedValue, $m)) {
+                    Response::json(['error'=>'invalid_banner_file'], 422);
+                }
+                $bannerFileId = (int)$m[1];
+                $fileStmt = $pdo->prepare('SELECT name, type FROM files WHERE id=? AND deleted_at IS NULL');
+                $fileStmt->execute([$bannerFileId]);
+                $file = $fileStmt->fetch(PDO::FETCH_ASSOC);
+                $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
+                if (!$file || !in_array($extension, ['jpg','jpeg','png','webp','gif'], true)) {
+                    Response::json(['error'=>'invalid_banner_file'], 422);
+                }
+            }
+            $upsertSql = $isSqlite
+                ? 'INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, ?) ON CONFLICT(`key`) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at'
+                : 'INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)';
+            $pdo->prepare($upsertSql)->execute([$k, $validatedValue, $now]);
 
-            if (in_array((string)$k, ['banner_main_1', 'banner_sidebar', 'promo_popup'], true)
-                && preg_match('#/api/uploads/(\d+)#', (string)$validatedValue, $m)) {
-                $pdo->prepare('UPDATE files SET is_public=1 WHERE id=?')->execute([(int)$m[1]]);
+            if ($bannerFileId !== null) {
+                $pdo->prepare('UPDATE files SET is_public=1 WHERE id=?')->execute([$bannerFileId]);
             }
         }
         Response::json(["ok"=>true]);

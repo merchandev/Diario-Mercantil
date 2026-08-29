@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react'
 import { listTrashedLegal, restoreLegal, permanentDeleteLegal, emptyTrash, type LegalRequest } from '../lib/api'
 import { IconTrash, IconArrowLeft } from '../components/icons'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Papelera() {
+  const { showAlert } = useDialog()
   const [items, setItems] = useState<LegalRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -15,7 +17,7 @@ export default function Papelera() {
       const r = await listTrashedLegal()
       setItems(r.items)
     } catch (e: any) {
-      alert('Error al cargar papelera: ' + (e.message || 'Error desconocido'))
+      void showAlert('Error al cargar papelera: ' + (e.message || 'Error desconocido'), { title: 'Error' })
     } finally {
       setLoading(false)
     }
@@ -37,7 +39,7 @@ export default function Papelera() {
           loadTrash()
           setSelected(new Set())
         } catch (e: any) {
-          alert('Error: ' + (e.message || 'No se pudo restaurar'))
+          void showAlert('Error: ' + (e.message || 'No se pudo restaurar'), { title: 'Error' })
         }
       }
     })
@@ -55,7 +57,7 @@ export default function Papelera() {
           loadTrash()
           setSelected(new Set())
         } catch (e: any) {
-          alert('Error: ' + (e.message || 'No se pudo eliminar'))
+          void showAlert('Error: ' + (e.message || 'No se pudo eliminar'), { title: 'Error' })
         }
       }
     })
@@ -70,18 +72,18 @@ export default function Papelera() {
       onConfirm: async () => {
         try {
           const r = await emptyTrash()
-          alert(r.message || `Se eliminaron ${r.count} publicaciones`)
+          await showAlert(r.message || `Se eliminaron ${r.count} publicaciones`, { title: 'Papelera vaciada' })
           loadTrash()
           setSelected(new Set())
         } catch (e: any) {
-          alert('Error: ' + (e.message || 'No se pudo vaciar la papelera'))
+          void showAlert('Error: ' + (e.message || 'No se pudo vaciar la papelera'), { title: 'Error' })
         }
       }
     })
   }
 
   const handleDeleteSelected = async () => {
-    if (selected.size === 0) return alert('No hay publicaciones seleccionadas')
+    if (selected.size === 0) { void showAlert('No hay publicaciones seleccionadas.', { title: 'Seleccione publicaciones' }); return }
     setConfirmDialog({
       isOpen: true,
       title: 'Eliminar seleccionadas',
@@ -95,7 +97,7 @@ export default function Papelera() {
           loadTrash()
           setSelected(new Set())
         } catch (e: any) {
-          alert('Error: ' + (e.message || 'No se pudieron eliminar todas las publicaciones'))
+          void showAlert('Error: ' + (e.message || 'No se pudieron eliminar todas las publicaciones'), { title: 'Error' })
           loadTrash()
         }
       }

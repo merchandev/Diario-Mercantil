@@ -3,8 +3,10 @@ import { ArrowLeft, Save, DollarSign, FileText, Settings as SettingsIcon, Refres
 import { useNavigate } from 'react-router-dom'
 import { getSettings, saveSettings, forceRefreshBcv, Settings as SettingsType } from '../../lib/api'
 import { verifySuperAdmin } from '../../lib/api'
+import { useDialog } from '../../contexts/DialogContext'
 
 export default function Settings() {
+    const { showAlert } = useDialog()
     const [settings, setSettings] = useState<Partial<SettingsType>>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -32,10 +34,10 @@ export default function Settings() {
         setSaving(true)
         try {
             await saveSettings(settings)
-            alert('Configuración guardada correctamente')
+            await showAlert('Configuración guardada correctamente.', { title: 'Guardado' })
         } catch (error) {
             console.error('Error saving settings:', error)
-            alert('Error al guardar configuración')
+            void showAlert('Error al guardar configuración.', { title: 'Error' })
         } finally {
             setSaving(false)
         }
@@ -47,13 +49,13 @@ export default function Settings() {
             const res = await forceRefreshBcv()
             if (res.rate) {
                 setSettings(prev => ({ ...prev, bcv_rate: res.rate }))
-                alert(`Tasa actualizada correctamente: ${res.rate} Bs/USD`)
+                await showAlert(`Tasa actualizada correctamente: ${res.rate} Bs/USD`, { title: 'Tasa actualizada' })
             } else {
-                alert('No se pudo obtener la tasa. Verifique conexión.')
+                void showAlert('No se pudo obtener la tasa. Verifique conexión.', { title: 'Error' })
             }
         } catch (error: any) {
             console.error('Error refreshing BCV:', error)
-            alert('Error al actualizar tasa: ' + (error.message || 'Desconocido'))
+            void showAlert('Error al actualizar tasa: ' + (error.message || 'Desconocido'), { title: 'Error' })
         } finally {
             setRefreshingRate(false)
         }

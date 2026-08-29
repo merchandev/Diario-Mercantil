@@ -16,6 +16,7 @@ import RequireAdmin from './components/RequireAdmin'
 import PublicLayout from './components/PublicLayout'
 import ApplicantLayout from './pages/solicitante/Layout'
 import PublishChoiceModal from './components/PublishChoiceModal'
+import { logout } from './lib/api'
 
 // Helper to auto-reload page if a chunk is missing (deployment cache issue)
 function lazyImport(factory: () => Promise<{ default: React.ComponentType<any> }>) {
@@ -109,14 +110,20 @@ export default function App() {
 
     const resetTimer = () => {
       clearTimeout(timer)
-      const role = localStorage.getItem('user_role') || sessionStorage.getItem('user_role') || localStorage.getItem('token')
+      const role = localStorage.getItem('user_role') || sessionStorage.getItem('user_role')
       if (role) {
-        timer = setTimeout(() => {
+        timer = setTimeout(async () => {
           console.warn('⏰ Inactivity timeout - logging out')
-          localStorage.removeItem('token')
-          sessionStorage.removeItem('token')
+          try {
+            await logout()
+          } catch {
+            // Continue with local cleanup even if the server is unreachable.
+          }
           localStorage.removeItem('user_role')
-          window.location.href = '/login'
+          localStorage.removeItem('user_name')
+          localStorage.removeItem('user_doc')
+          sessionStorage.clear()
+          window.location.assign('/login')
         }, TIMEOUT)
       }
     }

@@ -180,8 +180,6 @@ export default function PublicHeader() {
                     </Link>
                     <button onClick={async () => {
                       try { await logout(); } catch (e) { }
-                      localStorage.removeItem('token');
-                      sessionStorage.removeItem('token');
                       window.location.href = '/login';
                     }} className="btn btn-outline border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 h-9 px-4 flex items-center gap-2" title="Cerrar sesión">
                       <IconLogout className="w-4 h-4" /> <span>Salir</span>
@@ -222,8 +220,6 @@ export default function PublicHeader() {
                   try {
                     await logout();
                   } catch (e) { }
-                  localStorage.removeItem('token');
-                  sessionStorage.removeItem('token');
                   window.location.href = '/login';
                 }} className="btn btn-ghost h-9 px-2 text-slate-500 hover:text-red-600" title="Cerrar sesión">
                   <IconLogout className="w-5 h-5" />
