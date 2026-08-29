@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
 import { clearStats, getStats } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function PanelHome() {
-  const [stats, setStats] = useState<{ publications: number; editions: number; users_active: number }>({ publications: 0, editions: 0, users_active: 0 })
+  const { confirmAction } = useDialog()
+  const [stats, setStats] = useState<{ publications: number; editions: number; editions_published: number; users_active: number }>({ publications: 0, editions: 0, editions_published: 0, users_active: 0 })
   const [loading, setLoading] = useState(false)
-  const load = () => getStats().then(setStats).catch(() => setStats({ publications: 0, editions: 0, users_active: 0 }))
+  const load = () => getStats().then(s => setStats(s as any)).catch(() => setStats({ publications: 0, editions: 0, editions_published: 0, users_active: 0 }))
   useEffect(() => { load() }, [])
   const onClear = async () => {
-    if (!confirm('¿Seguro que deseas borrar todas las publicaciones, ediciones y pagos? Esta acción no se puede deshacer.')) return
+    if (!(await confirmAction('¿Seguro que deseas borrar todas las publicaciones, ediciones y pagos? Esta acción no se puede deshacer.', { title: 'Limpiar datos', danger: true }))) return
     setLoading(true)
-    try { const r = await clearStats(); setStats(r) } finally { setLoading(false) }
+    try { const r = await clearStats(); setStats(r as any) } finally { setLoading(false) }
   }
 
   const onClearCache = async () => {
-    if (!confirm('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión, limpiará los datos almacenados localmente y recargará todo el sitio original.')) return
+    if (!(await confirmAction('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión, limpiará los datos almacenados localmente y recargará todo el sitio original.', { title: 'Vaciar caché', danger: true }))) return
 
     try {
       localStorage.clear()
@@ -36,8 +38,8 @@ export default function PanelHome() {
     window.location.href = window.location.href.split('#')[0] + '?clear=' + new Date().getTime()
   }
   const cards = [
-    { t: 'Publicaciones', v: String(stats.publications) },
-    { t: 'Ediciones', v: String(stats.editions) },
+    { t: 'Publicaciones (Docs)', v: String(stats.publications) },
+    { t: 'Ediciones publicadas', v: String(stats.editions_published) },
     { t: 'Usuarios activos', v: String(stats.users_active) },
   ]
   return (
@@ -101,3 +103,5 @@ export default function PanelHome() {
     </section>
   )
 }
+
+

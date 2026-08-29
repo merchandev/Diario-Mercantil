@@ -1,14 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { api } from '../lib/api'
-import { createEdition, deleteEdition, listEditions, type Edition, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf } from '../lib/api'
+import { createEdition, deleteEdition, listEditions, type Edition, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AlertDialog from '../components/AlertDialog'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import FlipbookViewer from '../components/FlipbookViewer'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Ediciones() {
+  const { confirmAction } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
   const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
@@ -29,6 +30,7 @@ export default function Ediciones() {
   const [isDetailsCollapsed, setIsDetailsCollapsed] = useState(false)
   const [isPdfCollapsed, setIsPdfCollapsed] = useState(false)
   const [isPubsCollapsed, setIsPubsCollapsed] = useState(false)
+  const [publishingState, setPublishingState] = useState<{ active: boolean; progress: number; message: string }>({ active: false, progress: 0, message: '' })
 
   const load = async () => {
     try {
@@ -50,47 +52,47 @@ export default function Ediciones() {
     setDetail(det); setAllOrders(leg.items)
   }
 
-  const onCreate = async (e: any) => {
+  const onCreateAndPublish = async (e: any) => {
     e.preventDefault()
-    setCreating(true)
+    setPublishingState({ active: true, progress: 0, message: 'Creando registro...' })
     try {
-      // Create edition as 'Borrador' — PDF is optional at this stage
       const payload = { status: 'Borrador', date: form.date, edition_no: form.edition_no, orders: form.selectedOrders }
       const res = await createEdition(payload) as any
       const newId = res?.id
-      if (newId && createPdf) {
-        await uploadEditionPdf(newId, createPdf)
+      if (newId) {
+        setPublishingState({ active: true, progress: 10, message: 'Generando PDF consolidado...' })
+        await publishEdition(newId, (prog, msg) => {
+          setPublishingState(prev => ({ ...prev, progress: Math.max(10, prog), message: msg }))
+        })
       }
       setForm({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
-      setCreatePdf(null)
       setQrGenerated(false)
       setGeneratedCode('')
       await load()
-      if (newId) {
-        const [det, leg] = await Promise.all([getEdition(newId), listLegal()])
-        setSelId(newId)
-        setDetail(det)
-        setAllOrders(leg.items)
-      }
-      setAlertDialog({ isOpen: true, title: 'Edición creada', message: `Edición creada en borrador con código: ${res?.code || 'Generado'}. ${!createPdf ? 'Recuerda cargar el PDF antes de publicar.' : ''}`, variant: 'success' })
+      setAlertDialog({ isOpen: true, title: 'Edición publicada', message: `Edición publicada exitosamente.`, variant: 'success' })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      setAlertDialog({ isOpen: true, title: 'Error', message: `No se pudo crear la edición: ${errorMsg}`, variant: 'error' })
+      setAlertDialog({ isOpen: true, title: 'Error', message: `No se pudo publicar la edición: ${errorMsg}`, variant: 'error' })
     } finally {
-      setCreating(false)
+      setPublishingState({ active: false, progress: 0, message: '' })
     }
   }
 
   const handlePublish = async () => {
     if (!selId) return
+    setPublishingState({ active: true, progress: 0, message: 'Iniciando...' })
     try {
-      await publishEdition(selId)
+      await publishEdition(selId, (prog, msg) => {
+        setPublishingState(prev => ({ ...prev, progress: prog, message: msg }))
+      })
       const det = await getEdition(selId)
       setDetail(det)
       await load()
-      setAlertDialog({ isOpen: true, title: 'Exito', message: 'Edicion publicada', variant: 'success' })
+      setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Edición publicada y PDF generado', variant: 'success' })
     } catch (error) {
-      setAlertDialog({ isOpen: true, title: 'Error', message: 'Error al publicar la edicion', variant: 'error' })
+      setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'Error al publicar', variant: 'error' })
+    } finally {
+      setPublishingState({ active: false, progress: 0, message: '' })
     }
   }
 
@@ -101,7 +103,7 @@ export default function Ediciones() {
       const result = await uploadEditionPdf(selId, file)
       setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_url: result.edition?.file_url || `/api/e/code/${encodeURIComponent(prev.edition.code)}/download` } } : prev)
       await load()
-      setAlertDialog({ isOpen: true, title: 'Exito', message: 'PDF actualizado', variant: 'success' })
+      setAlertDialog({ isOpen: true, title: 'Éxito', message: 'PDF actualizado', variant: 'success' })
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'No se pudo subir el PDF'
       setAlertDialog({ isOpen: true, title: 'Error', message: msg, variant: 'error' })
@@ -110,7 +112,7 @@ export default function Ediciones() {
     }
   }
 
-  const pdfUrl = detail?.edition.code ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download` : (selId ? `/api/e/${selId}/download` : '')
+  const pdfUrl = detail?.edition.code ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download` : (selId ? `/api/e/id/${selId}/download` : '')
   const viewerUrl = detail?.edition.code ? `/visor-espresivo/${encodeURIComponent(detail.edition.code)}` : ''
   useEffect(() => {
     if (detail && pdfSectionRef.current) {
@@ -160,49 +162,27 @@ export default function Ediciones() {
             {!qrGenerated ? (
               <div className="flex items-end">
                 <button type="button" className="btn btn-primary w-full h-[42px] shadow-sm select-none" onClick={() => {
-                  const dateObj = new Date(form.date);
-                  const d = String(dateObj.getUTCDate()).padStart(2, '0');
-                  const m = String(dateObj.getUTCMonth() + 1).padStart(2, '0');
-                  const y = String(dateObj.getUTCFullYear());
-                  const dateStrNum = `${d}${m}${y}`;
-                  setGeneratedCode(`DMV-${form.edition_no}${dateStrNum}`);
+                  // The backend is the single authority for the annual atomic correlativo and CVE.
+                  // This button only opens the draft configuration; it does not fabricate a provisional CVE.
+                  setGeneratedCode('');
                   setQrGenerated(true);
                 }}>
                   Nueva Edición
                 </button>
               </div>
             ) : (
-              <label className="block">
-                <span className="block text-sm font-semibold mb-1.5 text-slate-700">Archivo PDF Final <span className="text-slate-400 font-normal">(opcional — puede cargarse después)</span></span>
-                <label className="btn btn-outline border-dashed hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 text-slate-600 w-full flex items-center justify-center gap-2 cursor-pointer h-[42px] transition-colors">
-                  <input type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; setCreatePdf(f || null); }} />
-                  <IconUpload /> <span className="truncate">{createPdf ? createPdf.name : 'Click para subir PDF (opcional)'}</span>
-                </label>
-              </label>
+              <div className="flex items-end text-sm text-slate-500 pb-2">
+                * El documento PDF será generado automáticamente al publicar.
+              </div>
             )}
           </div>
 
           {qrGenerated && (
-            <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg flex flex-col items-center justify-center space-y-3 mb-6 animate-in fade-in slide-in-from-top-2">
-              <h3 className="text-brand-800 font-semibold text-center">Código y QR Generados</h3>
-              <div ref={newQrWrapRef} className="bg-white p-3 rounded-md shadow-sm border border-slate-100">
-                <QRCode value={`${location.origin}/dm/e-${form.date.split('-').reverse().join('')}`} size={160} level="M" renderAs="canvas" />
-              </div>
-              <div className="font-mono text-slate-700 bg-white px-3 py-1 rounded border border-slate-200 shadow-inner">
-                {generatedCode}
-              </div>
-              <button type="button" className="btn btn-outline btn-sm inline-flex items-center gap-2 mt-1" onClick={() => {
-                const canvas = newQrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
-                if (!canvas) return
-                const url = canvas.toDataURL('image/png')
-                const a = document.createElement('a')
-                a.href = url; a.download = `QR-edicion-${generatedCode}.png`; a.click()
-              }}>
-                <IconDownload className="w-4 h-4" /> <span>Descargar QR</span>
-              </button>
-              <span className="text-xs text-brand-600 font-medium">Ahora puedes adjuntar el PDF y seleccionar las publicaciones para finalizar la edición.</span>
-              <button type="button" className="text-xs text-slate-500 hover:text-slate-700 underline mt-2" onClick={() => { setQrGenerated(false); setGeneratedCode(''); }}>
-                Deshacer
+            <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg mb-6 animate-in fade-in slide-in-from-top-2">
+              <h3 className="text-brand-800 font-semibold">Preparar nueva edición</h3>
+              <p className="text-sm text-brand-700 mt-1">Selecciona las publicaciones que compondrán el borrador. El CVE definitivo y su código QR se generan exclusivamente en el backend al crear la edición, usando el correlativo anual atómico.</p>
+              <button type="button" className="text-xs text-slate-500 hover:text-slate-700 underline mt-3" onClick={() => { setQrGenerated(false); setGeneratedCode(''); }}>
+                Cancelar
               </button>
             </div>
           )}
@@ -262,8 +242,8 @@ export default function Ediciones() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button type="button" onClick={onCreate} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={creating || form.selectedOrders.length === 0}>
-                  {creating ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición (borrador)</span></>)}
+                <button type="button" onClick={onCreateAndPublish} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={publishingState.active || form.selectedOrders.length === 0}>
+                  {publishingState.active ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Publicar edición</span></>)}
                 </button>
               </div>
             </>
@@ -271,16 +251,17 @@ export default function Ediciones() {
         </div>
       </div>
 
-      <div className="card shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-50 px-5 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800">Historial de Ediciones</h2>
-        </div>
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-slate-50 border-b border-slate-200 p-4">
+            <h2 className="text-lg font-semibold text-slate-800">Ediciones</h2>
+          </div>
         <div className="overflow-x-auto pb-2">
           <table className="min-w-[800px] w-full text-left text-sm">
             <thead>
               <tr className="bg-brand-800 text-white">
                 <th className="text-left px-4 py-2">Codigo</th>
                 <th className="text-left px-4 py-2">Estado</th>
+                <th className="text-left px-4 py-2">Generado por</th>
                 <th className="text-left px-4 py-2">Fecha</th>
                 <th className="text-left px-4 py-2">Nro edicion</th>
                 <th className="text-left px-4 py-2">Publicaciones</th>
@@ -296,6 +277,9 @@ export default function Ediciones() {
                       <span className={`pill ${r.status === 'Publicada' ? 'bg-green-100 text-green-700' : r.status === 'Borrador' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-700'}`}>
                         {r.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-2 text-slate-600">
+                      {r.published_by_name ? <span className="font-medium" title={r.published_at || ''}>{r.published_by_name}</span> : <span className="italic text-slate-400">Pendiente</span>}
                     </td>
                     <td className="px-4 py-2">{r.date}</td>
                     <td className="px-4 py-2">{r.edition_no}</td>
@@ -314,7 +298,7 @@ export default function Ediciones() {
                         }}>
                           {selId === r.id && !isDetailsCollapsed ? <><IconClose className="w-4 h-4" /> <span>Minimizar</span></> : <><IconEdit className="w-4 h-4" /> <span>Ver detalles</span></>}
                         </button>
-                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar edicion', message: 'Seguro de eliminar esta edicion?', onConfirm: async () => { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; load() } })}>
+                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar edición', message: '¿Seguro de eliminar esta edición?', onConfirm: async () => { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; load() } })}>
                           <IconTrash className="w-4 h-4" /> <span>Eliminar</span>
                         </button>
                       </div>
@@ -326,7 +310,7 @@ export default function Ediciones() {
                         <div className="p-6 grid lg:grid-cols-3 gap-6 animate-in slide-in-from-top-2 duration-200">
                           <div className="lg:col-span-2 space-y-6">
                             <div className="flex items-center justify-between border-b pb-4">
-                              <h2 className="text-xl font-bold text-brand-800">Detalles de la edicion #{detail.edition.edition_no}</h2>
+                              <h2 className="text-xl font-bold text-brand-800">Detalles de la edición #{detail.edition.edition_no}</h2>
                               <div className="flex items-center gap-2">
                                 <button className="btn btn-ghost text-slate-500 hover:text-red-600 flex items-center gap-1.5 text-sm font-medium" onClick={() => { setSelId(undefined); setDetail(null); setIsDetailsCollapsed(false); }}>
                                   <IconClose className="w-4 h-4" /> <span>Cerrar</span>
@@ -336,34 +320,59 @@ export default function Ediciones() {
 
                             <div className="grid sm:grid-cols-2 gap-4">
                               <label className="block">
-                                <span className="block text-sm font-medium mb-2">Codigo de verificacion</span>
-                                <input className="input w-full font-mono" value={detail.edition.code} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, code: e.target.value } })} />
+                                <span className="block text-sm font-medium mb-2">Código de Verificación Electrónica (CVE)</span>
+                                <input className="input w-full font-mono bg-slate-50 text-slate-600" value={detail.edition.code} disabled title="El CVE es generado automáticamente y no puede modificarse" />
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Fecha de la Edición</span>
-                                <input className="input w-full" type="date" value={detail.edition.date} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
+                                <input className="input w-full" type="date" value={detail.edition.date} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Estado</span>
-                                <select className="input w-full" value={detail.edition.status} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, status: e.target.value } })}>
-                                  {['Borrador', 'Publicada', 'Archivado'].map(s => <option key={s} value={s}>{s}</option>)}
+                                <select className="input w-full" value={detail.edition.status} disabled>
+                                  <option value={detail.edition.status}>{detail.edition.status}</option>
                                 </select>
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Numero de edicion</span>
-                                <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
+                                <input className="input w-full" type="number" min={1} value={detail.edition.edition_no} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, edition_no: +e.target.value } })} />
                               </label>
                             </div>
 
                             <div className="flex flex-wrap gap-2 border-t pt-4">
-                              <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Exito', message: 'Cambios guardados', variant: 'success' }) }}>
-                                <IconSave className="w-4 h-4" /> <span>Guardar cambios</span>
-                              </button>
-                              {detail.edition.status === 'Borrador' && (
-                                <button className="btn bg-green-600 hover:bg-green-700 text-white inline-flex items-center gap-2" onClick={() => setConfirmDialog({ isOpen: true, title: 'Publicar edicion', message: 'Aprobar esta edicion y marcarla como Publicada?', onConfirm: handlePublish })}>
-                                  <IconCheck className="w-4 h-4" /> <span>Publicar edicion</span>
+                              {detail.edition.status !== 'Publicada' && (
+                                <button className="btn btn-primary inline-flex items-center gap-2" onClick={async () => { await updateEdition(selId, { code: detail.edition.code, date: detail.edition.date, status: detail.edition.status, edition_no: detail.edition.edition_no }); load(); setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Cambios guardados', variant: 'success' }) }}>
+                                  <IconSave className="w-4 h-4" /> <span>Guardar cambios</span>
                                 </button>
                               )}
+                              
+                              {detail.edition.status === 'Publicada' && (
+                                <button className="btn btn-outline border-brand-200 text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2" onClick={async () => {
+                                  try {
+                                    setPublishingState({ active: true, progress: 100, message: 'Enviando notificaciones...' })
+                                    const res = await notifyEdition(selId)
+                                    setAlertDialog({ isOpen: true, title: 'Notificación enviada', message: `Se enviaron ${res.sent} correos a los solicitantes.`, variant: 'success' })
+                                  } catch (error) {
+                                    setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'Error al enviar notificaciones', variant: 'error' })
+                                  } finally {
+                                    setPublishingState({ active: false, progress: 0, message: '' })
+                                  }
+                                }}>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  <span>Notificar Solicitantes</span>
+                                </button>
+                              )}
+
+                              <button className="btn btn-outline border-slate-300 text-slate-700 hover:bg-slate-50 inline-flex items-center gap-2" onClick={() => {
+                                window.open(`/api/editions/${selId}/export`, '_blank')
+                              }}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                <span>Exportar Excel (.csv)</span>
+                              </button>
                             </div>
 
                             <div
@@ -379,44 +388,40 @@ export default function Ediciones() {
                                   </span>
                                 </h3>
                               </div>
-                              {!isPdfCollapsed && (
+                              {!isPdfCollapsed && detail.edition.file_id && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                  <label className="block">
-                                    <span className="block text-sm font-semibold mb-2 text-slate-700">Reemplazar PDF de Edicion</span>
-                                    <input type="file" accept="application/pdf" className="input w-full text-sm" onChange={async e => {
-                                      const file = e.target.files?.[0]
-                                      if (file && selId) {
-                                        await uploadEditionPdf(selId, file)
-                                        setAlertDialog({ isOpen: true, title: 'Exito', message: 'PDF actualizado!', variant: 'success' })
-                                        load()
-                                      }
-                                    }} />
-                                  </label>
-                                  {detail.edition.file_id && (
-                                    <div className="h-[550px] border border-slate-200 rounded-xl overflow-hidden relative group shadow-sm bg-slate-50 flex flex-col p-4">
-                                      <div className="flex items-center justify-between text-slate-700 text-sm mb-3 z-10 relative">
-                                        <span className="font-semibold text-brand-800">Visor PDF</span>
-                                        <span className="text-xs bg-slate-200/50 px-2 py-1 rounded-md text-slate-600 border border-slate-200">Vista tipo revista</span>
+                                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-slate-50 flex items-center justify-between p-4">
+                                    <div className="flex items-center gap-3 text-slate-700">
+                                      <div className="bg-brand-100 p-2 rounded-lg text-brand-600">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                        </svg>
                                       </div>
-                                      <div className="flex-1 relative z-10 w-full max-w-full">
-                                        <FlipbookViewer src={pdfUrl} height={420} />
-                                      </div>
-                                      <div className="flex flex-wrap gap-2 text-xs text-slate-500 mt-4 z-10 relative justify-center">
-                                        <span className="px-2 py-1 rounded bg-slate-200/50 border border-slate-200">Arrastra o clic para pasar página</span>
-                                        <span className="px-2 py-1 rounded bg-slate-200/50 border border-slate-200">Usa la rueda para navegar</span>
-                                      </div>
-                                      <div className="absolute bottom-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <a
-                                          href={`${pdfUrl}?download=1`}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="btn btn-primary shadow-lg inline-flex items-center gap-2 pl-3 pr-4"
-                                        >
-                                          <IconDownload className="w-4 h-4" /> <span>Descargar PDF</span>
-                                        </a>
+                                      <div>
+                                        <span className="block font-semibold text-brand-800">Documento Consolidado</span>
+                                        <span className="block text-xs text-slate-500">{detail.edition.file_name || 'edicion.pdf'}</span>
                                       </div>
                                     </div>
-                                  )}
+                                    
+                                    <div className="flex items-center gap-2">
+                                      <a
+                                        href={pdfUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="btn btn-outline border-brand-200 text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2"
+                                      >
+                                        <span>Ver Documento</span>
+                                      </a>
+                                      <a
+                                        href={`${pdfUrl}?download=1`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="btn btn-primary inline-flex items-center gap-2"
+                                      >
+                                        <IconDownload className="w-4 h-4" /> <span>Descargar</span>
+                                      </a>
+                                    </div>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -439,19 +444,20 @@ export default function Ediciones() {
                                       <li key={o.id} className="p-3 text-sm flex items-center justify-between hover:bg-white transition-colors">
                                         <div>
                                           <div className="font-semibold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</div>
-                                          <div className="text-slate-600 mt-0.5">{o.name}</div>
+                                          <div className="text-slate-600 mt-0.5">{(o as any).company_name || o.name}</div>
                                         </div>
+                                        {detail.edition.status === 'Borrador' && (
                                         <button className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors" title="Quitar publicación de esta edición" onClick={async () => {
-                                          if (confirm(`¿Quitar orden #${o.id} de esta edición?`)) {
+                                          if (await confirmAction(`¿Quitar orden #${o.id} de esta edición?`, { title: 'Quitar publicación', danger: true })) {
                                             const newOrders = detail.orders.filter(ord => ord.id !== o.id).map(ord => ord.id);
-                                            await api.post(`/editions/${selId}/orders`, { orders: newOrders });
-                                            const { data } = await api.get(`/editions/${selId}`);
-                                            setDetail({ edition: data.edition, orders: data.orders });
+                                            await setEditionOrders(selId!, newOrders);
+                                            const data = await getEdition(selId); setDetail(data);
                                             load();
                                           }
                                         }}>
                                           <IconTrash className="w-4 h-4" />
                                         </button>
+                                      )}
                                       </li>
                                     ))}
                                     {detail.orders.length === 0 && (
@@ -459,6 +465,7 @@ export default function Ediciones() {
                                     )}
                                   </ul>
 
+                                  {detail.edition.status === 'Borrador' && (
                                   <div className="mt-4 border-t pt-4">
                                     <h4 className="text-sm font-semibold mb-2 text-slate-700">Añadir más publicaciones</h4>
                                     <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
@@ -471,13 +478,12 @@ export default function Ediciones() {
                                                 <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
                                                 <span className="text-xs text-slate-400">{o.date}</span>
                                               </div>
-                                              <div className="text-slate-700 font-medium mt-0.5">{o.name || 'Sin nombre'}</div>
+                                              <div className="text-slate-700 font-medium mt-0.5">{(o as any).company_name || meta.razon_social || meta.razon_denominacion_social || o.name || 'Sin nombre'}</div>
                                             </div>
                                             <button className="btn btn-outline text-xs px-3 py-1.5 shrink-0 whitespace-nowrap" onClick={async () => {
                                               const newOrders = [...detail.orders.map(ord => ord.id), o.id];
-                                              await api.post(`/editions/${selId}/orders`, { orders: newOrders });
-                                              const { data } = await api.get(`/editions/${selId}`);
-                                              setDetail({ edition: data.edition, orders: data.orders });
+                                              await setEditionOrders(selId!, newOrders);
+                                              const data = await getEdition(selId); setDetail(data);
                                               load();
                                               setAlertDialog({ isOpen: true, title: 'Agregada', message: 'Publicación agregada a la edición.', variant: 'success' })
                                             }}>Añadir</button>
@@ -489,6 +495,7 @@ export default function Ediciones() {
                                       )}
                                     </div>
                                   </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -497,13 +504,13 @@ export default function Ediciones() {
                           <div className="space-y-4">
                             <div className="border rounded-lg p-4 bg-white">
                               <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
-                                Codigo QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
+                                Código QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
                               {expanded.qr && (() => {
-                                const qrUrl = `${location.origin}/dm/e-${detail.edition.date.split('-').reverse().join('')}`
+                                const qrUrl = `${location.origin}/edicion/${detail.edition.code}`
                                 return (
                                   <>
-                                    <p className="text-xs text-slate-600 mb-3">Escanea para ver la edicion publicada</p>
+                                    <p className="text-xs text-slate-600 mb-3">Escanea para ver la edición publicada</p>
                                     <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
                                       <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
                                     </div>
@@ -533,10 +540,10 @@ export default function Ediciones() {
                                     target="_blank"
                                     rel="noreferrer"
                                   >
-                                    <IconDownload className="w-4 h-4" /> <span>Descargar PDF de edicion</span>
+                                    <IconDownload className="w-4 h-4" /> <span>Descargar PDF de edición</span>
                                   </a>
                                   <p className="text-xs text-slate-600">
-                                    PDF cargado manualmente y listo para compartir.
+                                    PDF generado automáticamente y listo para compartir.
                                   </p>
                                 </>
                               ) : (
@@ -545,7 +552,7 @@ export default function Ediciones() {
                             </div>
 
                             <div className="border rounded-lg p-4 bg-slate-50">
-                              <h3 className="font-semibold mb-2 text-brand-800">Informacion</h3>
+                              <h3 className="font-semibold mb-2 text-brand-800">Información</h3>
                               <dl className="text-sm space-y-2">
                                 <div>
                                   <dt className="text-slate-600">Estado:</dt>
@@ -587,6 +594,24 @@ export default function Ediciones() {
       </div>
       <ConfirmDialog isOpen={confirmDialog.isOpen} title={confirmDialog.title} message={confirmDialog.message} variant="warning" onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       <AlertDialog {...alertDialog} onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })} />
+      
+      {publishingState.active && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 mx-4">
+            <h3 className="text-lg font-semibold text-brand-900 mb-2">Publicando Edición</h3>
+            <p className="text-slate-600 text-sm mb-4">{publishingState.message || 'Generando documento consolidado...'}</p>
+            <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden relative">
+              <div 
+                className="bg-brand-600 h-3 rounded-full transition-all duration-300 ease-out" 
+                style={{ width: `${publishingState.progress}%` }}
+              ></div>
+            </div>
+            <div className="text-right text-xs font-medium text-brand-700">
+              {publishingState.progress}%
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   )
 }

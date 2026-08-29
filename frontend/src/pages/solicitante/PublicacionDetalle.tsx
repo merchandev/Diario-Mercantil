@@ -5,7 +5,7 @@ import ProtectedPdfViewer from '../../components/ProtectedPdfViewer'
 import { IconArrowLeft, IconDownload, IconCheck } from '../../components/icons'
 import QRCode from 'qrcode.react'
 import AlertDialog from '../../components/AlertDialog'
-import LegalRequestDetails from '../../components/LegalRequestDetails'
+import LegalRequestDetails, { formatCaracasDateTime } from '../../components/LegalRequestDetails'
 
 export default function PublicacionDetalleSolicitante() {
   const { id } = useParams<{ id: string }>()
@@ -53,11 +53,11 @@ export default function PublicacionDetalleSolicitante() {
 
   const handleDownloadQR = () => {
     const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
-    if (!canvas || !req) return
+    if (!canvas || !req?.edition_code) return
     const url = canvas.toDataURL('image/png')
     const a = document.createElement('a')
     a.href = url
-    a.download = `QR-orden-${req.order_no || req.id}.png`
+    a.download = `QR-edicion-${req.edition_code}.png`
     a.click()
   }
 
@@ -86,14 +86,10 @@ export default function PublicacionDetalleSolicitante() {
   const meta = typeof req.meta === 'string' ? JSON.parse(req.meta) : (req.meta || {})
 
   const isPublicada = req.status === 'Publicada'
-  const publicUrl = `${window.location.origin}/publicaciones/${req.order_no || req.id}/${encodeURIComponent(req.name || 'publicacion')}`
+  // Public QR/URL must belong exclusively to the edition. Never fall back to request/order IDs.
+  const publicUrl = req.edition_code ? `${window.location.origin}/edicion/${encodeURIComponent(req.edition_code)}` : ''
 
-  // Date: use created_at (system date) for "Fecha de solicitud", fallback to date
-  const fechaSolicitud = (() => {
-    const raw = (req as any).created_at || req.date
-    if (!raw) return '-'
-    return raw.slice(0, 10).split('-').reverse().join('/')
-  })()
+  const fechaSolicitud = formatCaracasDateTime(req.submitted_at || req.created_at || req.date)
 
   return (
     <section className="space-y-6">
@@ -186,9 +182,18 @@ export default function PublicacionDetalleSolicitante() {
                       <span className="text-xs text-slate-500">Vista protegida</span>
                     </div>
                     {f.type === 'pdf' ? (
-                      <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8, '0')} - Solo Lectura`} />
+                      <div className="h-96">
+                        <ProtectedPdfViewer src={`/api/uploads/${f.file_id}`} watermark={`Orden N° ${req.order_no || String(req.id).padStart(8, '0')} - Solo Lectura`} />
+                      </div>
+                    ) : f.type === 'image' || (f.name && f.name.match(/\.(jpg|jpeg|png|gif)$/i)) ? (
+                      <div className="p-4 flex justify-center bg-slate-100">
+                        <img src={`/api/uploads/${f.file_id}`} alt={f.name} className="max-h-96 max-w-full rounded shadow" />
+                      </div>
                     ) : (
-                      <div className="p-6 text-center text-slate-500">Tipo de archivo no soportado para vista previa</div>
+                      <div className="p-6 text-center text-slate-500">
+                        <p>Tipo de archivo no soportado para vista previa</p>
+                        <a href={`/api/uploads/${f.file_id}`} download className="text-brand-600 hover:underline mt-2 inline-block">Descargar archivo</a>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -226,7 +231,7 @@ export default function PublicacionDetalleSolicitante() {
           </div>
 
           {/* QR Code — only when published (obs. 9) */}
-          {isPublicada && (
+          {isPublicada && publicUrl && (
             <div className="card p-6">
               <h3 className="font-semibold mb-3 text-brand-800">Código QR</h3>
               <p className="text-xs text-slate-600 mb-4">Comparte este código para acceder a tu publicación</p>
@@ -234,7 +239,7 @@ export default function PublicacionDetalleSolicitante() {
                 <QRCode value={publicUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
               </div>
               <div className="text-xs text-center mt-3 text-slate-500 font-mono break-all">
-                {req.order_no || String(req.id).padStart(8, '0')}
+                {req.edition_code}
               </div>
               <button
                 onClick={handleDownloadQR}
@@ -246,7 +251,7 @@ export default function PublicacionDetalleSolicitante() {
           )}
 
           {/* URL Pública — only when published (obs. 9) */}
-          {isPublicada && (
+          {isPublicada && publicUrl && (
             <div className="card p-6">
               <h3 className="font-semibold mb-3 text-brand-800">Enlace Público</h3>
               <p className="text-xs text-slate-600 mb-3">Comparte este enlace para que otros vean tu publicación</p>
@@ -270,12 +275,23 @@ export default function PublicacionDetalleSolicitante() {
             <div className="card p-6 bg-green-50 border border-green-200">
               <h3 className="font-semibold mb-3 text-green-800">Publicación en Edición</h3>
               <p className="text-xs text-green-700 mb-4">Su documento ya forma parte de una edición del Diario Mercantil de Venezuela.</p>
-              <a
-                href="/ediciones"
-                className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
-              >
-                <IconDownload /> Ver Ediciones del Diario
-              </a>
+              {req.edition_file_url ? (
+                <a
+                  href={`${req.edition_file_url}?download=1`}
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+                >
+                  <IconDownload /> Descargar publicación
+                </a>
+              ) : req.edition_code ? (
+                <a
+                  href={`/edicion/${encodeURIComponent(req.edition_code)}`}
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+                >
+                  Ver edición en línea
+                </a>
+              ) : (
+                <p className="text-xs text-green-800">La publicación está marcada como publicada, pero aún no tiene una edición vinculada. Contacte al administrador.</p>
+              )}
             </div>
           )}
         </div>

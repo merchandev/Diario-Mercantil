@@ -23,7 +23,7 @@ final class RolePolicy {
         }
 
         return $actorRole === Role::ADMIN
-            && $newRole->rank() < Role::ADMIN->rank();
+            && $newRole->rank() <= Role::ADMIN->rank();
     }
 
     public static function canModifyUser(array $actor, array $target): bool {
@@ -51,6 +51,18 @@ final class RolePolicy {
             return false;
         }
         return self::canModifyUser($actor, $target);
+    }
+
+    /**
+     * Can the actor manage users and view complete user profiles?
+     */
+    public static function canManageUsers(array $actor): bool {
+        try {
+            $role = Role::from(strtolower($actor['role'] ?? ''));
+        } catch (ValueError) {
+            return false;
+        }
+        return in_array($role, [Role::SUPERADMIN, Role::ADMIN], true);
     }
 
     /**

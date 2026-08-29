@@ -16,6 +16,7 @@ import RequireAdmin from './components/RequireAdmin'
 import PublicLayout from './components/PublicLayout'
 import ApplicantLayout from './pages/solicitante/Layout'
 import PublishChoiceModal from './components/PublishChoiceModal'
+import { logout } from './lib/api'
 
 // Helper to auto-reload page if a chunk is missing (deployment cache issue)
 function lazyImport(factory: () => Promise<{ default: React.ComponentType<any> }>) {
@@ -48,6 +49,7 @@ const Papelera = lazyImport(() => import('./pages/Papelera'))
 const MediosPago = lazyImport(() => import('./pages/MediosPago'))
 const DirectorioLegal = lazyImport(() => import('./pages/DirectorioLegal'))
 const Usuarios = lazyImport(() => import('./pages/Usuarios'))
+const UsuarioDetalle = lazyImport(() => import('./pages/UsuarioDetalle'))
 const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
 const SeoManager = lazyImport(() => import('./pages/SeoManager'))
@@ -111,14 +113,20 @@ export default function App() {
 
     const resetTimer = () => {
       clearTimeout(timer)
-      const role = localStorage.getItem('user_role') || sessionStorage.getItem('user_role') || localStorage.getItem('token')
+      const role = localStorage.getItem('user_role') || sessionStorage.getItem('user_role')
       if (role) {
-        timer = setTimeout(() => {
+        timer = setTimeout(async () => {
           console.warn('⏰ Inactivity timeout - logging out')
-          localStorage.removeItem('token')
-          sessionStorage.removeItem('token')
+          try {
+            await logout()
+          } catch {
+            // Continue with local cleanup even if the server is unreachable.
+          }
           localStorage.removeItem('user_role')
-          window.location.href = '/login'
+          localStorage.removeItem('user_name')
+          localStorage.removeItem('user_doc')
+          sessionStorage.clear()
+          window.location.assign('/login')
         }, TIMEOUT)
       }
     }
@@ -217,6 +225,7 @@ export default function App() {
                         <Route path="historial" element={<LazyRoute><Historial /></LazyRoute>} />
                         <Route path="cotizador" element={<LazyRoute><Cotizador /></LazyRoute>} />
                         <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
+                        <Route path="usuarios/:id" element={<RequireAdmin><LazyRoute><UsuarioDetalle /></LazyRoute></RequireAdmin>} />
                         <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
                         <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
                         <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />

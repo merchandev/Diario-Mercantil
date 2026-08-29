@@ -5,6 +5,8 @@ require_once __DIR__.'/UploadController.php';
 require_once __DIR__."/Http/StoragePath.php";
 
 class FileController {
+  private const PUBLIC_MEDIA_SETTINGS = ['banner_main_1', 'banner_sidebar', 'promo_popup'];
+
   private function requireAdmin() {
       require_once __DIR__.'/AuthController.php';
       $u = AuthController::requireAuth();
@@ -75,6 +77,14 @@ class FileController {
   public function softDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    $references = $this->publicSettingReferences($pdo, (int)$id);
+    if ($references) {
+      Response::json([
+        'error'=>'file_in_use',
+        'message'=>'No se puede eliminar este archivo porque actualmente está siendo utilizado como banner.',
+        'settings'=>$references,
+      ], 409);
+    }
     $pdo->prepare('UPDATE files SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
     Response::json(['ok'=>true]);
   }
@@ -103,20 +113,43 @@ class FileController {
   public function permanentDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    $references = $this->publicSettingReferences($pdo, (int)$id);
+    if ($references) {
+      Response::json([
+        'error'=>'file_in_use',
+        'message'=>'No se puede eliminar este archivo porque actualmente está siendo utilizado como banner.',
+        'settings'=>$references,
+      ], 409);
+    }
     $f = $pdo->prepare('SELECT path FROM files WHERE id=?');
     $f->execute([$id]);
     $file = $f->fetch(PDO::FETCH_ASSOC);
-    if ($file) {
-        if ($file['path']) {
-            try {
-                $fullPath = StoragePath::getFile($file['path']);
-                @unlink($fullPath);
-            } catch (RuntimeException $e) {}
+    if (!$file) { Response::json(['error'=>'not_found'], 404); return; }
+    if (!empty($file['path'])) {
+        try {
+            $fullPath = StoragePath::getFile($file['path']);
+            if (is_file($fullPath) && !unlink($fullPath)) {
+                Response::json(['error'=>'file_delete_failed', 'message'=>'No se pudo eliminar físicamente el archivo.'], 500);
+                return;
+            }
+        } catch (RuntimeException $e) {
+            // A missing physical file must not block cleaning an already orphaned DB record.
+            if (!str_contains($e->getMessage(), 'File not found')) {
+                Response::json(['error'=>'file_delete_failed'], 500);
+                return;
+            }
         }
     }
-    
-    $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$id]);
-    $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$id]);
+
+    $pdo->beginTransaction();
+    try {
+        $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$id]);
+        $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$id]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
     Response::json(['ok'=>true]);
   }
 
@@ -125,63 +158,91 @@ class FileController {
     $pdo = Database::pdo();
     $stmt = $pdo->query("SELECT id, path FROM files WHERE deleted_at IS NOT NULL");
     $files = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $count = 0;
+    $failed = [];
     foreach ($files as $f) {
-        if ($f['path']) {
+        if ($this->publicSettingReferences($pdo, (int)$f['id'])) {
+            $failed[] = (int)$f['id'];
+            continue;
+        }
+        if (!empty($f['path'])) {
             try {
                 $fullPath = StoragePath::getFile($f['path']);
-                @unlink($fullPath);
-            } catch (RuntimeException $e) {}
+                if (is_file($fullPath) && !unlink($fullPath)) {
+                    $failed[] = (int)$f['id'];
+                    continue;
+                }
+            } catch (RuntimeException $e) {
+                if (!str_contains($e->getMessage(), 'File not found')) {
+                    $failed[] = (int)$f['id'];
+                    continue;
+                }
+            }
         }
-        $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$f['id']]);
-        $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$f['id']]);
-        $count++;
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('DELETE FROM file_events WHERE file_id=?')->execute([$f['id']]);
+            $pdo->prepare('DELETE FROM files WHERE id=?')->execute([$f['id']]);
+            $pdo->commit();
+            $count++;
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $failed[] = (int)$f['id'];
+        }
     }
-    Response::json(['ok'=>true, 'count'=>$count]);
+    Response::json(['ok'=>count($failed)===0, 'count'=>$count, 'failed'=>$failed]);
+  }
+
+  private function publicSettingReferences(PDO $pdo, int $fileId): array {
+    $placeholders = implode(',', array_fill(0, count(self::PUBLIC_MEDIA_SETTINGS), '?'));
+    $sql = "SELECT `key`, value FROM settings WHERE `key` IN ($placeholders)";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute(self::PUBLIC_MEDIA_SETTINGS);
+
+    $references = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+      if (preg_match('~/api/uploads/(\d+)(?:$|[/?#])~', (string)($row['value'] ?? ''), $matches)
+          && (int)$matches[1] === $fileId) {
+        $references[] = (string)$row['key'];
+      }
+    }
+    return $references;
   }
 
   public function sse(): never {
-    // Auth via Authorization: Bearer or token query
     AuthController::requireAuth();
     Response::sseHeaders();
+    set_time_limit(0);
+    ignore_user_abort(false);
     $retry = (int) (getenv('SSE_RETRY_MS') ?: 2000);
     echo "retry: $retry\n\n";
     $pdo = Database::pdo();
-    $lastId = 0;
-    while (true) {
-      $stmt = $pdo->query('SELECT e.id, e.file_id, e.ts, e.type, e.message FROM file_events e ORDER BY e.id DESC LIMIT 20');
+    $lastId = max(0, (int)($_SERVER['HTTP_LAST_EVENT_ID'] ?? 0));
+    $startedAt = time();
+    while (!connection_aborted() && time() - $startedAt < 25) {
+      $stmt = $pdo->prepare('SELECT e.id, e.file_id, e.ts, e.type, e.message FROM file_events e WHERE e.id > ? ORDER BY e.id ASC LIMIT 20');
+      $stmt->execute([$lastId]);
       $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-      foreach (array_reverse($rows) as $row) {
-        if ($row['id'] <= $lastId) continue;
+      foreach ($rows as $row) {
         $lastId = $row['id'];
         $data = json_encode($row);
         echo "id: {$row['id']}\n";
         echo "event: file_event\n";
         echo "data: $data\n\n";
       }
+      if (!$rows) echo ": keep-alive\n\n";
       @ob_flush(); @flush();
       sleep(2);
     }
+    exit;
   }
 
 
   // Serve raw file content
   public function serve($id) {
-    // CORS headers for fetch requests from frontend
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-    header('Access-Control-Allow-Origin: ' . $origin);
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-    header('Access-Control-Allow-Methods: GET, OPTIONS');
-    
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        http_response_code(200);
-        exit;
-    }
-
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at FROM files WHERE id=?');
+    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at, is_public FROM files WHERE id=?');
     $stmt->execute([$id]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -195,7 +256,7 @@ class FileController {
     $ed->execute([$id]);
     $editionStatus = $ed->fetchColumn();
     
-    $isPublic = ($editionStatus === 'Publicada');
+    $isPublic = ($editionStatus === 'Publicada') || !empty($file['is_public']);
     
     if (!$isPublic) {
         require_once __DIR__.'/AuthController.php';
@@ -234,7 +295,8 @@ class FileController {
     
     // Provide filename for download
     $downloadName = $file['name'] ?: basename($filePath);
-    header('Content-Disposition: inline; filename="' . $downloadName . '"'); // inline to view, attachment to download
+    $disposition = (($_GET['download'] ?? '') === '1') ? 'attachment' : 'inline';
+    header('Content-Disposition: ' . $disposition . '; filename*=UTF-8\'\'' . rawurlencode($downloadName));
     
     // Prevent caching issues
     if ($isPublic) {
@@ -251,13 +313,6 @@ class FileController {
 
   // Serve Avatar content
   public function serveAvatar($filename) {
-    $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
-    header('Access-Control-Allow-Origin: ' . $origin);
-    header('Access-Control-Allow-Credentials: true');
-    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-    header('Access-Control-Allow-Methods: GET, OPTIONS');
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
-
     try {
         $filePath = StoragePath::getAvatar($filename);
     } catch (RuntimeException $e) {

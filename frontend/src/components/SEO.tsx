@@ -46,7 +46,7 @@ export const SEO = (props: SEOProps) => {
   const description = customSeo?.description || props.description;
   const ogImage = customSeo?.og_image || props.ogImage;
   const canonicalUrl = props.canonicalUrl;
-  
+
   let robots = "index, follow";
   if (customSeo?.robots) {
     robots = customSeo.robots;
@@ -61,10 +61,10 @@ export const SEO = (props: SEOProps) => {
       {/* Basic Metadata */}
       <title>{title}</title>
       <meta name="description" content={description} />
-      
+
       {/* Indexing Control */}
       <meta name="robots" content={robots} />
-      
+
       {/* Open Graph Tags for Social Sharing */}
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
@@ -72,7 +72,7 @@ export const SEO = (props: SEOProps) => {
       {ogImage && <meta property="og:image" content={ogImage} />}
       {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
       {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-      
+
       {/* Twitter Cards */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={title} />

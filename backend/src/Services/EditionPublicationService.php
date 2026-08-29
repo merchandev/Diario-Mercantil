@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../Database.php';
+require_once __DIR__ . '/../Http/StoragePath.php';
 
 class EditionPublicationService {
     private PDO $pdo;
@@ -8,7 +9,7 @@ class EditionPublicationService {
         $this->pdo = $pdo;
     }
 
-    public function publish(int $id, int $actorId): void {
+    public function publish(int $id, int $actorId, ?callable $progressCallback = null): void {
         $now = gmdate('Y-m-d');
         
         $ownsTransaction = !$this->pdo->inTransaction();
@@ -17,8 +18,9 @@ class EditionPublicationService {
         }
         
         try {
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
             // Lock edition
-            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? FOR UPDATE');
+            $edStmt = $this->pdo->prepare('SELECT date, status, file_id FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause);
             $edStmt->execute([$id]);
             $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
             
@@ -30,10 +32,6 @@ class EditionPublicationService {
                 throw new RuntimeException("La edición debe estar en estado Borrador para ser publicada.", 409);
             }
             
-            if (empty($edition['file_id'])) {
-                throw new RuntimeException("Debe subir el PDF definitivo antes de publicar la edición.", 422);
-            }
-            
             // Validate Orders
             $stmt = $this->pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
             $stmt->execute([$id]);
@@ -43,48 +41,56 @@ class EditionPublicationService {
                 throw new RuntimeException("La edición debe tener al menos una solicitud asociada.", 400);
             }
             
-            // Validate File Physical Integrity
-            $fStmt = $this->pdo->prepare('SELECT path, type, checksum FROM files WHERE id=? AND status="uploaded"');
-            $fStmt->execute([$edition['file_id']]);
-            $fileData = $fStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$fileData) {
-                throw new RuntimeException("El archivo físico asociado a la edición no existe o no es válido.", 422);
-            }
-            
-            $storageRoot = realpath(__DIR__ . '/../../storage/uploads');
-            $physicalPath = realpath($storageRoot . '/' . $fileData['path']);
-            
-            if ($physicalPath === false || !str_starts_with($physicalPath, $storageRoot . DIRECTORY_SEPARATOR)) {
-                throw new DomainException('Ruta de archivo inválida. Posible path traversal.', 422);
-            }
-            
-            if (!file_exists($physicalPath) || !is_readable($physicalPath)) {
-                throw new RuntimeException("El archivo PDF asociado no se encuentra en disco o no es legible.", 422);
-            }
-            
-            // MIME and Signature validation
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime = finfo_file($finfo, $physicalPath);
-            finfo_close($finfo);
-            if ($mime !== 'application/pdf') {
-                throw new RuntimeException("El archivo asociado no es un PDF válido (MIME: $mime).", 422);
-            }
-            
-            $handle = fopen($physicalPath, 'r');
-            $header = fread($handle, 5);
-            fclose($handle);
-            if ($header !== '%PDF-') {
-                throw new RuntimeException("El archivo asociado no tiene la firma de un PDF.", 422);
-            }
-            
-            $currentChecksum = hash_file('sha256', $physicalPath);
-            if ($currentChecksum !== $fileData['checksum']) {
-                throw new RuntimeException("La integridad del archivo PDF ha sido comprometida. El checksum no coincide.", 422);
+            // Check if there is an existing file_id, if not, generate it
+            $currentChecksum = '';
+            if (empty($edition['file_id'])) {
+                // Generate PDF automatically
+                require_once __DIR__ . '/EditionPdfGenerator.php';
+                $generator = new EditionPdfGenerator($this->pdo);
+                $outputName = $generator->generate($id, $orderIds, $progressCallback);
+                $storageRoot = StoragePath::getUploadsDir();
+                $physicalPath = StoragePath::getFile($outputName);
+                
+                $size = filesize($physicalPath);
+                $checksum = hash_file('sha256', $physicalPath);
+                $currentChecksum = $checksum;
+                $nowStr = gmdate('Y-m-d H:i:s');
+                
+                // Insert into files table
+                $ins = $this->pdo->prepare('INSERT INTO files(name, size, type, checksum, status, created_at, updated_at, path) VALUES(?,?,?,?,?,?,?,?)');
+                $ins->execute([$outputName, $size, 'pdf', $checksum, 'uploaded', $nowStr, $nowStr, $outputName]);
+                $newFileId = $this->pdo->lastInsertId();
+                
+                $this->pdo->prepare('UPDATE editions SET file_id=? WHERE id=?')->execute([$newFileId, $id]);
+            } else {
+                // Validate File Physical Integrity if it was uploaded manually
+                $fStmt = $this->pdo->prepare('SELECT path, type, checksum FROM files WHERE id=? AND status="uploaded"');
+                $fStmt->execute([$edition['file_id']]);
+                $fileData = $fStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$fileData) {
+                    throw new RuntimeException("El archivo físico asociado a la edición no existe o no es válido.", 422);
+                }
+                
+                $storageRoot = StoragePath::getUploadsDir();
+                try {
+                    $physicalPath = StoragePath::getFile((string)$fileData['path']);
+                } catch (RuntimeException $e) {
+                    throw new RuntimeException('El archivo PDF asociado no se encuentra en el almacenamiento configurado.', 422, $e);
+                }
+                
+                if (!file_exists($physicalPath) || !is_readable($physicalPath)) {
+                    throw new RuntimeException("El archivo PDF asociado no se encuentra en disco o no es legible.", 422);
+                }
+                
+                $currentChecksum = hash_file('sha256', $physicalPath);
+                if ($currentChecksum !== $fileData['checksum']) {
+                    throw new RuntimeException("La integridad del archivo PDF ha sido comprometida. El checksum no coincide.", 422);
+                }
             }
             
             $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
-            $statusStmt = $this->pdo->prepare("SELECT id, status, deleted_at FROM legal_requests WHERE id IN ($inQuery) FOR UPDATE");
+            $statusStmt = $this->pdo->prepare("SELECT id, status, deleted_at FROM legal_requests WHERE id IN ($inQuery)" . $lockClause);
             $statusStmt->execute($orderIds);
             $requests = $statusStmt->fetchAll(PDO::FETCH_ASSOC);
             
@@ -94,13 +100,13 @@ class EditionPublicationService {
             
             foreach ($requests as $req) {
                 if ($req['status'] !== 'En trámite' || $req['deleted_at'] !== null) {
-                    throw new RuntimeException("La solicitud {$req['id']} no está en estado 'En trámite' o fue eliminada.", 400);
+                    throw new RuntimeException("La solicitud {$req['id']} debe estar verificada y en estado 'En trámite', y no puede estar eliminada.", 400);
                 }
             }
 
             // Date chronology validation
             $editionDate = $edition['date'] ?: $now;
-            $lastEdStmt = $this->pdo->query("SELECT MAX(date) FROM editions WHERE status='Publicada'");
+            $lastEdStmt = $this->pdo->query("SELECT MAX(date) FROM editions WHERE status='Publicada' AND deleted_at IS NULL");
             $lastEdDate = $lastEdStmt->fetchColumn();
             if ($lastEdDate && $editionDate <= $lastEdDate) {
                 throw new RuntimeException("La fecha de esta edición ($editionDate) debe ser posterior a la última edición publicada ($lastEdDate).", 400);
@@ -122,30 +128,9 @@ class EditionPublicationService {
             $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
                  ->execute([$actorId, 'publish_edition', 'edition', $id]);
                  
-            // Send publication emails
-            try {
-                $edStmt2 = $this->pdo->prepare("SELECT code FROM editions WHERE id=?");
-                $edStmt2->execute([$id]);
-                $edCode = $edStmt2->fetchColumn() ?: "DM-$id";
-                
-                $ownersStmt = $this->pdo->prepare("SELECT u.email, u.name, l.order_no FROM legal_requests l JOIN users u ON l.user_id = u.id WHERE l.id IN ($inQuery)");
-                $ownersStmt->execute($orderIds);
-                $owners = $ownersStmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                if (count($owners) > 0) {
-                    require_once __DIR__ . '/EmailService.php';
-                    foreach ($owners as $owner) {
-                        if ($owner['email']) {
-                            try {
-                                EmailService::sendPublished($owner['email'], $owner['name'], $owner['order_no'] ?? 'N/A', $edCode);
-                            } catch (Throwable $e) {
-                                error_log("Failed to send published email to {$owner['email']}: " . $e->getMessage());
-                            }
-                        }
-                    }
-                }
-            } catch (Throwable $e) {
-                error_log("Failed to process publication emails: " . $e->getMessage());
+            $auditStmt = $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)");
+            foreach ($orderIds as $orderId) {
+                $auditStmt->execute([$actorId, 'status_changed_to_Publicada', 'legal_request', $orderId]);
             }
 
             if ($ownsTransaction) {

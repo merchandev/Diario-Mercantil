@@ -29,10 +29,12 @@ class PagesController {
       if ($type==='heading') {
         $lvl = (int)($props['level'] ?? 2); if ($lvl<1||$lvl>6) $lvl=2; $props['level'] = $lvl;
         $props['text'] = (string)($props['text'] ?? '');
-        $props['align'] = in_array(($props['align'] ?? 'left'), ['left','center','right'], true) ? $props['align'] : 'left';
+        $align = (string)($props['align'] ?? 'left');
+        $props['align'] = in_array($align, ['left','center','right'], true) ? $align : 'left';
       } elseif ($type==='paragraph') {
         $props['text'] = (string)($props['text'] ?? '');
-        $props['align'] = in_array(($props['align'] ?? 'left'), ['left','center','right'], true) ? $props['align'] : 'left';
+        $align = (string)($props['align'] ?? 'left');
+        $props['align'] = in_array($align, ['left','center','right'], true) ? $align : 'left';
       } elseif ($type==='image') {
         $props['url'] = (string)($props['url'] ?? '');
         $props['alt'] = (string)($props['alt'] ?? '');
@@ -77,7 +79,7 @@ class PagesController {
     $s->execute([(int)$id]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
     if (!$row) return Response::json(['error'=>'not_found'],404);
-    $row['body_blocks'] = json_decode($row['body_json'] ?? '[]', true) ?: [];
+    $row['body_blocks'] = $this->normalizeBlocks(json_decode($row['body_json'] ?? '[]', true) ?: []);
     unset($row['body_json']);
     Response::json($row);
   }
@@ -96,7 +98,9 @@ class PagesController {
     $header = array_key_exists('header_html',$in) ? strip_tags((string)$in['header_html'], $allowedTags) : ($row['header_html'] ?? '');
     $footer = array_key_exists('footer_html',$in) ? strip_tags((string)$in['footer_html'], $allowedTags) : ($row['footer_html'] ?? '');
     $status = isset($in['status']) ? (string)$in['status'] : ($row['status'] ?? 'published');
-    $blocks = array_key_exists('body_blocks',$in) ? $this->normalizeBlocks($in['body_blocks']) : json_decode($row['body_json'] ?? '[]', true);
+    $blocks = array_key_exists('body_blocks',$in)
+      ? $this->normalizeBlocks($in['body_blocks'])
+      : $this->normalizeBlocks(json_decode($row['body_json'] ?? '[]', true) ?: []);
     $now = gmdate('c');
     $u = $pdo->prepare('UPDATE pages SET slug=?, title=?, header_html=?, body_json=?, footer_html=?, status=?, updated_at=? WHERE id=?');
     $u->execute([$slug,$title,$header,json_encode($blocks),$footer,$status,$now,(int)$id]);
@@ -117,7 +121,7 @@ class PagesController {
     $s->execute([$slug]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
     if (!$row || ($row['status'] ?? 'published')!=='published') return Response::json(['error'=>'not_found'],404);
-    $row['body_blocks'] = json_decode($row['body_json'] ?? '[]', true) ?: [];
+    $row['body_blocks'] = $this->normalizeBlocks(json_decode($row['body_json'] ?? '[]', true) ?: []);
     unset($row['body_json']);
     Response::json(['page'=>$row]);
   }

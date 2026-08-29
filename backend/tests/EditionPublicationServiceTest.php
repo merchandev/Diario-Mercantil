@@ -37,17 +37,21 @@ class EditionPublicationServiceTest extends TestCase {
         $service->publish(1, 1);
     }
     
-    public function testPublishFailsIfNoPdf() {
+    public function testPublishFailsIfUploadedPdfRecordIsMissing() {
         $pdo = $this->createMock(PDO::class);
-        $stmt = $this->createMock(PDOStatement::class);
-        
-        $stmt->method('fetch')->willReturn(['status' => 'Borrador', 'file_id' => null]);
-        $pdo->method('prepare')->willReturn($stmt);
+        $editionStmt = $this->createMock(PDOStatement::class);
+        $ordersStmt = $this->createMock(PDOStatement::class);
+        $fileStmt = $this->createMock(PDOStatement::class);
+
+        $editionStmt->method('fetch')->willReturn(['status' => 'Borrador', 'file_id' => 99]);
+        $ordersStmt->method('fetchAll')->willReturn([1]);
+        $fileStmt->method('fetch')->willReturn(false);
+        $pdo->method('prepare')->willReturnOnConsecutiveCalls($editionStmt, $ordersStmt, $fileStmt);
         
         $service = new EditionPublicationService($pdo);
         
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("Debe subir el PDF definitivo antes de publicar la edición.");
+        $this->expectExceptionMessage("El archivo físico asociado a la edición no existe o no es válido.");
         $this->expectExceptionCode(422);
         
         $service->publish(1, 1);

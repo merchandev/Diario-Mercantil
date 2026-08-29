@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import QRCode from 'qrcode'
 import { IconClose, IconDownload, IconShare } from './icons'
+import { useDialog } from '../contexts/DialogContext'
 
 interface QRCodeModalProps {
   isOpen: boolean
@@ -10,6 +11,7 @@ interface QRCodeModalProps {
 }
 
 export default function QRCodeModal({ isOpen, url, title, onClose }: QRCodeModalProps) {
+  const { showAlert } = useDialog()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [qrDataUrl, setQrDataUrl] = useState('')
 
@@ -57,9 +59,9 @@ export default function QRCodeModal({ isOpen, url, title, onClose }: QRCodeModal
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(url)
-      alert('Enlace copiado al portapapeles')
+      void showAlert('Enlace copiado al portapapeles.', { title: 'Enlace copiado' })
     } catch (e) {
-      alert('No se pudo copiar el enlace')
+      void showAlert('No se pudo copiar el enlace.', { title: 'Error' })
     }
   }
 

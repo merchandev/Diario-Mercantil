@@ -33,9 +33,6 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   
   const res = await fetch(url, reqInit)
   if (res.status === 401 && !noRedirect) {
-      try { localStorage.removeItem('token'); } catch { }
-      try { localStorage.removeItem('superadmin_token'); } catch { }
-      try { sessionStorage.removeItem('token'); } catch { }
       if (typeof window !== 'undefined') {
         window.location.href = window.location.pathname.startsWith('/lotus/') ? '/lotus/' : '/login'
       }
@@ -88,7 +85,7 @@ export async function login(body: { document: string; password: string }) {
     }
     throw new Error(errorMsg);
   }
-  return res.json() as Promise<{ token: string; user: { id: number; document: string; name: string; role: string } }>
+  return res.json() as Promise<{ user: { id: number; document: string; name: string; role: string } }>
 }
 
 // ========== SUPERADMIN API ==========
@@ -104,30 +101,18 @@ export async function superadminLogin(body: { username: string; password: string
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error || 'invalid_credentials')
   }
-  return res.json() as Promise<{ token: string; superadmin: { id: number; username: string } }>
+  return res.json() as Promise<{ superadmin: { id: number; username: string } }>
 }
 
 export async function verifySuperAdmin() {
-  const token = localStorage.getItem('superadmin_token')
-  if (!token) throw new Error('No token')
-
-  const res = await fetch(getUrl('/api/superadmin/verify'), {
-    headers: { 'Authorization': `Bearer ${token}` },
-    credentials: 'include'
-  })
+  const res = await fetch(getUrl('/api/superadmin/verify'), { credentials: 'include' })
   if (!res.ok) throw new Error('Unauthorized')
-  return res.json() as Promise<{ valid: boolean; superadmin: { id: number; username: string } }>
+  return res.json() as Promise<{ ok: boolean; superadmin: { id: number; username: string } }>
 }
 
 export async function superadminLogout() {
-  const token = localStorage.getItem('superadmin_token')
-  if (!token) return
-
-  await fetch(getUrl('/api/superadmin/logout'), {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` },
-    credentials: 'include'
-  })
+  const res = await fetchAuth('/api/superadmin/logout', { method: 'POST' }, true)
+  return res.json()
 }
 
 
@@ -137,7 +122,7 @@ export async function me() {
 }
 
 export async function logout() {
-  const res = await fetchAuth('/api/auth/logout', { method: 'POST' })
+  const res = await fetchAuth('/api/auth/logout', { method: 'POST' }, true)
   return res.json()
 }
 
@@ -250,10 +235,8 @@ export type Edition = {
   file_url?: string | null;
   created_at?: string;
   updated_at?: string;
-}
-export async function listPublicEditions() {
-  const res = await fetchAuth('/api/e')
-  return res.json() as Promise<{ items: Edition[] }>
+  published_by_name?: string;
+  published_at?: string;
 }
 export async function listEditions() {
   const res = await fetchAuth('/api/editions')
@@ -279,9 +262,41 @@ export async function autoSelectEditionOrders(id: number, limit: number) {
   const res = await fetchAuth(`/api/editions/${id}/auto-select`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit }) })
   return res.json() as Promise<{ ok: true; orders_count: number; order_ids: number[] }>
 }
-export async function publishEdition(id: number) {
+export async function listPublicEditions(params?: { q?: string; from?: string; to?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set('q', params.q);
+  if (params?.from) qs.set('from', params.from);
+  if (params?.to) qs.set('to', params.to);
+  const suffix = qs.toString() ? '?' + qs.toString() : '';
+  const res = await fetch(`/api/public/editions${suffix}`);
+  if (!res.ok) throw new Error('No se pudieron cargar las ediciones');
+  return res.json() as Promise<{ items: Edition[] }>;
+}
+export async function notifyEdition(id: number) {
+  const res = await fetchAuth(`/api/editions/${id}/notify`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; sent: number }>
+}
+export async function publishEdition(id: number, onProgress?: (prog: number, msg: string) => void): Promise<{ ok: true }> {
   const res = await fetchAuth(`/api/editions/${id}/publish`, { method: 'POST' })
-  return res.json() as Promise<{ ok: true }>
+  if (!res.body) return { ok: true }
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder('utf-8')
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const chunks = buffer.split('\n\n')
+    buffer = chunks.pop() ?? ''
+    for (const chunk of chunks) {
+      if (!chunk.startsWith('data: ')) continue
+      const data = JSON.parse(chunk.slice(6))
+      if (data.error) throw new Error(data.error)
+      if (typeof data.progress === 'number') onProgress?.(data.progress, data.msg ?? '')
+      if (data.ok) return { ok: true }
+    }
+  }
+  return { ok: true }
 }
 export async function uploadEditionPdf(id: number, file: File) {
   const fd = new FormData()
@@ -331,6 +346,9 @@ export type LegalRequest = {
   document: string;
   date: string;
   order_no?: string;
+  user_id?: number;
+  created_at?: string;
+  submitted_at?: string;
   publish_date?: string;
   verification_date?: string;
   phone?: string;
@@ -343,6 +361,10 @@ export type LegalRequest = {
   total_bs?: number;
   meta?: any;
   files?: LegalFile[];
+  edition_code?: string;
+  edition_no?: number;
+  edition_id?: number | null;
+  edition_file_url?: string | null;
 }
 export type LegalPayment = {
   id: number;
@@ -357,7 +379,7 @@ export type LegalPayment = {
   mobile_phone?: string;
   document?: string;
 }
-export async function listLegal(params?: { q?: string; status?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string; limit?: number; pub_type?: string }) {
+export async function listLegal(params?: { q?: string; status?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string; limit?: number; pub_type?: string; user_id?: number | string }) {
   // Clean up undefined values - don't send them as "undefined" string
   const cleanParams: Record<string, string> = {}
   if (params) {
@@ -369,6 +391,7 @@ export async function listLegal(params?: { q?: string; status?: string; req_from
     if (params.pub_to && params.pub_to !== 'undefined') cleanParams.pub_to = params.pub_to
     if (params.limit) cleanParams.limit = String(params.limit)
     if (params.pub_type) cleanParams.pub_type = params.pub_type
+    if (params.user_id !== undefined && params.user_id !== null && String(params.user_id) !== '') cleanParams.user_id = String(params.user_id)
   }
 
   const qs = new URLSearchParams(cleanParams)
@@ -389,6 +412,14 @@ export async function getLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}`)
   return res.json() as Promise<{ item: LegalRequest; payments: LegalPayment[] }>
 }
+export async function getPublicLegalByOrder(orderNo: string) {
+  const res = await fetch(getUrl(`/api/legal/public/${encodeURIComponent(orderNo)}`), { credentials: 'include' })
+  if (!res.ok) {
+    throw new ApiError('Publicación no disponible.', res.status)
+  }
+  const data = await res.json() as { item: { edition_code?: string } }
+  return data.item
+}
 export async function updateLegal(id: number, body: Partial<LegalRequest>) {
   const res = await fetchAuth(`/api/legal/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
@@ -400,6 +431,10 @@ export async function rejectLegal(id: number, reason: string) {
 export async function submitLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/submit`, { method: 'POST' })
   return res.json() as Promise<{ ok: boolean; order_no?: string; error?: string }>
+}
+export async function unpublishLegal(id: number) {
+  const res = await fetchAuth(`/api/legal/${id}/unpublish`, { method: 'POST' })
+  return res.json()
 }
 export async function verifyLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/verify`, { method: 'POST' })
@@ -415,7 +450,15 @@ export async function addLegalPayment(id: number, body: Partial<LegalPayment>, i
     headers['Idempotency-Key'] = idempotencyKey
   }
   const res = await fetchAuth(`/api/legal/${id}/payments`, { method: 'POST', headers, body: JSON.stringify(body) })
-  return res.json() as Promise<{ ok: true; payment_id: number }>
+  return res.json() as Promise<{ ok: true; payment_id: number; remaining_bs: number }>
+}
+export async function verifyLegalPayment(requestId: number, paymentId: number) {
+  const res = await fetchAuth(`/api/legal/${requestId}/payments/${paymentId}/verify`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; payment: LegalPayment }>
+}
+export async function rejectLegalPayment(requestId: number, paymentId: number) {
+  const res = await fetchAuth(`/api/legal/${requestId}/payments/${paymentId}/reject`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; payment: LegalPayment }>
 }
 export async function deleteLegalPayment(id: number, paymentId: number) {
   const res = await fetchAuth(`/api/legal/${id}/payments/${paymentId}`, { method: 'DELETE' })
@@ -538,6 +581,9 @@ export type Settings = {
   instructions_documents_text?: string;
   instructions_documents_image_url?: string;
   instructions_convocatorias_text?: string;
+  banner_main_1?: string;
+  banner_sidebar?: string;
+  promo_popup?: string;
   default_user_role?: string;
   unit_tax_bs?: number;
 }
@@ -545,8 +591,12 @@ export async function getSettings() {
   const res = await fetchAuth('/api/settings')
   return res.json() as Promise<{ settings: Partial<Settings> }>
 }
+export async function getAdminSettings() {
+  const res = await fetchAuth('/api/admin/settings')
+  return res.json() as Promise<{ settings: Partial<Settings> }>
+}
 export async function saveSettings(settings: Partial<Settings>) {
-  const res = await fetchAuth('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+  const res = await fetchAuth('/api/admin/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
   return res.json()
 }
 

@@ -5,6 +5,7 @@ import {
     listLegal,
     getLegal,
     updateLegal,
+    verifyLegal,
     rejectLegal,
     deleteLegal,
     addLegalPayment,
@@ -16,10 +17,14 @@ import {
 } from '../../lib/api'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import QRCodeModal from '../../components/QRCodeModal'
+import { BANCOS_VENEZUELA } from '../../constants/banks'
+import { useDialog } from '../../contexts/DialogContext'
+import { formatCaracasDateTime } from '../../components/LegalRequestDetails'
 
 const statusOptions = ['Todos', 'Pendiente', 'Por verificar', 'En trámite', 'Publicado', 'Rechazado']
 
 export default function Publications() {
+    const { showAlert, requestText } = useDialog()
     const [submissions, setSubmissions] = useState<LegalRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -83,10 +88,7 @@ export default function Publications() {
             message: '¿Marcar esta solicitud como En trámite?\n\nSe registrará la fecha de hoy como verificación. La publicación quedará pendiente hasta ser incorporada a una edición del diario.',
             variant: 'info',
             onConfirm: async () => {
-                await updateLegal(id, {
-                    status: 'En trámite',
-                    verification_date: new Date().toISOString().slice(0, 10)
-                })
+                await verifyLegal(id)
                 loadSubmissions()
                 setSelected(null)
             }
@@ -94,10 +96,10 @@ export default function Publications() {
     }
 
     async function handleReject(id: number) {
-        const reason = prompt('Motivo del rechazo:')
+        const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
         if (reason === null) return
 
-        await rejectLegal(id, reason || 'No especificado')
+        await rejectLegal(id, reason)
         loadSubmissions()
         setSelected(null)
     }
@@ -133,14 +135,23 @@ export default function Publications() {
         const form = e.target as HTMLFormElement
         const formData = new FormData(form)
 
+        const ref = String(formData.get('ref') || '').replace(/\D/g, '').slice(0, 4)
+        const prefix = String(formData.get('mobile_prefix') || '0412')
+        const phone = String(formData.get('mobile_phone') || '').replace(/\D/g, '').slice(0, 7)
+        const amount = Number(formData.get('amount_bs') || 0)
+        if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
+            void showAlert('Revise referencia, operadora, teléfono y monto del Pago Móvil.', { title: 'Datos inválidos' })
+            return
+        }
         const paymentData = {
-            ref: formData.get('ref') as string || '',
-            date: formData.get('date') as string || new Date().toISOString().slice(0, 10),
-            bank: formData.get('bank') as string || '',
-            type: formData.get('type') as string || '',
-            amount_bs: Number(formData.get('amount_bs') || 0),
-            status: formData.get('pstatus') as string || 'Verificado',
-            comment: formData.get('comment') as string || ''
+            ref,
+            date: String(formData.get('date') || new Date().toISOString().slice(0, 10)),
+            bank: String(formData.get('bank') || ''),
+            type: 'pago_movil',
+            amount_bs: amount,
+            status: 'Pendiente',
+            mobile_phone: prefix + phone,
+            comment: String(formData.get('comment') || '')
         }
 
         await addLegalPayment(selected.id, paymentData)
@@ -295,12 +306,12 @@ export default function Publications() {
                                                 <Eye className="w-4 h-4" />
                                             </button>
 
-                                            {sub.status === 'Publicada' && (
+                                            {sub.status === 'Publicada' && sub.edition_code && (
                                                 <button
                                                     onClick={() => setQrModal({
                                                         isOpen: true,
-                                                        url: `${window.location.origin}/ediciones/${sub.order_no || sub.id}`,
-                                                        title: `Publicación ${sub.order_no || sub.id}`
+                                                        url: `${window.location.origin}/edicion/${encodeURIComponent(sub.edition_code!)}`,
+                                                        title: `Edición ${sub.edition_code}`
                                                     })}
                                                     className="p-2 hover:bg-blue-500/10 rounded-lg text-blue-400 hover:text-blue-300 transition-colors"
                                                     title="QR Code"
@@ -318,31 +329,33 @@ export default function Publications() {
                                             </button>
 
                                             {sub.status === 'Por verificar' && (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleApprove(sub.id)}
-                                                        className="p-2 hover:bg-green-500/10 rounded-lg text-green-400 hover:text-green-300 transition-colors"
-                                                        title="Aprobar"
-                                                    >
-                                                        <CheckCircle className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReject(sub.id)}
-                                                        className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
-                                                        title="Rechazar"
-                                                    >
-                                                        <XCircle className="w-4 h-4" />
-                                                    </button>
-                                                </>
+                                                <button
+                                                    onClick={() => handleApprove(sub.id)}
+                                                    className="p-2 hover:bg-green-500/10 rounded-lg text-green-400 hover:text-green-300 transition-colors"
+                                                    title="Verificar solicitud"
+                                                >
+                                                    <CheckCircle className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            {['Por verificar', 'En trámite'].includes(sub.status) && (
+                                                <button
+                                                    onClick={() => handleReject(sub.id)}
+                                                    className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
+                                                    title="Rechazar"
+                                                >
+                                                    <XCircle className="w-4 h-4" />
+                                                </button>
                                             )}
 
-                                            <button
-                                                onClick={() => handleDelete(sub.id)}
-                                                className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            {sub.status !== 'Publicada' && (
+                                                <button
+                                                    onClick={() => handleDelete(sub.id)}
+                                                    className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -376,52 +389,48 @@ export default function Publications() {
                                         <DollarSign className="w-4 h-4" />
                                         Pagos
                                     </h3>
-                                    <button
+                                    {selected.status === 'En trámite' && <button
                                         onClick={() => setShowPaymentForm(!showPaymentForm)}
                                         className="text-sm text-purple-400 hover:text-purple-300"
                                     >
                                         {showPaymentForm ? 'Cancelar' : '+ Agregar'}
-                                    </button>
+                                    </button>}
                                 </div>
 
-                                {showPaymentForm && (
+                                {showPaymentForm && selected.status === 'En trámite' && (
                                     <form onSubmit={handleAddPayment} className="mb-4 p-4 bg-gray-900/50 rounded-lg space-y-3">
                                         <input
                                             name="ref"
-                                            placeholder="Referencia"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            pattern="\d{4}"
+                                            placeholder="Últimos 4 dígitos"
+                                            required
                                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
                                         />
                                         <input
                                             type="date"
                                             name="date"
+                                            max={new Date().toISOString().slice(0, 10)}
                                             defaultValue={new Date().toISOString().slice(0, 10)}
+                                            required
                                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
                                         />
-                                        <input
-                                            name="bank"
-                                            placeholder="Banco"
-                                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
-                                        />
-                                        <input
-                                            name="type"
-                                            placeholder="Tipo (ej: Transferencia)"
-                                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
-                                        />
-                                        <input
-                                            type="number"
-                                            name="amount_bs"
-                                            step="0.01"
-                                            placeholder="Monto Bs."
-                                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
-                                        />
-                                        <select
-                                            name="pstatus"
-                                            defaultValue="Verificado"
-                                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
-                                        >
-                                            <option>Verificado</option>
-                                            <option>Pendiente</option>
+                                        <select name="bank" required defaultValue="" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none">
+                                            <option value="" disabled>Banco emisor</option>
+                                            {BANCOS_VENEZUELA.map(bank => <option key={bank} value={bank}>{bank}</option>)}
                                         </select>
+                                        <input
+                                            type="number" name="amount_bs" min="0.01" step="0.01" required placeholder="Monto parcial Bs."
+                                            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
+                                        />
+                                        <div className="grid grid-cols-[110px,1fr] gap-2">
+                                            <select name="mobile_prefix" defaultValue="0412" required className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none">
+                                                {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
+                                            </select>
+                                            <input name="mobile_phone" inputMode="numeric" maxLength={7} pattern="\d{7}" required placeholder="7 dígitos" className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none" />
+                                        </div>
+                                        <input name="comment" placeholder="Comentario (opcional)" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none" />
                                         <button
                                             type="submit"
                                             className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-white text-sm transition-colors"
@@ -516,7 +525,7 @@ export default function Publications() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Fecha de Solicitud:</span>
-                                        <span className="text-white">{prettyDate((selected as any).created_at?.slice(0, 10) || selected.date)}</span>
+                                        <span className="text-white">{formatCaracasDateTime((selected as any).created_at || selected.date)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-400">Estado:</span>
@@ -537,18 +546,20 @@ export default function Publications() {
                                 </div>
 
                                 {/* Quick Actions */}
-                                {selected.status === 'Por verificar' && (
+                                {['Por verificar', 'En trámite'].includes(selected.status) && (
                                     <div className="p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg mb-4">
                                         <p className="text-sm font-semibold text-orange-400 mb-3">
-                                            ⚠️ Pendiente de verificación
+                                            {selected.status === 'Por verificar' ? '⚠️ Pendiente de verificación' : '✓ Solicitud verificada y en trámite'}
                                         </p>
                                         <div className="flex gap-2">
-                                            <button
-                                                onClick={() => handleApprove(selected.id)}
-                                                className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-white text-sm transition-colors"
-                                            >
-                                                ✓ Aprobar
-                                            </button>
+                                            {selected.status === 'Por verificar' && (
+                                                <button
+                                                    onClick={() => handleApprove(selected.id)}
+                                                    className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-white text-sm transition-colors"
+                                                >
+                                                    ✓ Verificar
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleReject(selected.id)}
                                                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors"
@@ -568,12 +579,12 @@ export default function Publications() {
                                         <Download className="w-4 h-4" />
                                         Descargar PDF
                                     </button>
-                                    {selected.status === 'Publicada' && (
+                                    {selected.status === 'Publicada' && selected.edition_code && (
                                         <button
                                             onClick={() => setQrModal({
                                                 isOpen: true,
-                                                url: `${window.location.origin}/ediciones/${selected.order_no || selected.id}`,
-                                                title: `Publicación ${selected.order_no || selected.id}`
+                                                url: `${window.location.origin}/edicion/${encodeURIComponent(selected.edition_code!)}`,
+                                                title: `Edición ${selected.edition_code}`
                                             })}
                                             className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white text-sm flex items-center justify-center gap-2 transition-colors"
                                         >

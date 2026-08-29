@@ -38,9 +38,9 @@ export default function SuperAdminSeo() {
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* 
-                    Wrap the SeoManager in a container that forces text colors to be readable. 
-                    Because SeoManager uses standard admin colors (slate-800), we wrap it in a white/slate card 
+                {/*
+                    Wrap the SeoManager in a container that forces text colors to be readable.
+                    Because SeoManager uses standard admin colors (slate-800), we wrap it in a white/slate card
                 */}
                 <div className="bg-slate-50 rounded-2xl overflow-hidden shadow-2xl p-6">
                     <SeoManager />

@@ -17,7 +17,8 @@ final class LegalRequestStateMachine {
 
         try {
             // Lock row
-            $stmt = $this->pdo->prepare('SELECT * FROM legal_requests WHERE id=? FOR UPDATE');
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+            $stmt = $this->pdo->prepare('SELECT * FROM legal_requests WHERE id=?' . $lockClause);
             $stmt->execute([$id]);
             $req = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -93,7 +94,8 @@ final class LegalRequestStateMachine {
             }
 
             // Lock associated payments FOR UPDATE to prevent race conditions
-            $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=? FOR UPDATE")->execute([$id]);
+            $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+            $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=?" . $lockClause)->execute([$id]);
             
             $now = gmdate('Y-m-d H:i:s');
             
@@ -159,6 +161,19 @@ final class LegalRequestStateMachine {
 
             $this->pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")
                  ->execute([$comment, $id]);
+            return true;
+        });
+    }
+
+    public function unpublish(int $id): void {
+        $this->executeTransition($id, 'unpublish', function($req) use ($id) {
+            if ($req['status'] !== 'Publicada') {
+                throw new Exception("Solo se pueden despublicar solicitudes 'Publicada'.", 409);
+            }
+
+            $this->pdo->prepare("DELETE FROM edition_orders WHERE legal_request_id=?")->execute([$id]);
+            $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', publish_date=NULL WHERE id=?")->execute([$id]);
+            
             return true;
         });
     }

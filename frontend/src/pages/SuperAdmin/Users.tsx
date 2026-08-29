@@ -3,8 +3,10 @@ import { ArrowLeft, Plus, Search, Trash2, Edit2, Shield, User as UserIcon } from
 import { useNavigate } from 'react-router-dom'
 import { listUsers, createUser, updateUser, deleteUser, UserSummary } from '../../lib/api'
 import { verifySuperAdmin } from '../../lib/api'
+import { useDialog } from '../../contexts/DialogContext'
 
 export default function Users() {
+    const { showAlert, confirmAction } = useDialog()
     const [users, setUsers] = useState<UserSummary[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
@@ -58,18 +60,18 @@ export default function Users() {
             loadUsers()
         } catch (error) {
             console.error('Error saving user:', error)
-            alert('Error al guardar usuario')
+            void showAlert('Error al guardar usuario.', { title: 'Error' })
         }
     }
 
     async function handleDelete(id: number) {
-        if (!confirm('¿Estás seguro de eliminar este usuario?')) return
+        if (!(await confirmAction('¿Estás seguro de eliminar este usuario?', { title: 'Eliminar usuario', danger: true }))) return
         try {
             await deleteUser(id)
             loadUsers()
         } catch (error) {
             console.error('Error deleting user:', error)
-            alert('Error al eliminar usuario')
+            void showAlert('Error al eliminar usuario.', { title: 'Error' })
         }
     }
 

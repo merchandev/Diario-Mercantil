@@ -3,7 +3,7 @@ require __DIR__ . '/../src/Database.php';
 
 try {
     $pdo = Database::pdo();
-    
+
     // 1. Seed SEO Metadata for public pages
     $public_routes = [
         ['path' => '/', 'title' => 'Inicio - Diario Mercantil', 'desc' => 'El mejor diario mercantil de Venezuela'],
@@ -15,7 +15,7 @@ try {
     ];
 
     $seoStmt = $pdo->prepare("INSERT IGNORE INTO seo_metadata (path, title, description, robots) VALUES (?, ?, ?, 'index, follow')");
-    
+
     foreach ($public_routes as $route) {
         $seoStmt->execute([$route['path'], $route['title'], $route['desc']]);
     }
@@ -30,7 +30,7 @@ try {
     ];
 
     $pageStmt = $pdo->prepare("INSERT IGNORE INTO pages (slug, title, body_blocks) VALUES (?, ?, ?)");
-    
+
     foreach ($cms_pages as $page) {
         // Create a simple paragraph block
         $blocks = json_encode([[

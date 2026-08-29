@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
-import FlipbookViewer from '../components/FlipbookViewer'
-import { listPublicEditions } from '../lib/api'
+import { listPublicEditions, type Edition as ApiEdition } from '../lib/api'
 import { SEO } from '../components/SEO'
 
-type Edition = { id: number; code: string; status: string; date: string; edition_no: number; orders_count: number; file_id?: number | null; file_url?: string | null; file_name?: string | null; seo?: { title?: string, description?: string, og_image?: string } }
+type Edition = ApiEdition & { seo?: { title?: string, description?: string, og_image?: string } }
 type Order = { id: number; name: string; document: string; status: string; date: string }
 
 export default function EditionPublic() {
@@ -58,8 +57,8 @@ export default function EditionPublic() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <SEO 
-        title={edition.seo?.title || `Edición N° ${edition.edition_no} | Diario Mercantil Venezuela`} 
+      <SEO
+        title={edition.seo?.title || `Edición N° ${edition.edition_no} | Diario Mercantil Venezuela`}
         description={edition.seo?.description || `Consulte el archivo digital de la edición ${edition.edition_no} de fecha ${edition.date} del Diario Mercantil Venezuela.`}
         ogImage={edition.seo?.og_image}
       />
@@ -137,11 +136,11 @@ export default function EditionPublic() {
         </div>
 
         {/* 2. Revista PDF Central */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden h-[800px]">
           {edition.file_id ? (
-            <FlipbookViewer src={pdfUrl} />
+            <iframe src={`${pdfUrl}#view=FitH`} className="w-full h-full border-0 rounded" title={`Edición ${edition.edition_no}`} />
           ) : (
-            <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200 h-full flex flex-col items-center justify-center">
               <IconSearch className="w-12 h-12 mx-auto text-slate-300 mb-3" />
               Esta edición aún no tiene un archivo PDF disponible para visualizar.
             </div>
@@ -159,21 +158,16 @@ export default function EditionPublic() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {recentEditions.map(ed => (
-                <Link key={ed.id} to={`/dm/e-${ed.code}`} className="group card flex flex-col hover:border-brand-300 transition-all hover:shadow-md overflow-hidden bg-white">
-                  <div className="aspect-[3/4] bg-slate-100 relative overflow-hidden flex items-center justify-center border-b border-slate-100 p-4">
-                    {/* Simulando la portada del PDF */}
-                    <div className="w-full h-full bg-white shadow-sm border border-slate-200 flex flex-col">
-                      <div className="h-6 w-full bg-brand-800 text-[8px] text-white/80 flex items-center justify-center font-serif tracking-widest">DIARIO MERCANTIL</div>
-                      <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
-                        <div className="text-xs text-slate-400 mb-1 font-mono">{ed.code}</div>
-                        <div className="font-bold text-slate-700 group-hover:text-brand-700 transition-colors">Edición N° {ed.edition_no}</div>
-                        <div className="text-xs text-slate-500 mt-2">{ed.date}</div>
-                      </div>
-                    </div>
-                    <div className="absolute inset-0 bg-brand-900/0 group-hover:bg-brand-900/5 transition-colors"></div>
+                <Link key={ed.id} to={`/edicion/${ed.code}`} className="group card flex flex-col hover:border-brand-300 transition-all hover:shadow-md bg-white p-4 border border-slate-200 rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono text-slate-400">{ed.code}</span>
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{ed.date}</span>
                   </div>
-                  <div className="p-3 text-center bg-slate-50/50">
-                    <span className="text-xs font-semibold text-brand-700 uppercase tracking-wider">Ver Edición</span>
+                  <div className="font-bold text-lg text-slate-800 group-hover:text-brand-700 transition-colors mt-2">
+                    Edición N° {ed.edition_no}
+                  </div>
+                  <div className="mt-4 text-sm font-semibold text-brand-600 group-hover:text-brand-800 flex items-center">
+                    Ver Edición <IconChevronRight className="w-4 h-4 ml-1" />
                   </div>
                 </Link>
               ))}

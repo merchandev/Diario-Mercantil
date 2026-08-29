@@ -3,6 +3,7 @@ import { listFiles, uploadFiles, FileRow, deleteFile, listTrashedFiles, restoreF
 import { IconUpload, IconSearch, IconDocs, IconCheck, IconTrash } from './icons'
 import { LoadingSpinner } from './LoadingSpinner'
 import ConfirmDialog from './ConfirmDialog'
+import { useDialog } from '../contexts/DialogContext'
 
 interface MediaGalleryProps {
     onSelect?: (file: FileRow) => void
@@ -10,6 +11,7 @@ interface MediaGalleryProps {
 }
 
 export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps) {
+    const { showAlert } = useDialog()
     const [files, setFiles] = useState<FileRow[]>([])
     const [loading, setLoading] = useState(true)
     const [uploading, setUploading] = useState(false)
@@ -47,7 +49,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
             load() // Reload list
         } catch (error) {
             console.error(error)
-            alert('Error al subir archivos')
+            void showAlert('Error al subir archivos.', { title: 'Error' })
         } finally {
             setUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -60,6 +62,18 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
     }
 
     const isImage = (type: string) => ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(type.toLowerCase())
+
+    const runFileAction = async (action: () => Promise<unknown>) => {
+        try {
+            await action()
+            load()
+        } catch (error: any) {
+            const message = error?.data?.error === 'file_in_use'
+                ? 'No se puede eliminar este archivo porque actualmente está siendo utilizado como banner.'
+                : error?.message || 'No se pudo completar la operación sobre el archivo.'
+            void showAlert(message, { title: 'Archivo no eliminado' })
+        }
+    }
 
     return (
         <div className="space-y-4">
@@ -87,7 +101,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                 </div>
                 <div className="flex gap-2">
                     {viewMode === 'trash' && files.length > 0 && !selectable && (
-                        <button className="btn btn-danger text-sm px-3 flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Vaciar papelera', message: '¿Estás seguro de eliminar todos los archivos de la papelera permanentemente?', onConfirm: async () => { await emptyFileTrash(); load() } })}>
+                        <button className="btn btn-danger text-sm px-3 flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Vaciar papelera', message: '¿Estás seguro de eliminar todos los archivos de la papelera permanentemente?', onConfirm: () => { void runFileAction(emptyFileTrash) } })}>
                             <IconTrash className="w-4 h-4" /> Vaciar
                         </button>
                     )}
@@ -152,7 +166,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                                         <button onClick={() => openUrl(file.id)} className="flex-[2] bg-white/20 hover:bg-white/30 py-1.5 rounded text-center transition-colors font-semibold">
                                             Abrir
                                         </button>
-                                        <button onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar archivo', message: '¿Enviar este archivo a la papelera?', onConfirm: async () => { await deleteFile(file.id); load() } })} className="flex-1 bg-red-500/80 hover:bg-red-500 py-1.5 rounded flex items-center justify-center transition-colors text-white" title="Eliminar">
+                                        <button onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar archivo', message: '¿Enviar este archivo a la papelera?', onConfirm: () => { void runFileAction(() => deleteFile(file.id)) } })} className="flex-1 bg-red-500/80 hover:bg-red-500 py-1.5 rounded flex items-center justify-center transition-colors text-white" title="Eliminar">
                                             <IconTrash className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -165,7 +179,7 @@ export default function MediaGallery({ onSelect, selectable }: MediaGalleryProps
                                         <button onClick={async () => { await restoreFile(file.id); load() }} className="flex-1 bg-green-500/80 hover:bg-green-500 py-1.5 rounded text-center transition-colors font-semibold">
                                             Restaurar
                                         </button>
-                                        <button onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar definitivamente', message: '¿Eliminar permanentemente este archivo?', onConfirm: async () => { await permanentDeleteFile(file.id); load() } })} className="flex-1 bg-red-500/80 hover:bg-red-500 py-1.5 rounded text-center flex justify-center items-center transition-colors text-white" title="Eliminar">
+                                        <button onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar definitivamente', message: '¿Eliminar permanentemente este archivo?', onConfirm: () => { void runFileAction(() => permanentDeleteFile(file.id)) } })} className="flex-1 bg-red-500/80 hover:bg-red-500 py-1.5 rounded text-center flex justify-center items-center transition-colors text-white" title="Eliminar">
                                             <IconTrash className="w-4 h-4" />
                                         </button>
                                     </div>

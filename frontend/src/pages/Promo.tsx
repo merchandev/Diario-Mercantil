@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getSettings, saveSettings, Settings, FileRow } from '../lib/api'
+import { getAdminSettings, saveSettings, Settings, FileRow } from '../lib/api'
 import MediaGallery from '../components/MediaGallery'
 import { IconImage, IconX, IconCheck } from '../components/icons'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { useDialog } from '../contexts/DialogContext'
 
 // Define the keys we care about
 const BANNER_KEYS = {
@@ -12,6 +13,7 @@ const BANNER_KEYS = {
 }
 
 export default function Promo() {
+    const { showAlert, confirmAction } = useDialog()
     const [settings, setSettings] = useState<Partial<Settings & Record<string, string>>>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -23,7 +25,7 @@ export default function Promo() {
     const API_URL = import.meta.env.VITE_BACKEND_URL || ''
 
     useEffect(() => {
-        getSettings()
+        getAdminSettings()
             .then(res => setSettings(res.settings as Partial<Settings & Record<string, string>>))
             .catch(console.error)
             .finally(() => setLoading(false))
@@ -31,6 +33,11 @@ export default function Promo() {
 
     const handleSelectImage = async (file: FileRow) => {
         if (!currentKey) return
+        const imageTypes = ['jpg', 'jpeg', 'png', 'webp', 'gif']
+        if (!imageTypes.includes(String(file.type || '').toLowerCase())) {
+            void showAlert('Seleccione un archivo de imagen válido (JPG, PNG, WEBP o GIF).', { title: 'Archivo inválido' })
+            return
+        }
 
         // We store the full URL or just the relative path? 
         // Let's store the full API URL for simplicity in frontend usage, or just the file ID?
@@ -49,7 +56,7 @@ export default function Promo() {
             await saveSettings({ [currentKey]: url })
         } catch (error) {
             console.error(error)
-            alert('Error al guardar la configuración')
+            void showAlert('Error al guardar la configuración.', { title: 'Error' })
         } finally {
             setSaving(false)
         }
@@ -61,7 +68,7 @@ export default function Promo() {
     }
 
     const clearImage = async (key: string) => {
-        if (!confirm('¿Quitar esta imagen?')) return
+        if (!(await confirmAction('¿Quitar esta imagen?', { title: 'Quitar banner', danger: true }))) return
         const newSettings = { ...settings, [key]: '' } as Partial<Settings & Record<string, string>>
         setSettings(newSettings)
         setSaving(true)

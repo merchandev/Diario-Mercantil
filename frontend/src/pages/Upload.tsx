@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react'
 import Dropzone from '../components/Dropzone'
 import { uploadFiles } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function Upload(){
+  const { showAlert } = useDialog()
   const [rows, setRows] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -15,8 +17,8 @@ export default function Upload(){
 
   async function onUpload(){
     setBusy(true)
-    try { await uploadFiles(rows); alert('Carga enviada'); setRows([]) }
-    catch(e:any){ alert(e.message) }
+    try { await uploadFiles(rows); await showAlert('Carga enviada.', { title: 'Archivos cargados' }); setRows([]) }
+    catch(e:any){ void showAlert(e.message || 'No se pudo completar la carga.', { title: 'Error' }) }
     finally{ setBusy(false) }
   }
 

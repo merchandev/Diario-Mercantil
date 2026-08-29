@@ -14,9 +14,8 @@ export default function MediosPagoInfo(){
           <ul className="grid md:grid-cols-2 gap-3">
             {items.map(m=> (
               <li key={m.id} className="border rounded p-3 text-sm">
-                <div className="font-semibold">{m.type}</div>
+                <div className="font-semibold">{m.type === 'pago_movil' ? 'Pago Móvil' : m.type}</div>
                 {m.bank && <div className="text-slate-600">Banco: {m.bank}</div>}
-                {m.account && <div className="text-slate-600">Cuenta: {m.account}</div>}
                 {m.holder && <div className="text-slate-600">Titular: {m.holder}</div>}
                 {m.rif && <div className="text-slate-600">RIF: {m.rif}</div>}
                 {m.phone && <div className="text-slate-600">Teléfono: {m.phone}</div>}

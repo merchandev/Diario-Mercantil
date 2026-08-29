@@ -136,8 +136,8 @@ final class DocumentUploadService
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
             }
-            if ($fileSaved && is_file($absolutePath)) {
-                @unlink($absolutePath);
+            if ($fileSaved && is_file($absolutePath) && !unlink($absolutePath)) {
+                error_log('[document-upload] No se pudo limpiar el archivo tras el rollback: ' . $absolutePath);
             }
 
             if ($e instanceof DocumentUploadException) {

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 import { listUsers, type UserSummary, createUser, deleteUser, updateUser, changeUserRole, setUserPassword, listLegal, type LegalRequest } from '../lib/api'
 import RolesModal from '../components/RolesModal'
@@ -123,8 +124,8 @@ export default function Usuarios() {
                 <td className="px-4 py-2">
                   <span className={`pill ${u.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-700'}`}>{u.status === 'active' ? 'Activo' : 'Inactivo'}</span>
                 </td>
-                <td className="px-4 py-2">{u.document}</td>
-                <td className="px-4 py-2">{u.name}</td>
+                <td className="px-4 py-2"><Link to={`/dashboard/usuarios/${u.id}`} className="text-brand-600 hover:underline">{u.document}</Link></td>
+                <td className="px-4 py-2"><Link to={`/dashboard/usuarios/${u.id}`} className="font-medium text-slate-900 hover:text-brand-600">{u.name}</Link></td>
                 <td className="px-4 py-2">{u.role}</td>
                 <td className="px-4 py-2 text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -150,13 +151,13 @@ export default function Usuarios() {
             <form onSubmit={async e => {
               e.preventDefault()
               try {
-                // Actualizar campos básicos (nombre, email, teléfono, etc.)
                 await updateUser(editUser.id, {
                   name: editUser.name,
                   email: editUser.email,
                   phone: editUser.phone,
+                  status: editUser.status,
+                  person_type: editUser.person_type,
                 })
-                // Cambiar rol solo si cambió (endpoint separado en el backend)
                 const originalUser = rows.find((r: any) => r.id === editUser.id)
                 if (originalUser && originalUser.role !== editUser.role) {
                   await changeUserRole(editUser.id, editUser.role)
@@ -242,3 +243,4 @@ export default function Usuarios() {
     </section>
   )
 }
+

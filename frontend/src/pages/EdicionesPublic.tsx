@@ -16,7 +16,7 @@ export default function EdicionesPublic() {
   const load = async () => {
     setLoading(true)
     try {
-      const r = await listPublicEditions()
+      const r = await listPublicEditions({ q: q || undefined, from: from || undefined, to: to || undefined })
       setRows(r.items ?? [])
     } catch {
       setRows([])
@@ -24,27 +24,9 @@ export default function EdicionesPublic() {
       setLoading(false)
     }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [q, from, to])
 
-  const filtered = useMemo(() => {
-    const fFrom = from ? new Date(from) : null
-    const fTo = to ? new Date(to) : null
-    return [...rows]
-      .filter(ed => {
-        if (ed.status !== 'Publicada') return false
-        const t = (String(ed.code || '') + ' ' + String(ed.edition_no || '') + ' ' + String(ed.status || '')).toLowerCase()
-        if (q && !t.includes(q.toLowerCase())) return false
-        const d = ed.date ? new Date(ed.date) : (ed.created_at ? new Date(ed.created_at) : null)
-        if (fFrom && d && d < fFrom) return false
-        if (fTo && d && d > new Date(new Date(to).getTime() + 24 * 60 * 60 * 1000 - 1)) return false
-        return true
-      })
-      .sort((a, b) => {
-        const da = a.date ? new Date(a.date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0)
-        const db = b.date ? new Date(b.date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0)
-        return db - da
-      })
-  }, [rows, q, from, to])
+  const filtered = rows
 
   // Latest published edition
   const latestEdition = useMemo(() => {
@@ -57,8 +39,8 @@ export default function EdicionesPublic() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <SEO 
-        title="Ediciones Publicadas | Diario Mercantil Venezuela" 
+      <SEO
+        title="Ediciones Publicadas | Diario Mercantil Venezuela"
         description="Consulta el archivo digital de ediciones publicadas. Verifica actas de asamblea, balances y notificaciones exigidas por la ley venezolana."
       />
       <div className="mx-auto max-w-7xl p-6 space-y-6">
@@ -92,7 +74,7 @@ export default function EdicionesPublic() {
                     </p>
                     {latestEdition.code && (
                       <p className="text-xs text-slate-500 font-mono mt-1">
-                        CEV: {latestEdition.code}
+                        CVE: {latestEdition.code}
                       </p>
                     )}
                   </div>
@@ -141,7 +123,7 @@ export default function EdicionesPublic() {
           <>
             <div className="card p-4 grid md:grid-cols-[1fr,auto,auto,auto] gap-3 items-end">
               <label className="text-sm">Buscar
-                <input className="input w-full mt-1" placeholder="Código, número o estado" value={q} onChange={e => setQ(e.target.value)} />
+                <input className="input w-full mt-1" placeholder="CVE o razón social" value={q} onChange={e => setQ(e.target.value)} />
               </label>
               <label className="text-sm">Desde
                 <input type="date" className="input mt-1" value={from} onChange={e => setFrom(e.target.value)} />
@@ -166,7 +148,8 @@ export default function EdicionesPublic() {
                     <tr className="text-left border-b bg-brand-800 text-white">
                       <th className="p-3">Fecha de la Edición</th>
                       <th className="p-3">N° de Edición</th>
-                      <th className="p-3">Código de Verificación (CEV)</th>
+                      <th className="p-3">Razón social</th>
+                      <th className="p-3">Código de Verificación (CVE)</th>
                       <th className="p-3">Estado</th>
                       <th className="p-3 text-right">Acciones</th>
                     </tr>
@@ -180,6 +163,7 @@ export default function EdicionesPublic() {
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
                           <td className="p-3">{ed.edition_no ? `N° ${ed.edition_no}` : '-'}</td>
+                          <td className="p-3">{ed.company_name || ed.name || '-'}</td>
                           <td className="p-3 font-mono text-xs">{ed.code || '-'}</td>
                           <td className="p-3">
                             <span className={`pill text-xs ${ed.status === 'Publicada' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>

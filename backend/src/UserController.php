@@ -17,6 +17,18 @@ class UserController {
           ->execute([$actorId, $action, $type, $resId, $bJson, $aJson, $ip]);
   }
 
+  
+  public function get($id) {
+    $u = AuthController::requireAuth();
+    if (!RolePolicy::canManageUsers($u)) return Response::json(['error'=>'forbidden'],403);
+    $pdo = Database::pdo();
+    $s = $pdo->prepare('SELECT id, name, document, phone, email, role, status, person_type, state, municipality, address, created_at, updated_at, avatar_url, avatar_updated_at FROM users WHERE id=?');
+    $s->execute([$id]);
+    $user = $s->fetch(PDO::FETCH_ASSOC);
+    if (!$user) return Response::json(['error'=>'not_found'],404);
+    return Response::json($user);
+  }
+
   public function list(){
     $u = AuthController::requireAuth(); 
     if ($u['role'] !== RolePolicy::ADMIN && $u['role'] !== RolePolicy::SUPERADMIN) {
@@ -411,8 +423,26 @@ class UserController {
 
         $allowed = ['name', 'email', 'phone', 'state', 'municipality', 'address'];
         foreach ($allowed as $field) {
-            $val = trim($in[$field] ?? '');
-            if ($val !== '') { $set[] = "{$field}=?"; $params[] = $val; }
+            if (array_key_exists($field, $in)) {
+                $val = trim((string)($in[$field] ?? ''));
+                $set[] = "{$field}=?";
+                $params[] = $val !== '' ? $val : null;
+            }
+        }
+
+        if (array_key_exists('status', $in)) {
+            $status = strtolower(trim((string)$in['status']));
+            if (!in_array($status, ['active', 'inactive', 'suspended'], true)) {
+                Response::json(['error'=>'invalid_status'], 422); exit;
+            }
+            $set[] = 'status=?'; $params[] = $status;
+        }
+        if (array_key_exists('person_type', $in)) {
+            $personType = strtolower(trim((string)$in['person_type']));
+            if (!in_array($personType, ['natural', 'juridica'], true)) {
+                Response::json(['error'=>'invalid_person_type'], 422); exit;
+            }
+            $set[] = 'person_type=?'; $params[] = $personType;
         }
 
         $password = (string)($in["password"] ?? "");

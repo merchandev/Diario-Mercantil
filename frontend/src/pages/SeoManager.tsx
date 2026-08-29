@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SeoMetadata, listSeoAdmin, saveSeoAdmin, deleteSeoAdmin } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 const DEFAULT_PUBLIC_PAGES = [
   { path: '/', title: 'Inicio (Home)' },
@@ -11,10 +12,11 @@ const DEFAULT_PUBLIC_PAGES = [
 ];
 
 export default function SeoManager() {
+  const { showAlert, confirmAction } = useDialog()
   const [items, setItems] = useState<SeoMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<SeoMetadata | null>(null)
-  
+
   const [form, setForm] = useState<SeoMetadata>({ path: '', title: '', description: '', og_image: '', robots: 'index, follow' })
 
   const load = async () => {
@@ -34,12 +36,12 @@ export default function SeoManager() {
   const displayItems = [...items];
   DEFAULT_PUBLIC_PAGES.forEach(def => {
     if (!displayItems.find(i => i.path === def.path)) {
-      displayItems.push({ 
-        path: def.path, 
-        title: def.title + ' (Sin Configurar)', 
-        description: 'Falta SEO', 
-        og_image: '', 
-        robots: 'index, follow' 
+      displayItems.push({
+        path: def.path,
+        title: def.title + ' (Sin Configurar)',
+        description: 'Falta SEO',
+        og_image: '',
+        robots: 'index, follow'
       });
     }
   });
@@ -59,25 +61,30 @@ export default function SeoManager() {
     setLoading(true)
     try {
       await saveSeoAdmin(form)
-      alert('Guardado exitosamente')
+      await showAlert('Guardado exitosamente', { title: 'SEO actualizado' })
       load()
       handleNew()
     } catch (e: any) {
-      alert('Error al guardar: ' + e.message)
+      await showAlert('Error al guardar: ' + e.message, { title: 'Error' })
     } finally {
       setLoading(false)
     }
   }
 
   const handleDelete = async (path: string) => {
-    if (!confirm('¿Seguro que deseas eliminar la regla SEO para ' + path + '?')) return
+    const confirmed = await confirmAction('¿Seguro que deseas eliminar la regla SEO para ' + path + '?', {
+      title: 'Eliminar regla SEO',
+      danger: true,
+      confirmText: 'Eliminar',
+    })
+    if (!confirmed) return
     setLoading(true)
     try {
       await deleteSeoAdmin(path)
       load()
       if (selected?.path === path) handleNew()
     } catch (e: any) {
-      alert('Error al eliminar: ' + e.message)
+      await showAlert('Error al eliminar: ' + e.message, { title: 'Error' })
       setLoading(false)
     }
   }
@@ -101,19 +108,19 @@ export default function SeoManager() {
           <div className="overflow-y-auto p-4 flex-1">
             {loading && items.length === 0 ? <p className="text-sm text-slate-500">Cargando...</p> : null}
             {!loading && items.length === 0 ? <p className="text-sm text-slate-500">No hay reglas SEO creadas.</p> : null}
-            
+
             <div className="space-y-3">
               {displayItems.map(item => (
-                <div 
-                  key={item.path} 
+                <div
+                  key={item.path}
                   className={`p-3 rounded border transition-colors cursor-pointer ${form.path === item.path ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-brand-300'} ${item.title.includes('(Sin Configurar)') ? 'bg-orange-50 border-orange-200' : ''}`}
                   onClick={() => handleEdit(item)}
                 >
                   <div className="flex justify-between items-start mb-1">
                     <span className="font-mono text-xs px-2 py-0.5 bg-slate-800 text-white rounded">{item.path}</span>
                     {!item.title.includes('(Sin Configurar)') && (
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleDelete(item.path) }} 
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(item.path) }}
                         className="text-rose-500 hover:text-rose-700 text-xs font-semibold"
                       >
                         Eliminar
@@ -136,13 +143,13 @@ export default function SeoManager() {
             {selected ? `Editar SEO: ${selected.path}` : 'Nueva Regla SEO'}
           </div>
           <form onSubmit={handleSave} className="p-4 flex-1 space-y-4">
-            
+
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Ruta (URL Path)</label>
-              <input 
-                type="text" 
-                className="input w-full font-mono text-sm" 
-                placeholder="Ej: /contacto, /ediciones" 
+              <input
+                type="text"
+                className="input w-full font-mono text-sm"
+                placeholder="Ej: /contacto, /ediciones"
                 value={form.path}
                 onChange={e => setForm({...form, path: e.target.value})}
                 required
@@ -153,10 +160,10 @@ export default function SeoManager() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Título SEO</label>
-              <input 
-                type="text" 
-                className="input w-full text-sm" 
-                placeholder="El título que aparecerá en Google" 
+              <input
+                type="text"
+                className="input w-full text-sm"
+                placeholder="El título que aparecerá en Google"
                 value={form.title}
                 onChange={e => setForm({...form, title: e.target.value})}
               />
@@ -164,9 +171,9 @@ export default function SeoManager() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Meta Descripción</label>
-              <textarea 
-                className="input w-full text-sm h-24" 
-                placeholder="Resumen atractivo para los buscadores (max 160 caracteres)" 
+              <textarea
+                className="input w-full text-sm h-24"
+                placeholder="Resumen atractivo para los buscadores (max 160 caracteres)"
                 value={form.description}
                 onChange={e => setForm({...form, description: e.target.value})}
               />
@@ -175,10 +182,10 @@ export default function SeoManager() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Imagen (Open Graph)</label>
-              <input 
-                type="url" 
-                className="input w-full text-sm" 
-                placeholder="https://..." 
+              <input
+                type="url"
+                className="input w-full text-sm"
+                placeholder="https://..."
                 value={form.og_image}
                 onChange={e => setForm({...form, og_image: e.target.value})}
               />
@@ -187,8 +194,8 @@ export default function SeoManager() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Indexación (Robots)</label>
-              <select 
-                className="input w-full text-sm" 
+              <select
+                className="input w-full text-sm"
                 value={form.robots}
                 onChange={e => setForm({...form, robots: e.target.value})}
               >
@@ -207,7 +214,7 @@ export default function SeoManager() {
           </form>
         </div>
       </div>
-      
+
       {/* PREVIEW */}
       {form.title && (
         <div className="card p-6 mt-6 max-w-2xl">

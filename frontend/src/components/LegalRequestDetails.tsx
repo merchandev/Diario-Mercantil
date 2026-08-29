@@ -1,3 +1,22 @@
+export function formatCaracasDateTime(value?: string) {
+  if (!value) return '-'
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T') + 'Z'
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Caracas',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date)
+  const map = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}`
+}
+
 import type { LegalRequest } from '../lib/api'
 import type React from 'react'
 
@@ -9,11 +28,11 @@ type Props = {
 export default function LegalRequestDetails({ item, meta }: Props) {
   const isPublicada = item.status === 'Publicada'
   
-  const fechaSolicitud = (() => {
-    const raw = (item as any).submitted_at || (item as any).created_at || item.date
-    if (!raw) return '-'
-    return raw.slice(0, 10).split('-').reverse().join('/')
-  })()
+  const fechaSolicitud = formatCaracasDateTime(
+    (item as any).submitted_at || (item as any).created_at || item.date
+  )
+  const expediente = meta.numero_expediente ?? meta.expediente ?? ''
+  const planilla = meta.numero_planilla ?? meta.planilla ?? ''
 
   return (
     <>
@@ -96,14 +115,17 @@ export default function LegalRequestDetails({ item, meta }: Props) {
                   <div className="font-medium">{meta.oficina}</div>
                 </div>
               )}
-              {meta.registrador && (
+              {(meta.registrador || meta.registrador_nombre) && (
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Registrador Mercantil</label>
-                  <div className="font-medium">{meta.registrador}</div>
+                  <div className="font-medium">
+                    {meta.registrador_nombre || meta.registrador}
+                    {(meta.registrador_tipo || meta.tipo_registrador) ? ` (${(meta.registrador_tipo || meta.tipo_registrador)})` : ''}
+                  </div>
                 </div>
               )}
               {meta.tomo && (
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-sm text-slate-600 mb-1">Tomo</label>
                     <div className="font-medium">{meta.tomo}</div>
@@ -112,6 +134,12 @@ export default function LegalRequestDetails({ item, meta }: Props) {
                     <div>
                       <label className="block text-sm text-slate-600 mb-1">Número</label>
                       <div className="font-medium">{meta.numero}</div>
+                    </div>
+                  )}
+                  {meta.letra && (
+                    <div>
+                      <label className="block text-sm text-slate-600 mb-1">Letra</label>
+                      <div className="font-medium">{meta.letra}</div>
                     </div>
                   )}
                 </div>
@@ -128,16 +156,16 @@ export default function LegalRequestDetails({ item, meta }: Props) {
                   <div className="font-medium">{meta.fecha_registro}</div>
                 </div>
               )}
-              {meta.expediente && (
+              {expediente && (
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Número de Expediente</label>
-                  <div className="font-medium">{meta.expediente}</div>
+                  <div className="font-medium">{expediente}</div>
                 </div>
               )}
-              {meta.planilla && (
+              {planilla && (
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Número de Planilla (PUB)</label>
-                  <div className="font-medium">{meta.planilla}</div>
+                  <div className="font-medium">{planilla}</div>
                 </div>
               )}
               {(meta.representante || meta.ci_representante || meta.ci_rep) && (
@@ -154,3 +182,4 @@ export default function LegalRequestDetails({ item, meta }: Props) {
     </>
   )
 }
+

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, Users, FileText, Settings, LogOut, Activity, BarChart3, Search, LayoutTemplate } from 'lucide-react'
 import { verifySuperAdmin, superadminLogout } from '../../lib/api'
+import { useDialog } from '../../contexts/DialogContext'
 
 export default function SuperAdminDashboard() {
+    const { confirmAction } = useDialog()
     const [superadmin, setSuperadmin] = useState<any>(null)
     const [loading, setLoading] = useState(true)
     const navigate = useNavigate()
@@ -14,8 +16,6 @@ export default function SuperAdminDashboard() {
                 const res = await verifySuperAdmin()
                 setSuperadmin(res.superadmin)
             } catch {
-                localStorage.removeItem('superadmin_token')
-                localStorage.removeItem('superadmin')
                 navigate('/lotus/')
             } finally {
                 setLoading(false)
@@ -30,13 +30,11 @@ export default function SuperAdminDashboard() {
         } catch {
             // Ignorar errores
         }
-        localStorage.removeItem('superadmin_token')
-        localStorage.removeItem('superadmin')
         navigate('/lotus/')
     }
 
     const onClearCache = async () => {
-        if (!confirm('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión central y limpiará datos almacenados.')) return
+        if (!(await confirmAction('¿Seguro que deseas vaciar la caché del navegador? Esto cerrará tu sesión central y limpiará datos almacenados.', { title: 'Vaciar caché', danger: true }))) return
         try {
             localStorage.clear()
             sessionStorage.clear()

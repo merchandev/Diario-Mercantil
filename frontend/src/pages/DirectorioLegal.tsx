@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { getDirectoryProfile, saveDirectoryProfile, setDirectoryPhoto, type DirectoryProfile, uploadFiles } from '../lib/api'
+import { useDialog } from '../contexts/DialogContext'
 
 export default function DirectorioLegal(){
+  const { showAlert } = useDialog()
   const [profile, setProfile] = useState<DirectoryProfile|null>(null)
   const [form, setForm] = useState<Partial<DirectoryProfile>>({})
   const [accepted, setAccepted] = useState(false)
@@ -12,11 +14,11 @@ export default function DirectorioLegal(){
   const onSave = async(e:React.FormEvent)=>{
     e.preventDefault()
     if (!accepted && !(profile && profile.status==='aprobado')) {
-      alert('Debe aceptar los Términos y Condiciones y las Políticas de Privacidad.')
+      void showAlert('Debe aceptar los Términos y Condiciones y las Políticas de Privacidad.', { title: 'Aceptación requerida' })
       return
     }
     await saveDirectoryProfile(form)
-    alert(profile?.status==='aprobado' ? 'Información actualizada.' : 'Su registro en el Directorio Legal se encuentra en estado pendiente de verificación y aprobación. Este proceso puede tardar hasta 72 horas, dependiendo de la cantidad de solicitudes por procesar.')
+    await showAlert(profile?.status==='aprobado' ? 'Información actualizada.' : 'Su registro en el Directorio Legal se encuentra en estado pendiente de verificación y aprobación. Este proceso puede tardar hasta 72 horas, dependiendo de la cantidad de solicitudes por procesar.', { title: 'Directorio Legal' })
     load()
   }
 
@@ -29,7 +31,7 @@ export default function DirectorioLegal(){
         await setDirectoryPhoto(id, kind)
         load()
       } catch (e:any) {
-        alert('No se pudo actualizar la foto. '+(e?.message||''))
+        void showAlert('No se pudo actualizar la foto. '+(e?.message||''), { title: 'Error' })
       }
     }
   }

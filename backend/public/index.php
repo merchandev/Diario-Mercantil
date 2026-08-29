@@ -33,6 +33,7 @@ require_once __DIR__."/../src/AuthController.php";
 require_once __DIR__."/../src/UserController.php";
 require_once __DIR__."/../src/LegalController.php";
 require_once __DIR__."/../src/SystemController.php";
+require_once __DIR__."/../src/PaymentController.php";
 require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/RateController.php";
 require_once __DIR__."/../src/PagesController.php";
@@ -41,6 +42,7 @@ require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
 require_once __DIR__."/../src/MetricsController.php";
 require_once __DIR__."/../src/UploadController.php";
+require_once __DIR__."/../src/DirectoryController.php";
 require_once __DIR__."/../src/SeoController.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
@@ -57,17 +59,18 @@ $router->post('/api/auth/register', [AuthController::class, 'register']);
 $router->post('/api/auth/forgot-password', [AuthController::class, 'forgotPassword']);
 $router->post('/api/auth/reset-password', [AuthController::class, 'resetPassword']);
 $router->get('/api/auth/me', [AuthController::class, 'me'], $auth);
-$router->post('/api/auth/logout', [AuthController::class, 'logout'], $auth); // Let's keep logout without CSRF for now or just auth
+$router->post('/api/auth/logout', [AuthController::class, 'logout'], $csrf);
 $router->post('/api/superadmin/login', [AuthController::class, 'superadminLogin']);
 $router->get('/api/superadmin/verify', [AuthController::class, 'verifySuperAdmin']);
-$router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $auth);
-$router->get('/api/superadmin/activity', [SystemController::class, 'getActivityLog'], $auth);
+$router->post('/api/superadmin/logout', [AuthController::class, 'superadminLogout'], $csrf);
+$router->get('/api/superadmin/activity', [SystemController::class, 'getActivityLog'], $admin);
 
 // USERS (Admin)
 $router->get('/api/users', [UserController::class, 'list'], $admin);
 $router->post('/api/users', [UserController::class, 'create'], $adminCsrf);
 $router->put('/api/users/{id}', [UserController::class, 'update'], $csrf);
 $router->delete('/api/users/{id}', [UserController::class, 'delete'], $adminCsrf);
+$router->get('/api/admin/users/{id}', [UserController::class, 'get'], $admin);
 $router->post('/api/admin/users/{id}/suspend', [UserController::class, 'suspend'], $adminCsrf);
 $router->post('/api/admin/users/{id}/restore', [UserController::class, 'restore'], $adminCsrf);
 $router->post('/api/admin/users/{id}/role', [UserController::class, 'changeRole'], $adminCsrf);
@@ -103,6 +106,8 @@ $router->post('/api/legal/{id}/files', [LegalController::class, 'attachFile'], $
 $router->delete('/api/legal/{id}/files/{fid}', [LegalController::class, 'detachFile'], $csrf);
 $router->post('/api/admin/legal/{id}/files/{fid}/repair', [LegalController::class, 'repairPdf'], $adminCsrf);
 $router->post('/api/legal/{id}/payments', [LegalController::class, 'addPayment'], $csrf);
+$router->post('/api/legal/{id}/payments/{paymentId}/verify', [LegalController::class, 'verifyPayment'], $adminCsrf);
+$router->post('/api/legal/{id}/payments/{paymentId}/reject', [LegalController::class, 'rejectPayment'], $adminCsrf);
 $router->delete('/api/legal/{id}/payments/{pid}', [LegalController::class, 'deletePayment'], $csrf);
 $router->get('/api/legal/public/check', [LegalController::class, 'getPublic']);
 $router->get('/api/legal/public/{id}', [LegalController::class, 'getPublic']);
@@ -119,6 +124,7 @@ $router->delete('/api/files/{id}', [FileController::class, 'softDelete'], $admin
 $router->post('/api/files/{id}/retry', [FileController::class, 'retry'], $adminCsrf);
 $router->get('/api/files', [FileController::class, 'list'], $admin);
 $router->post('/api/files', [UploadController::class, 'upload'], $csrf);
+$router->get('/api/events', [FileController::class, 'sse'], $auth);
 
 // EDITIONS
 $router->get('/api/editions', [EditionController::class, 'list'], $admin);
@@ -129,7 +135,10 @@ $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adm
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
 $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
+$router->post('/api/editions/{id}/notify', [EditionController::class, 'notify'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
+$router->get('/api/editions/{id}/download', [EditionController::class, 'downloadById'], $admin);
+$router->get('/api/editions/{id}/export', [EditionController::class, 'exportCsv'], $admin);
 $router->get('/api/e', [EditionController::class, 'listPublic']);
 $router->get('/api/e/id/{id}/download', [EditionController::class, 'downloadById']);
 $router->get('/api/e/code/{code}/download', [EditionController::class, 'downloadByCode']);
@@ -150,31 +159,40 @@ $router->post('/api/settings', [SystemController::class, 'saveSettings'], $admin
 $router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $admin);
 $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
+$router->post('/api/payments', [PaymentController::class, 'create'], $adminCsrf);
+$router->delete('/api/payments/{id}', [PaymentController::class, 'delete'], $adminCsrf);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
+$router->get('/api/public/editions', [EditionController::class, 'listPublic']);
 $router->get('/api/public/pages', [PagesController::class, 'publicList']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/p/{slug}', [PagesController::class, 'publicGet']);
 $router->get('/api/pages/public', [PagesController::class, 'publicList']);
-$router->get('/api/publications', [SystemController::class, 'listPages'], $admin);
-$router->get('/api/publications/{id}', [SystemController::class, 'getPage'], $admin);
-$router->post('/api/publications', [SystemController::class, 'createPage'], $adminCsrf);
-$router->put('/api/publications/{id}', [SystemController::class, 'updatePage'], $adminCsrf);
-$router->delete('/api/publications/{id}', [SystemController::class, 'deletePage'], $adminCsrf);
-$router->get('/api/directory/profile', [SystemController::class, 'getDirectoryProfile']);
+
+// Alias temporal para clientes CMS anteriores.
+$router->get('/api/publications', [PagesController::class, 'list'], $admin);
+$router->get('/api/publications/{id}', [PagesController::class, 'get'], $admin);
+$router->post('/api/publications', [PagesController::class, 'create'], $adminCsrf);
+$router->put('/api/publications/{id}', [PagesController::class, 'update'], $adminCsrf);
+$router->delete('/api/publications/{id}', [PagesController::class, 'delete'], $adminCsrf);
+
+$router->get('/api/directory/profile', [DirectoryController::class, 'getProfile'], $auth);
+$router->post('/api/directory/profile', [DirectoryController::class, 'saveProfile'], $csrf);
+$router->post('/api/directory/profile/photo', [DirectoryController::class, 'setPhoto'], $csrf);
+$router->get('/api/directory/areas', [DirectoryController::class, 'listAreas'], $admin);
+$router->post('/api/directory/areas', [DirectoryController::class, 'createArea'], $adminCsrf);
+$router->put('/api/directory/areas/{id}', [DirectoryController::class, 'updateArea'], $adminCsrf);
+$router->delete('/api/directory/areas/{id}', [DirectoryController::class, 'deleteArea'], $adminCsrf);
+$router->get('/api/directory/colleges', [DirectoryController::class, 'listColleges'], $admin);
+$router->post('/api/directory/colleges', [DirectoryController::class, 'createCollege'], $adminCsrf);
+$router->put('/api/directory/colleges/{id}', [DirectoryController::class, 'updateCollege'], $adminCsrf);
+$router->delete('/api/directory/colleges/{id}', [DirectoryController::class, 'deleteCollege'], $adminCsrf);
 
 // SEO
 $router->get('/api/seo/all', [SeoController::class, 'getAllPublic']);
 $router->get('/api/admin/seo', [SeoController::class, 'listAll'], $admin);
 $router->post('/api/admin/seo', [SeoController::class, 'save'], $adminCsrf);
 $router->delete('/api/admin/seo', [SeoController::class, 'delete'], $adminCsrf);
-
-// STUBS
-class StubController {
-    public function emptyList() { Response::json(['items'=>[]]); }
-}
-$router->get('/api/directory/areas', [StubController::class, 'emptyList']);
-$router->get('/api/directory/colleges', [StubController::class, 'emptyList']);
 
 // HEALTH
 $router->get('/api/health/live', [HealthController::class, 'live']);

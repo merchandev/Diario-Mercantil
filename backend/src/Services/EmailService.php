@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -157,7 +157,7 @@ class EmailService {
         $content = <<<HTML
         <h2>¡Tu documento ha sido publicado!</h2>
         <p>Hola, $name.</p>
-        <p>Te informamos que tu solicitud <strong>$orderNo</strong> ha sido incorporada en la edición <strong>$editionCode</strong> del Diario Mercantil.</p>
+        <p>Te informamos que tu solicitud <strong>$orderNo</strong> ha sido incorporada en la edición con CVE <strong>$editionCode</strong> del Diario Mercantil.</p>
         <p>Ya puedes acceder a nuestra plataforma para ver la edición oficial o generar el certificado digital de publicación legal.</p>
         <p>Gracias por confiar en nosotros.</p>
         HTML;
@@ -186,3 +186,8 @@ class EmailService {
         return $mail->send();
     }
 }
+
+
+
+
+

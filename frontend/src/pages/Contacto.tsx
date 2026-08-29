@@ -16,8 +16,8 @@ export default function Contacto(){
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <SEO 
-        title="Contacto y Soporte | Diario Mercantil Venezuela" 
+      <SEO
+        title="Contacto y Soporte | Diario Mercantil Venezuela"
         description="Contáctanos para asesoría en la publicación de carteles, edictos y actas mercantiles. Soporte técnico y atención al usuario corporativo."
       />
       <div className="max-w-4xl mx-auto p-6">

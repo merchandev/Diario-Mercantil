@@ -16,7 +16,7 @@ export default function Activity() {
     async function loadActivity() {
         try {
             const data = await getActivityLog()
-            
+
             const allEvents = data.items.map(a => {
                 let icon = ActivityIcon
                 let color = 'text-gray-400'
@@ -107,7 +107,7 @@ export default function Activity() {
                                             <div className="flex items-center justify-between mb-1">
                                                 <h4 className="text-white font-medium">{item.title}</h4>
                                                 <span className="text-xs text-gray-400">
-                                                    {item.date.toLocaleDateString()} {item.date.toLocaleTimeString()} 
+                                                    {item.date.toLocaleDateString()} {item.date.toLocaleTimeString()}
                                                     {item.ip && <span className="ml-2 text-purple-400">IP: {item.ip}</span>}
                                                 </span>
                                             </div>
