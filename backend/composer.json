@@ -1,5 +1,7 @@
 {
     "name": "diario/backend",
+    "description": "Backend del portal Diario Mercantil de Venezuela",
+    "license": "proprietary",
     "require": {
         "php": "^8.4",
         "zircote/swagger-php": "^4.8",
