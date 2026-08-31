@@ -18,7 +18,11 @@ return static function (PDO $pdo): void {
         );
     }
 
-    $pdo->exec('UPDATE settings SET created_at=COALESCE(created_at,updated_at,NOW()) WHERE created_at IS NULL');
+    $pdo->exec('UPDATE settings SET created_at=COALESCE(updated_at,NOW()) WHERE created_at IS NULL');
+    // Older production rows may contain MySQL's legacy zero-date sentinel.
+    // It must be repaired before applying a strict NOT NULL/default contract.
+    $pdo->exec('UPDATE settings SET created_at=NOW() WHERE YEAR(created_at)=0');
+    $pdo->exec('UPDATE settings SET updated_at=NOW() WHERE YEAR(updated_at)=0');
     $pdo->exec(
         'ALTER TABLE settings '
         . 'MODIFY created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, '
