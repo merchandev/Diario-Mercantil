@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, type LegalRequest, listLegal, updateLegal, uploadFiles } from '../lib/api'
 import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, TIPOS_TRAMITE, BANCOS_VENEZUELA } from '../lib/constants'
 import { useDialog } from '../contexts/DialogContext'
+import PaymentMethodsPanel from '../components/PaymentMethodsPanel'
 
 export default function PublicarDocumento() {
   const { showAlert } = useDialog()
@@ -318,6 +319,7 @@ export default function PublicarDocumento() {
                   <div className="text-slate-600">Importante: el pago debe realizarse por el monto exacto indicado en el total de la orden de servicio, sin realizar redondeos ni modificaciones.</div>
                   <div className="text-slate-600">Por favor, reporte el pago realizado completando los datos que se indican a continuación:</div>
                 </div>
+                <div className="mt-3"><PaymentMethodsPanel /></div>
                 <div className="mt-2 grid md:grid-cols-3 gap-2">
                   <select className="input" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })}>
                     <option value="">Banco</option>

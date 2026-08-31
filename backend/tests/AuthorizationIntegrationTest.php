@@ -26,6 +26,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, publication_file_id INTEGER, publication_file_name TEXT, publication_checksum TEXT, publication_source TEXT, publication_prepared_at TEXT, publication_updated_at TEXT, PRIMARY KEY(edition_id, legal_request_id))");
         $pdo->exec("CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, type TEXT, checksum TEXT, version INTEGER, status TEXT, owner TEXT, is_public INTEGER DEFAULT 0, deleted_at TEXT, created_at TEXT, updated_at TEXT)");
         $pdo->exec("CREATE TABLE settings (`key` TEXT PRIMARY KEY, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
+        $pdo->exec("CREATE TABLE payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, bank TEXT, account TEXT, holder TEXT, rif TEXT, phone TEXT, created_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id INTEGER, action TEXT, resource_type TEXT, resource_id INTEGER)");
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
@@ -178,6 +179,42 @@ class AuthorizationIntegrationTest extends TestCase {
         $public = $this->request('GET', '/api/settings');
         $this->assertSame(200, $public['code'], json_encode($public['body']));
         $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_main_1'] ?? null);
+    }
+
+    public function testAdminCanCreateAndUpdatePaymentMethodVisibleToApplicant(): void {
+        $created = $this->request('POST', '/api/payments', 'admin_session_test', [
+            'bank' => 'Banco de Venezuela',
+            'holder' => 'Diario Mercantil',
+            'rif' => 'J-12345678-9',
+            'phone' => '04121234567',
+        ]);
+        $this->assertSame(201, $created['code'], json_encode($created['body']));
+        $id = (int)($created['body']['id'] ?? 0);
+        $this->assertGreaterThan(0, $id);
+
+        $visible = $this->request('GET', '/api/payment-methods', 'user_session_test');
+        $this->assertSame(200, $visible['code'], json_encode($visible['body']));
+        $this->assertSame('04121234567', $visible['body']['items'][0]['phone'] ?? null);
+
+        $updated = $this->request('PUT', '/api/payments/' . $id, 'admin_session_test', [
+            'bank' => 'Banesco',
+            'holder' => 'Diario Mercantil Actualizado',
+            'rif' => 'J-12345678-9',
+            'phone' => '04141234567',
+        ]);
+        $this->assertSame(200, $updated['code'], json_encode($updated['body']));
+
+        $refreshed = $this->request('GET', '/api/payment-methods', 'user_session_test');
+        $this->assertSame('Banesco', $refreshed['body']['items'][0]['bank'] ?? null);
+        $this->assertSame('04141234567', $refreshed['body']['items'][0]['phone'] ?? null);
+
+        $blocked = $this->request('PUT', '/api/payments/' . $id, 'user_session_test', [
+            'bank' => 'Otro banco',
+            'holder' => 'No autorizado',
+            'rif' => 'J-00000000-0',
+            'phone' => '04161234567',
+        ]);
+        $this->assertSame(403, $blocked['code']);
     }
 
     public function testRetiringEditionRequeuesRequestsAndRemovesStaleDownloadLink(): void {

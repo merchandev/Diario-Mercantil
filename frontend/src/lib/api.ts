@@ -347,6 +347,10 @@ export async function createPayment(body: Partial<PaymentMethod>) {
   const res = await fetchAuth('/api/payments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }
+export async function updatePayment(id: number, body: Partial<PaymentMethod>) {
+  const res = await fetchAuth(`/api/payments/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return res.json()
+}
 export async function deletePayment(id: number) {
   const res = await fetchAuth(`/api/payments/${id}`, { method: 'DELETE' })
   return res.json()

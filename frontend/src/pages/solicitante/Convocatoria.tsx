@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, submitLegal } from '../../lib/api'
 import YearPicker from '../../components/YearPicker'
 import { BANCOS_VENEZUELA } from '../../constants/banks'
 import { useDialog } from '../../contexts/DialogContext'
+import { usePaymentMethods } from '../../hooks/usePaymentMethods'
 
 type ConvocatoriaPaymentForm = {
   type: 'pago_movil'
@@ -29,9 +30,9 @@ export default function Convocatoria() {
   const [accept, setAccept] = useState(false)
   const [pay, setPay] = useState<ConvocatoriaPaymentForm>({ type: 'pago_movil', bank: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_phone_prefix: '0414' })
   const [user, setUser] = useState<any>({})
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const { paymentMethods, paymentMethodsLoading, paymentMethodsError, reloadPaymentMethods } = usePaymentMethods()
 
-  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPaymentMethods().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
+  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setUser(u); } catch { } })(); }, [])
 
   useEffect(() => {
@@ -197,6 +198,12 @@ export default function Convocatoria() {
             Realice el pago a una de las siguientes cuentas antes de registrar su referencia:
           </p>
           <div className="grid md:grid-cols-2 gap-3">
+            {paymentMethodsLoading && <p className="text-sm text-slate-600">Cargando datos bancarios...</p>}
+            {!paymentMethodsLoading && paymentMethodsError && (
+              <div className="md:col-span-2 rounded-lg border border-rose-200 bg-white p-3 text-sm text-rose-800">
+                {paymentMethodsError} <button type="button" className="font-semibold underline" onClick={() => void reloadPaymentMethods()}>Reintentar</button>
+              </div>
+            )}
             {paymentMethods.map(pm => (
               <div key={pm.id} className="bg-white p-3 rounded-lg shadow-sm border border-blue-100 text-xs">
                 <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
@@ -206,7 +213,7 @@ export default function Convocatoria() {
                 <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
               </div>
             ))}
-            {paymentMethods.length === 0 && <p className="text-slate-500 italic text-sm">No hay métodos configurados.</p>}
+            {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No hay medios de pago configurados. Comuníquese con administración antes de efectuar el pago.</p>}
           </div>
         </div>
 

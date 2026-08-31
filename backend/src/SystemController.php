@@ -187,7 +187,7 @@ class SystemController {
     // --- PAYMENTS ---
     public function listPayments(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT * FROM payment_methods");
+        $stmt = $pdo->query("SELECT * FROM payment_methods ORDER BY id DESC");
         Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     }
 

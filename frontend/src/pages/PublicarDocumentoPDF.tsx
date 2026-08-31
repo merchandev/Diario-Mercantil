@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type React from 'react'
-import { addLegalPayment, downloadLegal, listPayments, type PaymentMethod, uploadLegalPdf } from '../lib/api'
+import { addLegalPayment, downloadLegal, listPaymentMethods, type PaymentMethod, uploadLegalPdf } from '../lib/api'
 import { useDialog } from '../contexts/DialogContext'
 
 export default function PublicarDocumentoPDF() {
@@ -17,7 +17,7 @@ export default function PublicarDocumentoPDF() {
   )
   const [accepted, setAccepted] = useState(false)
 
-  useEffect(() => { listPayments().then(r => setMethods(r.items)).catch(() => setMethods([])) }, [])
+  useEffect(() => { listPaymentMethods().then(r => setMethods(r.items)).catch(() => setMethods([])) }, [])
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.currentTarget.files?.[0]

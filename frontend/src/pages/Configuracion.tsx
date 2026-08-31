@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getSettings, getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
 import { useDialog } from '../contexts/DialogContext'
+import MediosPago from './MediosPago'
 
 export default function Configuracion() {
   const { showAlert, confirmAction, requestText } = useDialog()
@@ -81,6 +82,8 @@ export default function Configuracion() {
           </div>
         )}
 
+        {tab === 'Medios de pago' && <MediosPago embedded />}
+
         {tab === 'Instrucciones: Documentos' && (
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-4">
             <h3 className="font-bold text-slate-900 mb-3">📝 Instrucciones para Documentos</h3>
@@ -138,7 +141,7 @@ export default function Configuracion() {
           </div>
         )}
 
-        {tab !== 'Directorio Legal' && (
+        {tab !== 'Directorio Legal' && tab !== 'Medios de pago' && (
           <div className="mt-4"><button onClick={onSave} className="btn btn-primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button></div>
         )}
       </div>

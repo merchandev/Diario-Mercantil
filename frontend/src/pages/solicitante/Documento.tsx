@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, listPaymentMethods, type PaymentMethod, submitLegal, fetchAuth, ApiError } from '../../lib/api'
+import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, submitLegal, fetchAuth, ApiError } from '../../lib/api'
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 import ProtectedPdfViewer from '../../components/ProtectedPdfViewer'
 import { BANCOS_VENEZUELA } from '../../constants/banks'
 import QRCode from 'qrcode.react'
+import { usePaymentMethods } from '../../hooks/usePaymentMethods'
 
 const ESTADOS_VENEZUELA = [
   'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes',
@@ -455,9 +456,9 @@ export default function Documento() {
   const step2Ref = useRef<HTMLDivElement>(null)
   const step3Ref = useRef<HTMLDivElement>(null)
 
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([])
+  const { paymentMethods, paymentMethodsLoading, paymentMethodsError, reloadPaymentMethods } = usePaymentMethods()
 
-  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }); listPaymentMethods().then(r => setPaymentMethods(r.items)).catch(() => { }) }, [])
+  useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '', address: p.address || u.address || '' })); } catch { } })(); }, [])
 
   useEffect(() => {
@@ -1212,6 +1213,12 @@ export default function Documento() {
                 Por favor realice el pago a una de las siguientes cuentas bancarias antes de registrar su referencia:
               </p>
               <div className="grid md:grid-cols-2 gap-4">
+                {paymentMethodsLoading && <p className="text-sm text-slate-600">Cargando datos bancarios...</p>}
+                {!paymentMethodsLoading && paymentMethodsError && (
+                  <div className="md:col-span-2 rounded-lg border border-rose-200 bg-white p-3 text-sm text-rose-800">
+                    {paymentMethodsError} <button type="button" className="font-semibold underline" onClick={() => void reloadPaymentMethods()}>Reintentar</button>
+                  </div>
+                )}
                 {paymentMethods.map(pm => {
                   const amountText = pdfAnalysis
                     ? `VES ${pdfAnalysis.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -1259,7 +1266,7 @@ export default function Documento() {
                     </div>
                   )
                 })}
-                {paymentMethods.length === 0 && <p className="text-slate-500 italic">No hay métodos de pago configurados.</p>}
+                {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No hay medios de pago configurados. Comuníquese con administración antes de efectuar el pago.</p>}
               </div>
             </div>
 

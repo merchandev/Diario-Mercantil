@@ -3,6 +3,7 @@ import type React from 'react'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegal, updateLegal, uploadFiles, type LegalRequest } from '../lib/api'
 import { ESTADOS_VENEZUELA, REGISTROS_MERCANTILES, TIPOS_SOCIEDAD, BANCOS_VENEZUELA } from '../lib/constants'
 import { useDialog } from '../contexts/DialogContext'
+import PaymentMethodsPanel from '../components/PaymentMethodsPanel'
 
 const TIPO_CONV_OPTS = [
   'Asamblea Ordinaria de accionistas o socios',
@@ -296,6 +297,8 @@ export default function PublicarConvocatoria() {
                   <div className="text-slate-600">Importante: el pago debe realizarse por el monto exacto indicado en el total de la orden de servicio, sin realizar redondeos ni modificaciones.</div>
                   <div className="text-slate-600">Por favor, reporte el pago realizado completando los datos que se indican a continuación:</div>
                 </div>
+
+                <div className="mt-3"><PaymentMethodsPanel /></div>
 
                 <div className="mt-2 grid md:grid-cols-3 gap-2">
                   <select className="input" value={pay.banco} onChange={e => setPay({ ...pay, banco: e.target.value })}>

@@ -165,6 +165,7 @@ $router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $a
 $router->post('/api/admin/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin);
 $router->post('/api/payments', [PaymentController::class, 'create'], $adminCsrf);
+$router->put('/api/payments/{id}', [PaymentController::class, 'update'], $adminCsrf);
 $router->delete('/api/payments/{id}', [PaymentController::class, 'delete'], $adminCsrf);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
