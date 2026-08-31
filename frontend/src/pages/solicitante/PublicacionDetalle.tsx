@@ -275,12 +275,19 @@ export default function PublicacionDetalleSolicitante() {
             <div className="card p-6 bg-green-50 border border-green-200">
               <h3 className="font-semibold mb-3 text-green-800">Publicación en Edición</h3>
               <p className="text-xs text-green-700 mb-4">Su documento ya forma parte de una edición del Diario Mercantil de Venezuela.</p>
-              {req.publication_file_url || req.edition_file_url ? (
+              {req.publication_file_url ? (
                 <a
-                  href={`${req.publication_file_url || req.edition_file_url}?download=1`}
+                  href={`${req.publication_file_url}?download=1`}
                   className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
                 >
                   <IconDownload /> Descargar publicación individual
+                </a>
+              ) : req.edition_file_url ? (
+                <a
+                  href={`${req.edition_file_url}?download=1`}
+                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
+                >
+                  <IconDownload /> Descargar edición completa
                 </a>
               ) : req.edition_code ? (
                 <a

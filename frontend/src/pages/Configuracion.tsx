@@ -24,7 +24,9 @@ export default function Configuracion() {
     setSaving(true)
     try {
       await saveSettings(s)
-      await showAlert('Configuración guardada.', { title: 'Guardado' })
+      const persisted = await getAdminSettings()
+      setS(persisted.settings)
+      await showAlert(`Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
     } catch (error: any) {
       void showAlert(error?.message || 'No se pudo guardar la configuración.', { title: 'Error' })
     } finally {

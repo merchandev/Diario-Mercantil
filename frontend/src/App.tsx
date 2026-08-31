@@ -166,6 +166,8 @@ export default function App() {
         <Route path="/lotus/users" element={<LazyRoute><SuperAdminUsers /></LazyRoute>} />
         <Route path="/lotus/publications" element={<LazyRoute><SuperAdminPublications /></LazyRoute>} />
         <Route path="/lotus/settings" element={<LazyRoute><SuperAdminSettings /></LazyRoute>} />
+        <Route path="/lotus/medios" element={<LazyRoute><Medios /></LazyRoute>} />
+        <Route path="/lotus/banners" element={<LazyRoute><Promo /></LazyRoute>} />
         <Route path="/lotus/stats" element={<LazyRoute><SuperAdminStats /></LazyRoute>} />
         <Route path="/lotus/activity" element={<LazyRoute><SuperAdminActivity /></LazyRoute>} />
         <Route path="/lotus/seo" element={<LazyRoute><SuperAdminSeo /></LazyRoute>} />

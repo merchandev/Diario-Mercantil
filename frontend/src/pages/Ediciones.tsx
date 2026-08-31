@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { createEdition, deleteEdition, listEditions, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
+import { createEdition, deleteEdition, listEditions, listRetiredEditions, restoreEdition, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -11,6 +11,7 @@ import { useDialog } from '../contexts/DialogContext'
 export default function Ediciones() {
   const { confirmAction } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
+  const [retiredRows, setRetiredRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
   const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
   const [form, setForm] = useState<{ date: string; edition_no: number; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
@@ -34,8 +35,9 @@ export default function Ediciones() {
 
   const load = async () => {
     try {
-      const [edRes, legRes] = await Promise.all([listEditions(), listLegal()]);
+      const [edRes, retiredRes, legRes] = await Promise.all([listEditions(), listRetiredEditions(), listLegal()]);
       setRows(edRes.items);
+      setRetiredRows(retiredRes.items);
       setAllOrders(legRes.items);
     } catch (e) {
       console.error(e);
@@ -55,12 +57,13 @@ export default function Ediciones() {
   const onCreateAndPublish = async (e: any) => {
     e.preventDefault()
     setPublishingState({ active: true, progress: 0, message: 'Creando registro...' })
+    let newId: number | undefined
     try {
       const payload = { status: 'Borrador', date: form.date, edition_no: form.edition_no, orders: form.selectedOrders }
       const res = await createEdition(payload) as any
-      const newId = res?.id
+      newId = res?.id
       if (newId) {
-        setPublishingState({ active: true, progress: 10, message: 'Generando PDF consolidado...' })
+        setPublishingState({ active: true, progress: 10, message: 'Preparando PDFs individuales...' })
         await publishEdition(newId, (prog, msg) => {
           setPublishingState(prev => ({ ...prev, progress: Math.max(10, prog), message: msg }))
         })
@@ -72,7 +75,9 @@ export default function Ediciones() {
       setAlertDialog({ isOpen: true, title: 'Edición publicada', message: `Edición publicada exitosamente.`, variant: 'success' })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      setAlertDialog({ isOpen: true, title: 'Error', message: `No se pudo publicar la edición: ${errorMsg}`, variant: 'error' })
+      await load()
+      if (newId) await openDetail(newId)
+      setAlertDialog({ isOpen: true, title: 'Edición guardada como borrador', message: `No se pudo completar la publicación: ${errorMsg}. El borrador se conservó para corregir o cargar el PDF faltante.`, variant: 'warning' })
     } finally {
       setPublishingState({ active: false, progress: 0, message: '' })
     }
@@ -332,8 +337,8 @@ export default function Ediciones() {
                         }}>
                           {selId === r.id && !isDetailsCollapsed ? <><IconClose className="w-4 h-4" /> <span>Minimizar</span></> : <><IconEdit className="w-4 h-4" /> <span>Ver detalles</span></>}
                         </button>
-                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar edición', message: '¿Seguro de eliminar esta edición?', onConfirm: async () => { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; load() } })}>
-                          <IconTrash className="w-4 h-4" /> <span>Eliminar</span>
+                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: r.status === 'Publicada' ? 'Retirar edición' : 'Eliminar borrador', message: r.status === 'Publicada' ? 'La edición dejará de ser pública y sus solicitudes volverán a En trámite para poder corregirlas o publicarlas de nuevo. ¿Deseas continuar?' : '¿Seguro de eliminar este borrador?', onConfirm: async () => { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; load() } })}>
+                          <IconTrash className="w-4 h-4" /> <span>{r.status === 'Publicada' ? 'Retirar' : 'Eliminar'}</span>
                         </button>
                       </div>
                     </td>
@@ -685,6 +690,38 @@ export default function Ediciones() {
           </table>
         </div>
       </div>
+      {retiredRows.length > 0 && (
+        <div className="card overflow-hidden border border-amber-200">
+          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+            <h2 className="font-semibold text-amber-900">Ediciones retiradas</h2>
+            <p className="text-xs text-amber-800 mt-1">Se conserva el historial. Restaurar vuelve a publicar la edición solo si sus solicitudes no pertenecen a otra edición activa.</p>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {retiredRows.map(edition => (
+              <div key={edition.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono font-semibold text-slate-800">{edition.code}</div>
+                  <div className="text-xs text-slate-500">Fecha {edition.date} · retirada {edition.deleted_at || ''}</div>
+                </div>
+                <button className="btn btn-outline" onClick={() => setConfirmDialog({
+                  isOpen: true,
+                  title: 'Restaurar edición',
+                  message: `¿Volver a publicar la edición ${edition.code}?`,
+                  onConfirm: async () => {
+                    try {
+                      await restoreEdition(edition.id)
+                      await load()
+                      setAlertDialog({ isOpen: true, title: 'Edición restaurada', message: 'La edición y sus solicitudes vuelven a estar publicadas.', variant: 'success' })
+                    } catch (error) {
+                      setAlertDialog({ isOpen: true, title: 'No se pudo restaurar', message: error instanceof Error ? error.message : 'Error al restaurar la edición.', variant: 'error' })
+                    }
+                  }
+                })}>Restaurar</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <ConfirmDialog isOpen={confirmDialog.isOpen} title={confirmDialog.title} message={confirmDialog.message} variant="warning" onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       <AlertDialog {...alertDialog} onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })} />
       

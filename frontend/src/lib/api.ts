@@ -237,6 +237,7 @@ export type Edition = {
   updated_at?: string;
   published_by_name?: string;
   published_at?: string;
+  deleted_at?: string | null;
 }
 export type EditionOrder = LegalRequest & {
   publication_file_id?: number | null;
@@ -312,6 +313,10 @@ export async function uploadEditionPdf(id: number, file: File) {
   const res = await fetchAuth(`/api/editions/${id}/pdf`, { method: 'POST', body: fd })
   return res.json() as Promise<{ ok: true; file_id: number; file_name: string; edition: Edition }>
 }
+export async function listRetiredEditions() {
+  const res = await fetchAuth('/api/editions-retired')
+  return res.json() as Promise<{ items: Edition[] }>
+}
 export async function prepareEditionOrderPdf(editionId: number, orderId: number) {
   const res = await fetchAuth(`/api/editions/${editionId}/orders/${orderId}/prepare-pdf`, { method: 'POST' })
   return res.json() as Promise<{ ok: true; file_id: number; file_name: string; checksum: string; source: string; prepared_at: string }>
@@ -385,6 +390,10 @@ export type LegalRequest = {
   edition_file_url?: string | null;
   publication_file_id?: number | null;
   publication_file_url?: string | null;
+}
+export async function restoreEdition(id: number) {
+  const res = await fetchAuth(`/api/editions/${id}/restore`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true }>
 }
 export type LegalPayment = {
   id: number;

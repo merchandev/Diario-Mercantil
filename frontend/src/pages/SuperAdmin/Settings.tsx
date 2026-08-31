@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Save, DollarSign, FileText, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getSettings, saveSettings, forceRefreshBcv, Settings as SettingsType } from '../../lib/api'
+import { getAdminSettings, saveSettings, forceRefreshBcv, Settings as SettingsType } from '../../lib/api'
 import { verifySuperAdmin } from '../../lib/api'
 import { useDialog } from '../../contexts/DialogContext'
 
@@ -20,7 +20,7 @@ export default function Settings() {
 
     async function loadSettings() {
         try {
-            const res = await getSettings()
+            const res = await getAdminSettings()
             setSettings(res.settings)
         } catch (error) {
             console.error('Error loading settings:', error)
@@ -33,11 +33,17 @@ export default function Settings() {
         e.preventDefault()
         setSaving(true)
         try {
+            const folioPrice = Number(settings.price_per_folio_usd)
+            if (!Number.isFinite(folioPrice) || folioPrice < 0) {
+                throw new Error('El precio por folio debe ser un número válido mayor o igual a cero.')
+            }
             await saveSettings(settings)
-            await showAlert('Configuración guardada correctamente.', { title: 'Guardado' })
-        } catch (error) {
+            const persisted = await getAdminSettings()
+            setSettings(persisted.settings)
+            await showAlert(`Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
+        } catch (error: any) {
             console.error('Error saving settings:', error)
-            void showAlert('Error al guardar configuración.', { title: 'Error' })
+            void showAlert(error?.message || 'Error al guardar configuración.', { title: 'Error' })
         } finally {
             setSaving(false)
         }

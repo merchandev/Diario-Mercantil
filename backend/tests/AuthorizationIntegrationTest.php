@@ -20,8 +20,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, document TEXT NOT NULL, email TEXT, phone TEXT, password_hash TEXT, status TEXT, person_type TEXT DEFAULT 'natural', state TEXT, municipality TEXT, address TEXT, created_at DATETIME, updated_at DATETIME)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
         $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, UNIQUE(publication_year, edition_no))");
-        $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT)");
+        $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
+        $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, publication_file_id INTEGER, publication_file_name TEXT, publication_checksum TEXT, publication_source TEXT, publication_prepared_at TEXT, publication_updated_at TEXT, PRIMARY KEY(edition_id, legal_request_id))");
         $pdo->exec("CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, type TEXT, checksum TEXT, version INTEGER, status TEXT, owner TEXT, is_public INTEGER DEFAULT 0, deleted_at TEXT, created_at TEXT, updated_at TEXT)");
         $pdo->exec("CREATE TABLE settings (`key` TEXT PRIMARY KEY, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
@@ -50,10 +51,13 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("INSERT INTO files(id,name,type,status,is_public,created_at,updated_at) VALUES(200,'banner.png','png','processed',0,'$createdAt','$createdAt')");
 
         $cmd = [PHP_BINARY, '-S', '127.0.0.1:' . self::$port, '-t', realpath(__DIR__ . '/../public')];
+        $nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
         self::$process = proc_open($cmd, [
             0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w']
+            // The built-in server writes one access line per request. Leaving these
+            // as unread pipes eventually fills the buffer and stalls the suite.
+            1 => ['file', $nullDevice, 'a'],
+            2 => ['file', $nullDevice, 'a']
         ], self::$pipes);
         sleep(2);
     }
@@ -174,6 +178,29 @@ class AuthorizationIntegrationTest extends TestCase {
         $public = $this->request('GET', '/api/settings');
         $this->assertSame(200, $public['code'], json_encode($public['body']));
         $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_main_1'] ?? null);
+    }
+
+    public function testRetiringEditionRequeuesRequestsAndRemovesStaleDownloadLink(): void {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,order_no,date,edition_code,publish_date) VALUES(150,2,'Publicada',100,'Publicada retirada','ORD-150','2026-08-30','MMXXVI-0050','2026-08-30')");
+        $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(50,'MMXXVI-0050','Publicada','2026-08-30',50,1,'2026-08-30',2026,NULL)");
+        $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(50,150)");
+
+        $retired = $this->request('DELETE', '/api/editions/50', 'admin_session_test');
+        $this->assertSame(200, $retired['code'], json_encode($retired['body']));
+        $this->assertTrue((bool)($retired['body']['retired'] ?? false));
+        $this->assertNotNull($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
+        $this->assertSame('En trámite', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
+
+        $detail = $this->request('GET', '/api/legal/150', 'admin_session_test');
+        $this->assertSame(200, $detail['code'], json_encode($detail['body']));
+        $this->assertEmpty($detail['body']['item']['edition_code'] ?? null);
+        $this->assertEmpty($detail['body']['item']['edition_file_url'] ?? null);
+
+        $restored = $this->request('POST', '/api/editions/50/restore', 'admin_session_test');
+        $this->assertSame(200, $restored['code'], json_encode($restored['body']));
+        $this->assertSame('Publicada', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
+        $this->assertNull($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
     }
 
     public function testAdminCannotReportMoreThanRemainingAndCanVerifyOnePayment() {

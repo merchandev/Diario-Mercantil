@@ -66,7 +66,7 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT l.*, COALESCE(e.code, l.edition_code) AS edition_code, e.id AS edition_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id LEFT JOIN editions e ON e.id=eo.edition_id AND e.deleted_at IS NULL WHERE l.deleted_at IS NULL";
+    $sql = "SELECT l.*, e.code AS edition_code, e.id AS edition_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.deleted_at IS NULL";
     $params = [];
     
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
@@ -91,8 +91,7 @@ class LegalController {
     
     $editionCode = $_GET['edition_code'] ?? '';
     if ($editionCode !== '') {
-        $sql .= " AND (e.code = ? OR l.edition_code = ?)";
-        $params[] = $editionCode;
+        $sql .= " AND e.code = ?";
         $params[] = $editionCode;
     }
     
@@ -142,7 +141,7 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare('SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id = l.id LEFT JOIN editions e ON e.id = eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL'); $s->execute([$id]);
+    $s = $pdo->prepare("SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL"); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
     
@@ -624,7 +623,7 @@ class LegalController {
           die('Orden no encontrada');
       }
 
-      $stmt = $pdo->prepare("SELECT e.code, e.id FROM editions e JOIN edition_orders eo ON eo.edition_id = e.id WHERE eo.legal_request_id = ? LIMIT 1");
+      $stmt = $pdo->prepare("SELECT e.code, e.id FROM editions e JOIN edition_orders eo ON eo.edition_id = e.id WHERE eo.legal_request_id = ? AND e.status='Publicada' AND e.deleted_at IS NULL LIMIT 1");
       $stmt->execute([$id]);
       $edition = $stmt->fetch(PDO::FETCH_ASSOC);
       if ($edition) {

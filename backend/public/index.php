@@ -128,10 +128,12 @@ $router->get('/api/events', [FileController::class, 'sse'], $auth);
 
 // EDITIONS
 $router->get('/api/editions', [EditionController::class, 'list'], $admin);
+$router->get('/api/editions-retired', [EditionController::class, 'listRetired'], $admin);
 $router->post('/api/editions', [EditionController::class, 'create'], $adminCsrf);
 $router->get('/api/editions/{id}', [EditionController::class, 'get'], $admin);
 $router->put('/api/editions/{id}', [EditionController::class, 'update'], $adminCsrf);
 $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adminCsrf);
+$router->post('/api/editions/{id}/restore', [EditionController::class, 'restore'], $adminCsrf);
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
 $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);

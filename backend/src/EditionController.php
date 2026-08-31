@@ -148,6 +148,17 @@ class EditionController {
     Response::json(['items'=>$items]);
   }
 
+  public function listRetired(){
+    $this->requireAdmin();
+    $pdo = Database::pdo();
+    $stmt = $pdo->query(
+      'SELECT e.*, u.name AS published_by_name '
+      . 'FROM editions e LEFT JOIN users u ON e.published_by=u.id '
+      . 'WHERE e.deleted_at IS NOT NULL ORDER BY e.deleted_at DESC, e.id DESC LIMIT 200'
+    );
+    Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+  }
+
   public function listPublic(){
     $pdo = Database::pdo();
     $today = gmdate('Y-m-d');
@@ -393,22 +404,90 @@ class EditionController {
   public function delete($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
-    
-    $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
-    $status = $s->fetchColumn();
-    if (!$status) { Response::json(['error'=>'not_found'], 404); exit; }
-    if ($status === 'Publicada') {
-        // Preserve legal traceability: published editions are retired logically, never destroyed.
-        $pdo->prepare('UPDATE editions SET deleted_at=NOW() WHERE id=?')->execute([$id]);
-    } else {
+
+    try {
+      $pdo->beginTransaction();
+      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+      $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL' . $lock);
+      $s->execute([$id]);
+      $status = $s->fetchColumn();
+      if (!$status) throw new RuntimeException('Edición no encontrada.', 404);
+
+      if ($status === 'Publicada') {
+        // A published edition is retired, never destroyed. Its requests return to the
+        // publication queue so they can be corrected and included in a new edition.
+        $pdo->prepare('UPDATE editions SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
+        $pdo->prepare(
+          "UPDATE legal_requests SET status='En trámite',publish_date=NULL,edition_code=NULL "
+          . "WHERE status='Publicada' AND id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?) "
+          . 'AND NOT EXISTS (SELECT 1 FROM edition_orders active_eo '
+          . 'JOIN editions active_e ON active_e.id=active_eo.edition_id '
+          . 'WHERE active_eo.legal_request_id=legal_requests.id AND active_e.deleted_at IS NULL)'
+        )->execute([$id]);
+        $action = 'retire_edition';
+      } else {
         $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
         $pdo->prepare('DELETE FROM editions WHERE id=?')->execute([$id]);
+        $action = 'delete_edition';
+      }
+
+      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+          ->execute([$u['id'], $action, 'edition', $id]);
+      $pdo->commit();
+      Response::json(['ok'=>true, 'retired'=>$status === 'Publicada']);
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      error_log('[edition.retire] ' . get_class($e) . ': ' . $e->getMessage());
+      $code = (int)$e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      Response::json(['error'=>$e->getMessage() ?: 'No se pudo retirar la edición.'], $code);
     }
-    
-    $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
-        ->execute([$u['id'], 'delete_edition', 'edition', $id]);
-        
-    Response::json(['ok'=>true]);
+  }
+
+  public function restore($id){
+    $u = $this->requireAdmin();
+    $pdo = Database::pdo();
+    try {
+      $pdo->beginTransaction();
+      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+      $stmt = $pdo->prepare('SELECT status,date FROM editions WHERE id=? AND deleted_at IS NOT NULL' . $lock);
+      $stmt->execute([$id]);
+      $edition = $stmt->fetch(PDO::FETCH_ASSOC);
+      if (!$edition) throw new RuntimeException('Edición retirada no encontrada.', 404);
+      if (($edition['status'] ?? '') !== 'Publicada') {
+        throw new RuntimeException('Solo se pueden restaurar ediciones previamente publicadas.', 409);
+      }
+
+      $conflict = $pdo->prepare(
+        'SELECT eo.legal_request_id,e.code FROM edition_orders own '
+        . 'JOIN edition_orders eo ON eo.legal_request_id=own.legal_request_id '
+        . 'JOIN editions e ON e.id=eo.edition_id '
+        . 'WHERE own.edition_id=? AND e.id<>? AND e.deleted_at IS NULL LIMIT 1'
+      );
+      $conflict->execute([$id, $id]);
+      if ($row = $conflict->fetch(PDO::FETCH_ASSOC)) {
+        throw new RuntimeException(
+          "La solicitud {$row['legal_request_id']} ya pertenece a la edición activa {$row['code']}.",
+          409
+        );
+      }
+
+      $pdo->prepare('UPDATE editions SET deleted_at=NULL WHERE id=?')->execute([$id]);
+      $pdo->prepare(
+        "UPDATE legal_requests SET status='Publicada',publish_date=? "
+        . 'WHERE deleted_at IS NULL AND id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?)'
+      )->execute([(string)$edition['date'], $id]);
+      $pdo->prepare("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)")
+        ->execute([$u['id'], 'restore_edition', 'edition', $id]);
+      $pdo->commit();
+      Response::json(['ok'=>true]);
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      error_log('[edition.restore] ' . get_class($e) . ': ' . $e->getMessage());
+      $code = (int)$e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      Response::json(['error'=>$e->getMessage() ?: 'No se pudo restaurar la edición.'], $code);
+    }
   }
 
   public function update($id){

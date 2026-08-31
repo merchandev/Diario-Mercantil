@@ -21,7 +21,7 @@ final class EditionOrderService {
             $isSqlite = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
             $lockClause = $isSqlite ? '' : ' FOR UPDATE';
             // Verificar estado de la edición (FOR UPDATE)
-            $stmt = $this->pdo->prepare('SELECT status,file_id FROM editions WHERE id=?' . $lockClause);
+            $stmt = $this->pdo->prepare('SELECT status,file_id FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause);
             $stmt->execute([$editionId]);
             $edition = $stmt->fetch(PDO::FETCH_ASSOC);
             $editionStatus = $edition['status'] ?? null;
@@ -59,7 +59,7 @@ final class EditionOrderService {
                     SELECT eo.legal_request_id, e.code 
                     FROM edition_orders eo
                     JOIN editions e ON e.id = eo.edition_id
-                    WHERE eo.legal_request_id IN ($inQuery) AND e.id != ?
+                    WHERE eo.legal_request_id IN ($inQuery) AND e.id != ? AND e.deleted_at IS NULL
                 ");
                 $params = $orderIds;
                 $params[] = $editionId;
