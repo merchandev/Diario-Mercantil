@@ -137,6 +137,9 @@ $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'auto
 $router->post('/api/editions/{id}/publish', [EditionController::class, 'publish'], $adminCsrf);
 $router->post('/api/editions/{id}/notify', [EditionController::class, 'notify'], $adminCsrf);
 $router->post('/api/editions/{id}/pdf', [EditionController::class, 'uploadPdf'], $adminCsrf);
+$router->post('/api/editions/{id}/orders/{orderId}/prepare-pdf', [EditionController::class, 'prepareOrderPdf'], $adminCsrf);
+$router->post('/api/editions/{id}/orders/{orderId}/pdf', [EditionController::class, 'uploadOrderPdf'], $adminCsrf);
+$router->get('/api/editions/{id}/orders/{orderId}/pdf', [EditionController::class, 'downloadOrderPdf'], $auth);
 $router->get('/api/editions/{id}/download', [EditionController::class, 'downloadById'], $admin);
 $router->get('/api/editions/{id}/export', [EditionController::class, 'exportCsv'], $admin);
 $router->get('/api/e', [EditionController::class, 'listPublic']);

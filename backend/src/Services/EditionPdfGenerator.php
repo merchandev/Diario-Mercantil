@@ -22,9 +22,15 @@ class EditionPdfGenerator {
         $done = 0;
 
         foreach ($orderIds as $orderId) {
-            // Find the PDF file for this order
-            $fStmt = $this->pdo->prepare("SELECT f.path FROM files f JOIN legal_files lf ON lf.file_id = f.id WHERE lf.legal_request_id = ? AND lf.kind = 'document_pdf' LIMIT 1");
-            $fStmt->execute([$orderId]);
+            // The consolidated edition may only consume the immutable artifact prepared
+            // for this exact edition/request pair. It must never read another request's file.
+            $fStmt = $this->pdo->prepare(
+                'SELECT f.path,f.checksum,eo.publication_checksum FROM edition_orders eo '
+                . 'JOIN files f ON f.id=eo.publication_file_id '
+                . 'WHERE eo.edition_id=? AND eo.legal_request_id=? '
+                . "AND f.deleted_at IS NULL AND f.status IN ('processed','uploaded') LIMIT 1"
+            );
+            $fStmt->execute([$editionId, $orderId]);
             $fileData = $fStmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$fileData || empty($fileData['path'])) {
@@ -33,6 +39,11 @@ class EditionPdfGenerator {
 
             try {
                 $physicalPath = StoragePath::getFile((string)$fileData['path']);
+                $actualChecksum = hash_file('sha256', $physicalPath);
+                $expectedChecksum = (string) ($fileData['publication_checksum'] ?: $fileData['checksum']);
+                if ($actualChecksum === false || !hash_equals($expectedChecksum, $actualChecksum)) {
+                    throw new RuntimeException("La integridad del PDF individual de la solicitud {$orderId} no coincide.", 422);
+                }
                 $pageCount = $pdf->setSourceFile($physicalPath);
                 if ($pageCount < 1) {
                     throw new RuntimeException("El PDF de la orden {$orderId} no contiene páginas válidas.", 422);
@@ -63,8 +74,15 @@ class EditionPdfGenerator {
         $codeStmt->execute([$editionId]);
         $code = $codeStmt->fetchColumn() ?: "DM-$editionId";
 
-        $outputName = "edition_{$code}_" . time() . ".pdf";
-        $outputPath = $storageRoot . '/' . $outputName;
+        $safeCode = preg_replace('/[^A-Za-z0-9_-]/', '_', (string) $code) ?: "DM-{$editionId}";
+        $relativeDir = "editions/{$editionId}/consolidated";
+        $outputDir = $storageRoot . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+        if (!is_dir($outputDir) && !mkdir($outputDir, 0750, true) && !is_dir($outputDir)) {
+            throw new RuntimeException('No se pudo crear el directorio del PDF consolidado.', 500);
+        }
+        $outputName = "edition_{$safeCode}_" . bin2hex(random_bytes(8)) . '.pdf';
+        $relativePath = $relativeDir . '/' . $outputName;
+        $outputPath = $outputDir . DIRECTORY_SEPARATOR . $outputName;
         if (!is_dir($storageRoot) || !is_writable($storageRoot)) {
             throw new RuntimeException('El directorio de almacenamiento de ediciones no está disponible para escritura.', 500);
         }
@@ -74,6 +92,7 @@ class EditionPdfGenerator {
             throw new RuntimeException('No se pudo generar el PDF final de la edición.', 500);
         }
 
-        return $outputName;
+        @chmod($outputPath, 0640);
+        return $relativePath;
     }
 }

@@ -257,7 +257,13 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
     $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
-    $ord = $pdo->prepare('SELECT l.id, l.name, l.document, l.status, l.date, l.meta FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id');
+    $ord = $pdo->prepare(
+        'SELECT l.id,l.name,l.document,l.status,l.date,l.meta,'
+        . 'eo.publication_file_id,eo.publication_file_name,eo.publication_checksum,'
+        . 'eo.publication_source,eo.publication_prepared_at '
+        . 'FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id '
+        . 'WHERE eo.edition_id=? ORDER BY l.id'
+    );
     $ord->execute([$id]);
     $orders = $ord->fetchAll(PDO::FETCH_ASSOC);
     foreach ($orders as &$order) {
@@ -268,6 +274,9 @@ class EditionController {
             $order['company_name'] = $order['name'];
         }
         unset($order['meta']);
+        $order['publication_file_url'] = !empty($order['publication_file_id'])
+            ? '/api/editions/' . $id . '/orders/' . $order['id'] . '/pdf'
+            : null;
     }
     Response::json(['edition'=>$edition, 'orders'=>$orders]);
   }
@@ -569,7 +578,7 @@ class EditionController {
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
     $lockClause = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
-    $ed = $pdo->prepare('SELECT status, code FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause);
+    $ed = $pdo->prepare('SELECT status, code, file_id FROM editions WHERE id=? AND deleted_at IS NULL');
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
@@ -608,25 +617,46 @@ class EditionController {
         return Response::json(['error'=>'Firma de archivo PDF inválida.'], 400);
     }
 
-    $uploadDir = realpath(__DIR__.'/..').'/storage/uploads';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+    $uploadDir = StoragePath::getUploadsDir();
+    $relativeDir = 'editions/' . (int) $id . '/consolidated';
+    $targetDir = $uploadDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativeDir);
+    if (!is_dir($targetDir) && !mkdir($targetDir, 0750, true) && !is_dir($targetDir)) {
+      return Response::json(['error'=>'No se pudo crear el directorio de la edición.'],500);
+    }
     $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', basename($name));
+    $path = $relativeDir . '/' . bin2hex(random_bytes(16)) . '_' . $safeName;
+    $dest = $uploadDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $path);
+
+    if (!move_uploaded_file($tmp, $dest)) {
+      return Response::json(['error'=>'No se pudo guardar el archivo físico'],500);
+    }
+    @chmod($dest, 0640);
 
     $pdo->beginTransaction();
     try {
-      $checksum = hash_file('sha256', $tmp);
-      $now = gmdate('c');
-      $stmt = $pdo->prepare('INSERT INTO files(name,size,type,checksum,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?)');
-      $stmt->execute([$name,$size,'pdf',$checksum,'uploaded',$now,$now]);
+      $lockedEdition = $pdo->prepare(
+        'SELECT status,file_id FROM editions WHERE id=? AND deleted_at IS NULL' . $lockClause
+      );
+      $lockedEdition->execute([$id]);
+      $locked = $lockedEdition->fetch(PDO::FETCH_ASSOC);
+      if (!$locked || ($locked['status'] ?? '') !== 'Borrador') {
+        throw new RuntimeException('La edición cambió mientras se cargaba el PDF.', 409);
+      }
+
+      $checksum = hash_file('sha256', $dest);
+      if ($checksum === false) throw new RuntimeException('No se pudo calcular la integridad del PDF.', 500);
+      $now = gmdate('Y-m-d H:i:s');
+      $stmt = $pdo->prepare('INSERT INTO files(name,path,size,type,checksum,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)');
+      $stmt->execute([$name,$path,$size,'pdf',$checksum,'uploaded',$now,$now]);
       $fileId = (int)$pdo->lastInsertId();
-      
-      $path = $fileId . '_edition_' . $safeName;
-      $dest = $uploadDir . '/' . $path;
-      
-      if (!move_uploaded_file($tmp, $dest)) throw new Exception('No se pudo guardar el archivo físico');
-      
-      $pdo->prepare("UPDATE files SET path=? WHERE id=?")->execute([$path, $fileId]);
       $pdo->prepare('UPDATE editions SET file_id=?, file_name=? WHERE id=?')->execute([$fileId,$name,$id]);
+
+      $oldFileId = (int) ($locked['file_id'] ?? 0);
+      if ($oldFileId > 0 && $oldFileId !== $fileId) {
+        $pdo->prepare(
+          "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
+        )->execute([$now,$now,$oldFileId]);
+      }
       
       $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
             ->execute([$u['id'], 'upload_edition_pdf', 'edition', $id]);
@@ -640,6 +670,79 @@ class EditionController {
         error_log('No se pudo limpiar el PDF de edición tras el rollback: ' . $dest);
       }
       Response::json(['error'=>'Error guardando PDF: '.$e->getMessage()],500);
+    }
+  }
+
+  public function prepareOrderPdf($id, $orderId){
+    $u = $this->requireAdmin();
+    try {
+      require_once __DIR__ . '/Services/EditionOrderPdfService.php';
+      $result = (new EditionOrderPdfService(Database::pdo()))->prepareFromRequest(
+        (int) $id,
+        (int) $orderId,
+        (int) $u['id']
+      );
+      Response::json($result);
+    } catch (Throwable $e) {
+      $code = (int) $e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      if ($code >= 500) error_log('[edition.order.prepare] ' . $e->getMessage());
+      Response::json(['error'=>$e->getMessage() ?: 'No se pudo preparar el PDF individual.'], $code);
+    }
+  }
+
+  public function uploadOrderPdf($id, $orderId){
+    $u = $this->requireAdmin();
+    if (!isset($_FILES['file'])) return Response::json(['error'=>'Debe seleccionar un archivo PDF.'], 400);
+    try {
+      require_once __DIR__ . '/Services/EditionOrderPdfService.php';
+      $result = (new EditionOrderPdfService(Database::pdo()))->upload(
+        (int) $id,
+        (int) $orderId,
+        (int) $u['id'],
+        $_FILES['file']
+      );
+      Response::json($result);
+    } catch (Throwable $e) {
+      $code = (int) $e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      if ($code >= 500) error_log('[edition.order.upload] ' . $e->getMessage());
+      Response::json(['error'=>$e->getMessage() ?: 'No se pudo cargar el PDF individual.'], $code);
+    }
+  }
+
+  public function downloadOrderPdf($id, $orderId){
+    require_once __DIR__.'/AuthController.php';
+    $user = AuthController::requireAuth();
+    try {
+      $pdo = Database::pdo();
+      $access = $pdo->prepare(
+        'SELECT l.user_id,e.status FROM edition_orders eo '
+        . 'JOIN editions e ON e.id=eo.edition_id '
+        . 'JOIN legal_requests l ON l.id=eo.legal_request_id '
+        . 'WHERE eo.edition_id=? AND eo.legal_request_id=? AND e.deleted_at IS NULL'
+      );
+      $access->execute([(int) $id, (int) $orderId]);
+      $row = $access->fetch(PDO::FETCH_ASSOC);
+      if (!$row) throw new RuntimeException('La solicitud no pertenece a esta edición.', 404);
+      $role = strtolower((string) ($user['role'] ?? ''));
+      $canManage = in_array($role, ['admin','superadmin','manager','staff'], true);
+      $isPublishedOwner = ($row['status'] ?? '') === 'Publicada'
+        && (int) $row['user_id'] === (int) ($user['id'] ?? 0);
+      if (!$canManage && !$isPublishedOwner) {
+        throw new RuntimeException('No tiene acceso a este PDF individual.', 403);
+      }
+
+      require_once __DIR__ . '/Services/EditionOrderPdfService.php';
+      $file = (new EditionOrderPdfService($pdo))->get((int) $id, (int) $orderId);
+      $path = StoragePath::getFile((string) $file['path']);
+      $name = (string) ($file['publication_file_name'] ?: ('solicitud-' . $orderId . '.pdf'));
+      $forceDownload = isset($_GET['download']) && $_GET['download'] === '1';
+      $this->streamPdf($path, $name, $forceDownload);
+    } catch (Throwable $e) {
+      $code = (int) $e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      Response::json(['error'=>$e->getMessage() ?: 'No se encontró el PDF individual.'], $code);
     }
   }
 }

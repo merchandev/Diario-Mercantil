@@ -3,6 +3,7 @@ require_once __DIR__."/Response.php";
 require_once __DIR__."/Database.php";
 require_once __DIR__."/AuthController.php";
 require_once __DIR__."/Http/SettingSchema.php";
+require_once __DIR__."/Repositories/SettingRepository.php";
 
 class SystemController {
     private function json(){ return json_decode(file_get_contents("php://input"), true) ?: []; }
@@ -89,9 +90,7 @@ class SystemController {
     public function getSettings(){
         $this->requireAdmin();
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT `key`, value FROM settings");
-        $settings = [];
-        while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
+        $settings = (new SettingRepository($pdo))->getMany(SettingSchema::keys());
         Response::json(["settings"=>$settings]);
     }
     
@@ -104,16 +103,23 @@ class SystemController {
     }
     
     public function saveSettings(){
+        $user = $this->requireAdmin();
         $in = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($in) || $in === []) {
+            throw new HttpException(400, 'invalid_settings_payload', 'No se recibieron opciones para guardar.');
+        }
         $pdo = Database::pdo();
-        $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
         $now = gmdate('Y-m-d H:i:s');
-        foreach($in as $k=>$v){
-            $validatedValue = SettingSchema::validate((string)$k, $v);
+        $validated = [];
+        $bannerFileIds = [];
+
+        foreach ($in as $k => $v) {
+            $validatedValue = SettingSchema::validate((string) $k, $v);
+            $validated[(string) $k] = (string) $validatedValue;
             $bannerFileId = null;
             if (in_array((string)$k, ['banner_main_1', 'banner_sidebar', 'promo_popup'], true) && $validatedValue !== '') {
                 if (!preg_match('~/api/uploads/(\d+)(?:$|[/?#])~', (string)$validatedValue, $m)) {
-                    Response::json(['error'=>'invalid_banner_file'], 422);
+                    throw new HttpException(422, 'invalid_banner_file', 'La URL del banner no corresponde a un archivo cargado.');
                 }
                 $bannerFileId = (int)$m[1];
                 $fileStmt = $pdo->prepare('SELECT name, type FROM files WHERE id=? AND deleted_at IS NULL');
@@ -121,19 +127,38 @@ class SystemController {
                 $file = $fileStmt->fetch(PDO::FETCH_ASSOC);
                 $extension = strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION));
                 if (!$file || !in_array($extension, ['jpg','jpeg','png','webp','gif'], true)) {
-                    Response::json(['error'=>'invalid_banner_file'], 422);
+                    throw new HttpException(422, 'invalid_banner_file', 'El archivo seleccionado no es una imagen válida.');
                 }
             }
-            $upsertSql = $isSqlite
-                ? 'INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, ?) ON CONFLICT(`key`) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at'
-                : 'INSERT INTO settings(`key`, value, updated_at) VALUES(?, ?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value), updated_at=VALUES(updated_at)';
-            $pdo->prepare($upsertSql)->execute([$k, $validatedValue, $now]);
-
             if ($bannerFileId !== null) {
-                $pdo->prepare('UPDATE files SET is_public=1 WHERE id=?')->execute([$bannerFileId]);
+                $bannerFileIds[] = $bannerFileId;
             }
         }
-        Response::json(["ok"=>true]);
+
+        $ownsTransaction = !$pdo->inTransaction();
+        if ($ownsTransaction) $pdo->beginTransaction();
+        try {
+            $repository = new SettingRepository($pdo);
+            foreach ($validated as $key => $value) {
+                $repository->set($key, $value, $now);
+            }
+            if ($bannerFileIds !== []) {
+                $publicStmt = $pdo->prepare('UPDATE files SET is_public=1, updated_at=? WHERE id=?');
+                foreach (array_unique($bannerFileIds) as $bannerFileId) {
+                    $publicStmt->execute([$now, $bannerFileId]);
+                }
+            }
+            $pdo->prepare(
+                'INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)'
+            )->execute([(int) $user['id'], 'update_settings', 'settings', null]);
+            if ($ownsTransaction) $pdo->commit();
+        } catch (Throwable $e) {
+            if ($ownsTransaction && $pdo->inTransaction()) $pdo->rollBack();
+            error_log('[settings.save] ' . get_class($e) . ': ' . $e->getMessage());
+            throw $e;
+        }
+
+        Response::json(["ok"=>true, 'updated_keys'=>array_keys($validated)]);
     }
 
     public function getBcvRate(){

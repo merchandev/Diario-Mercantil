@@ -120,9 +120,16 @@ CREATE TABLE IF NOT EXISTS editions (
 CREATE TABLE IF NOT EXISTS edition_orders (
   edition_id INT NOT NULL,
   legal_request_id INT NOT NULL,
+  publication_file_id INT NULL,
+  publication_file_name VARCHAR(255) NULL,
+  publication_checksum CHAR(64) NULL,
+  publication_source VARCHAR(20) NULL,
+  publication_prepared_at DATETIME NULL,
+  publication_updated_at DATETIME NULL,
   PRIMARY KEY (edition_id, legal_request_id),
   FOREIGN KEY(edition_id) REFERENCES editions(id) ON DELETE CASCADE,
   FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id),
+  FOREIGN KEY(publication_file_id) REFERENCES files(id) ON DELETE SET NULL,
   UNIQUE KEY uq_edition_orders_request (legal_request_id)
 );
 
@@ -212,15 +219,16 @@ CREATE TABLE IF NOT EXISTS pages (
 CREATE TABLE IF NOT EXISTS settings (
   `key` VARCHAR(100) PRIMARY KEY,
   value TEXT NOT NULL,
-  updated_at DATETIME NOT NULL
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- Seed defaults
-INSERT IGNORE INTO settings(`key`,value,updated_at) VALUES
- ('bcv_rate','203.74',NOW()),
- ('price_per_folio_usd','3.00',NOW()),
- ('convocatoria_usd','10.00',NOW()),
- ('iva_percent','16',NOW()),
- ('raptor_mini_preview_enabled','1',NOW());
+INSERT IGNORE INTO settings(`key`,value,created_at,updated_at) VALUES
+ ('bcv_rate','203.74',NOW(),NOW()),
+ ('price_per_folio_usd','3.00',NOW(),NOW()),
+ ('convocatoria_usd','10.00',NOW(),NOW()),
+ ('iva_percent','16',NOW(),NOW()),
+ ('raptor_mini_preview_enabled','1',NOW(),NOW());
 
 SET FOREIGN_KEY_CHECKS=1;

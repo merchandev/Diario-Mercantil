@@ -10,7 +10,7 @@ final class EditionOrderService {
 
     public function setOrdersForEdition(int $editionId, array $orderIds): int {
         // Normalizar y eliminar duplicados
-        $orderIds = array_unique(array_filter(array_map('intval', $orderIds)));
+        $orderIds = array_values(array_unique(array_filter(array_map('intval', $orderIds))));
         
         $ownsTransaction = !$this->pdo->inTransaction();
         if ($ownsTransaction) {
@@ -21,17 +21,15 @@ final class EditionOrderService {
             $isSqlite = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
             $lockClause = $isSqlite ? '' : ' FOR UPDATE';
             // Verificar estado de la edición (FOR UPDATE)
-            $stmt = $this->pdo->prepare('SELECT status FROM editions WHERE id=?' . $lockClause);
+            $stmt = $this->pdo->prepare('SELECT status,file_id FROM editions WHERE id=?' . $lockClause);
             $stmt->execute([$editionId]);
-            $editionStatus = $stmt->fetchColumn();
+            $edition = $stmt->fetch(PDO::FETCH_ASSOC);
+            $editionStatus = $edition['status'] ?? null;
 
             if ($editionStatus !== 'Borrador') {
                 throw new Exception("Solo se pueden modificar las órdenes de una edición en Borrador.", 403);
             }
 
-            // Limpiar relaciones anteriores
-            $this->pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$editionId]);
-            
             if (count($orderIds) > 0) {
                 // Verificar órdenes
                 $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
@@ -71,11 +69,56 @@ final class EditionOrderService {
                     throw new Exception("La solicitud {$conflicts[0]['legal_request_id']} ya pertenece a la edición {$conflicts[0]['code']}.", 400);
                 }
 
-                // Insertar
-                $ins = $this->pdo->prepare('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)');
-                foreach ($orderIds as $oid) {
-                    $ins->execute([$editionId, $oid]);
+            }
+
+            // Conservar las asociaciones que no cambiaron para no perder sus PDF individuales.
+            $existingStmt = $this->pdo->prepare(
+                'SELECT legal_request_id,publication_file_id FROM edition_orders WHERE edition_id=?' . $lockClause
+            );
+            $existingStmt->execute([$editionId]);
+            $existingRows = $existingStmt->fetchAll(PDO::FETCH_ASSOC);
+            $existingIds = array_map(static fn(array $row): int => (int) $row['legal_request_id'], $existingRows);
+            $removedIds = array_values(array_diff($existingIds, $orderIds));
+            $addedIds = array_values(array_diff($orderIds, $existingIds));
+
+            if ($removedIds !== []) {
+                $now = gmdate('Y-m-d H:i:s');
+                $markFile = $this->pdo->prepare(
+                    "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
+                );
+                foreach ($existingRows as $existingRow) {
+                    if (
+                        in_array((int) $existingRow['legal_request_id'], $removedIds, true)
+                        && (int) ($existingRow['publication_file_id'] ?? 0) > 0
+                    ) {
+                        $markFile->execute([$now, $now, (int) $existingRow['publication_file_id']]);
+                    }
                 }
+                $delete = $this->pdo->prepare(
+                    'DELETE FROM edition_orders WHERE edition_id=? AND legal_request_id=?'
+                );
+                foreach ($removedIds as $removedId) {
+                    $delete->execute([$editionId, $removedId]);
+                }
+            }
+
+            if ($addedIds !== []) {
+                $insert = $this->pdo->prepare(
+                    'INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(?,?)'
+                );
+                foreach ($addedIds as $addedId) {
+                    $insert->execute([$editionId, $addedId]);
+                }
+            }
+
+            if (($addedIds !== [] || $removedIds !== []) && (int) ($edition['file_id'] ?? 0) > 0) {
+                $now = gmdate('Y-m-d H:i:s');
+                $this->pdo->prepare(
+                    "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
+                )->execute([$now, $now, (int) $edition['file_id']]);
+                $this->pdo->prepare(
+                    'UPDATE editions SET file_id=NULL,file_name=NULL WHERE id=?'
+                )->execute([$editionId]);
             }
             
             // Actualizar contador

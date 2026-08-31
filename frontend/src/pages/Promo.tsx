@@ -44,6 +44,7 @@ export default function Promo() {
         // Storing URL is easier for now to display.
         const url = `${API_URL}/api/uploads/${file.id}`;
 
+        const previousSettings = settings
         // Optimistic update
         const newSettings = { ...settings, [currentKey]: url } as Partial<Settings & Record<string, string>>
         setSettings(newSettings)
@@ -55,6 +56,7 @@ export default function Promo() {
         try {
             await saveSettings({ [currentKey]: url })
         } catch (error) {
+            setSettings(previousSettings)
             console.error(error)
             void showAlert('Error al guardar la configuración.', { title: 'Error' })
         } finally {
@@ -69,13 +71,16 @@ export default function Promo() {
 
     const clearImage = async (key: string) => {
         if (!(await confirmAction('¿Quitar esta imagen?', { title: 'Quitar banner', danger: true }))) return
+        const previousSettings = settings
         const newSettings = { ...settings, [key]: '' } as Partial<Settings & Record<string, string>>
         setSettings(newSettings)
         setSaving(true)
         try {
             await saveSettings({ [key]: '' })
         } catch (error) {
+            setSettings(previousSettings)
             console.error(error)
+            void showAlert('No se pudo quitar el banner. La configuración anterior fue restaurada.', { title: 'Error' })
         } finally {
             setSaving(false)
         }

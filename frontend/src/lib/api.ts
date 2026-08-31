@@ -238,6 +238,14 @@ export type Edition = {
   published_by_name?: string;
   published_at?: string;
 }
+export type EditionOrder = LegalRequest & {
+  publication_file_id?: number | null;
+  publication_file_name?: string | null;
+  publication_checksum?: string | null;
+  publication_source?: 'generated' | 'uploaded' | null;
+  publication_prepared_at?: string | null;
+  publication_file_url?: string | null;
+}
 export async function listEditions() {
   const res = await fetchAuth('/api/editions')
   return res.json() as Promise<{ items: Edition[] }>
@@ -248,7 +256,7 @@ export async function createEdition(body: { code?: string; status?: string; date
 }
 export async function getEdition(id: number) {
   const res = await fetchAuth(`/api/editions/${id}`)
-  return res.json() as Promise<{ edition: Edition; orders: LegalRequest[] }>
+  return res.json() as Promise<{ edition: Edition; orders: EditionOrder[] }>
 }
 export async function updateEdition(id: number, body: Partial<Pick<Edition, 'code' | 'status' | 'date' | 'edition_no' | 'file_id' | 'file_name'>>) {
   const res = await fetchAuth(`/api/editions/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -303,6 +311,16 @@ export async function uploadEditionPdf(id: number, file: File) {
   fd.append('file', file)
   const res = await fetchAuth(`/api/editions/${id}/pdf`, { method: 'POST', body: fd })
   return res.json() as Promise<{ ok: true; file_id: number; file_name: string; edition: Edition }>
+}
+export async function prepareEditionOrderPdf(editionId: number, orderId: number) {
+  const res = await fetchAuth(`/api/editions/${editionId}/orders/${orderId}/prepare-pdf`, { method: 'POST' })
+  return res.json() as Promise<{ ok: true; file_id: number; file_name: string; checksum: string; source: string; prepared_at: string }>
+}
+export async function uploadEditionOrderPdf(editionId: number, orderId: number, file: File) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const res = await fetchAuth(`/api/editions/${editionId}/orders/${orderId}/pdf`, { method: 'POST', body: fd })
+  return res.json() as Promise<{ ok: true; file_id: number; file_name: string; checksum: string; source: string; prepared_at: string }>
 }
 export async function deleteEdition(id: number) {
   const res = await fetchAuth(`/api/editions/${id}`, { method: 'DELETE' })
@@ -365,6 +383,8 @@ export type LegalRequest = {
   edition_no?: number;
   edition_id?: number | null;
   edition_file_url?: string | null;
+  publication_file_id?: number | null;
+  publication_file_url?: string | null;
 }
 export type LegalPayment = {
   id: number;
@@ -586,6 +606,7 @@ export type Settings = {
   promo_popup?: string;
   default_user_role?: string;
   unit_tax_bs?: number;
+  raptor_mini_preview_enabled?: boolean | 0 | 1;
 }
 export async function getSettings() {
   const res = await fetchAuth('/api/settings')

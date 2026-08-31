@@ -11,9 +11,8 @@ class RateController {
     return $v === false ? null : (string)$v;
   }
   private function setSetting(PDO $pdo, string $key, string $value): void {
-    $now = gmdate('Y-m-d H:i:s');
-    $stmt = $pdo->prepare('INSERT INTO settings(`key`, value, created_at, updated_at) VALUES(?, ?, ?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value), updated_at = VALUES(updated_at)');
-    $stmt->execute([$key, $value, $now, $now]);
+    require_once __DIR__ . '/Repositories/SettingRepository.php';
+    (new SettingRepository($pdo))->set($key, $value);
   }
 
   public function bcv(){

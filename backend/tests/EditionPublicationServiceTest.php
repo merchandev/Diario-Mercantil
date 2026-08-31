@@ -37,21 +37,36 @@ class EditionPublicationServiceTest extends TestCase {
         $service->publish(1, 1);
     }
     
-    public function testPublishFailsIfUploadedPdfRecordIsMissing() {
+    public function testPublishFailsIfOrderHasNoSourcePdf() {
         $pdo = $this->createMock(PDO::class);
         $editionStmt = $this->createMock(PDOStatement::class);
         $ordersStmt = $this->createMock(PDOStatement::class);
-        $fileStmt = $this->createMock(PDOStatement::class);
+        $preparedStmt = $this->createMock(PDOStatement::class);
+        $orderStmt = $this->createMock(PDOStatement::class);
+        $sourceStmt = $this->createMock(PDOStatement::class);
 
-        $editionStmt->method('fetch')->willReturn(['status' => 'Borrador', 'file_id' => 99]);
+        $editionStmt->method('fetch')->willReturn(['status' => 'Borrador']);
         $ordersStmt->method('fetchAll')->willReturn([1]);
-        $fileStmt->method('fetch')->willReturn(false);
-        $pdo->method('prepare')->willReturnOnConsecutiveCalls($editionStmt, $ordersStmt, $fileStmt);
+        $preparedStmt->method('fetch')->willReturn(false);
+        $orderStmt->method('fetch')->willReturn([
+            'status' => 'Borrador',
+            'request_status' => 'En trámite',
+            'publication_file_id' => null,
+            'edition_file_id' => null,
+        ]);
+        $sourceStmt->method('fetch')->willReturn(false);
+        $pdo->method('prepare')->willReturnOnConsecutiveCalls(
+            $editionStmt,
+            $ordersStmt,
+            $preparedStmt,
+            $orderStmt,
+            $sourceStmt
+        );
         
         $service = new EditionPublicationService($pdo);
         
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("El archivo físico asociado a la edición no existe o no es válido.");
+        $this->expectExceptionMessage("La solicitud 1 no tiene un PDF de documento válido.");
         $this->expectExceptionCode(422);
         
         $service->publish(1, 1);

@@ -22,7 +22,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, UNIQUE(publication_year, edition_no))");
         $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
-        $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, PRIMARY KEY(edition_id, legal_request_id))");
+        $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, publication_file_id INTEGER, publication_file_name TEXT, publication_checksum TEXT, publication_source TEXT, publication_prepared_at TEXT, publication_updated_at TEXT, PRIMARY KEY(edition_id, legal_request_id))");
+        $pdo->exec("CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, type TEXT, checksum TEXT, version INTEGER, status TEXT, owner TEXT, is_public INTEGER DEFAULT 0, deleted_at TEXT, created_at TEXT, updated_at TEXT)");
+        $pdo->exec("CREATE TABLE settings (`key` TEXT PRIMARY KEY, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id INTEGER, action TEXT, resource_type TEXT, resource_id INTEGER)");
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
@@ -44,6 +46,8 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date) VALUES(100,2,'En trámite',100,'Solicitud admin','2026-08-29')");
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date) VALUES(101,2,'Borrador',100,'Solicitud usuario','2026-08-29')");
         $pdo->exec("INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone,created_at) VALUES(100,'1111','2026-08-29','Banco de Venezuela','pago_movil',80,'Aprobado','04121234567','$createdAt')");
+        $pdo->exec("INSERT INTO settings VALUES('price_per_folio_usd','3.00','$createdAt','$createdAt'),('raptor_mini_preview_enabled','1','$createdAt','$createdAt')");
+        $pdo->exec("INSERT INTO files(id,name,type,status,is_public,created_at,updated_at) VALUES(200,'banner.png','png','processed',0,'$createdAt','$createdAt')");
 
         $cmd = [PHP_BINARY, '-S', '127.0.0.1:' . self::$port, '-t', realpath(__DIR__ . '/../public')];
         self::$process = proc_open($cmd, [
@@ -151,6 +155,25 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame('MMXXVI-0001', $first['body']['code'] ?? null);
         $this->assertSame(200, $second['code'], json_encode($second['body']));
         $this->assertSame('MMXXVI-0002', $second['body']['code'] ?? null);
+    }
+
+    public function testAdminCanPersistSettingsAndPublishBanner(): void {
+        $saved = $this->request('POST', '/api/admin/settings', 'admin_session_test', [
+            'price_per_folio_usd' => 4.25,
+            'raptor_mini_preview_enabled' => '1',
+            'banner_main_1' => '/api/uploads/200',
+        ]);
+        $this->assertSame(200, $saved['code'], json_encode($saved['body']));
+        $this->assertSame('4.25', Database::pdo()->query(
+            "SELECT value FROM settings WHERE `key`='price_per_folio_usd'"
+        )->fetchColumn());
+        $this->assertSame(1, (int) Database::pdo()->query(
+            'SELECT is_public FROM files WHERE id=200'
+        )->fetchColumn());
+
+        $public = $this->request('GET', '/api/settings');
+        $this->assertSame(200, $public['code'], json_encode($public['body']));
+        $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_main_1'] ?? null);
     }
 
     public function testAdminCannotReportMoreThanRemainingAndCanVerifyOnePayment() {

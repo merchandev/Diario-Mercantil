@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { createEdition, deleteEdition, listEditions, type Edition, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, notifyEdition } from '../lib/api'
+import { createEdition, deleteEdition, listEditions, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -14,13 +14,13 @@ export default function Ediciones() {
   const [creating, setCreating] = useState(false)
   const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
   const [form, setForm] = useState<{ date: string; edition_no: number; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
-  const [createPdf, setCreatePdf] = useState<File | null>(null)
   const [selId, setSelId] = useState<number | undefined>(undefined)
-  const [detail, setDetail] = useState<{ edition: Edition; orders: LegalRequest[] } | null>(null)
+  const [detail, setDetail] = useState<{ edition: Edition; orders: EditionOrder[] } | null>(null)
   const [qrGenerated, setQrGenerated] = useState(false)
   const [generatedCode, setGeneratedCode] = useState('')
   const [allOrders, setAllOrders] = useState<LegalRequest[]>([])
   const [uploadingPdf, setUploadingPdf] = useState(false)
+  const [orderPdfBusy, setOrderPdfBusy] = useState<Record<number, string>>({})
   const qrWrapRef = useRef<HTMLDivElement | null>(null)
   const newQrWrapRef = useRef<HTMLDivElement | null>(null)
   const pdfSectionRef = useRef<HTMLDivElement | null>(null)
@@ -109,6 +109,40 @@ export default function Ediciones() {
       setAlertDialog({ isOpen: true, title: 'Error', message: msg, variant: 'error' })
     } finally {
       setUploadingPdf(false)
+    }
+  }
+
+  const refreshDetail = async () => {
+    if (!selId) return
+    setDetail(await getEdition(selId))
+    await load()
+  }
+
+  const handlePrepareOrderPdf = async (orderId: number) => {
+    if (!selId) return
+    setOrderPdfBusy(prev => ({ ...prev, [orderId]: 'Generando...' }))
+    try {
+      await prepareEditionOrderPdf(selId, orderId)
+      await refreshDetail()
+      setAlertDialog({ isOpen: true, title: 'PDF listo', message: `El PDF individual de la solicitud ${orderId} fue preparado.`, variant: 'success' })
+    } catch (error) {
+      setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'No se pudo preparar el PDF individual', variant: 'error' })
+    } finally {
+      setOrderPdfBusy(prev => { const next = { ...prev }; delete next[orderId]; return next })
+    }
+  }
+
+  const handleOrderPdfFile = async (orderId: number, file: File) => {
+    if (!selId) return
+    setOrderPdfBusy(prev => ({ ...prev, [orderId]: 'Cargando...' }))
+    try {
+      await uploadEditionOrderPdf(selId, orderId, file)
+      await refreshDetail()
+      setAlertDialog({ isOpen: true, title: 'PDF actualizado', message: `El PDF individual de la solicitud ${orderId} fue guardado.`, variant: 'success' })
+    } catch (error) {
+      setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'No se pudo cargar el PDF individual', variant: 'error' })
+    } finally {
+      setOrderPdfBusy(prev => { const next = { ...prev }; delete next[orderId]; return next })
     }
   }
 
@@ -387,7 +421,32 @@ export default function Ediciones() {
                                     {isPdfCollapsed ? '▼ Expandir' : '▲ Minimizar'}
                                   </span>
                                 </h3>
+                                {detail.edition.status === 'Borrador' && (
+                                  <div className="flex flex-wrap gap-2">
+                                    <label className={`btn btn-outline inline-flex items-center gap-2 cursor-pointer ${uploadingPdf ? 'opacity-60 pointer-events-none' : ''}`}>
+                                      <IconUpload className="w-4 h-4" />
+                                      <span>{uploadingPdf ? 'Cargando...' : 'Cargar consolidado'}</span>
+                                      <input
+                                        type="file"
+                                        accept="application/pdf,.pdf"
+                                        className="sr-only"
+                                        disabled={uploadingPdf}
+                                        onChange={event => {
+                                          const file = event.target.files?.[0]
+                                          if (file) void handlePdfFile(file)
+                                          event.currentTarget.value = ''
+                                        }}
+                                      />
+                                    </label>
+                                    <button className="btn btn-primary inline-flex items-center gap-2" onClick={handlePublish} disabled={publishingState.active || detail.orders.length === 0}>
+                                      <IconCheck className="w-4 h-4" /> <span>Publicar edición</span>
+                                    </button>
+                                  </div>
+                                )}
                               </div>
+                              {!isPdfCollapsed && !detail.edition.file_id && (
+                                <p className="text-sm text-slate-600">El consolidado se generará al publicar, después de preparar cada PDF individual. También puedes cargar uno manualmente.</p>
+                              )}
                               {!isPdfCollapsed && detail.edition.file_id && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-slate-50 flex items-center justify-between p-4">
@@ -441,23 +500,57 @@ export default function Ediciones() {
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                   <ul className="divide-y divide-slate-100 border rounded-lg bg-slate-50">
                                     {detail.orders.map(o => (
-                                      <li key={o.id} className="p-3 text-sm flex items-center justify-between hover:bg-white transition-colors">
-                                        <div>
+                                      <li key={o.id} className="p-3 text-sm flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-white transition-colors">
+                                        <div className="min-w-0">
                                           <div className="font-semibold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</div>
                                           <div className="text-slate-600 mt-0.5">{(o as any).company_name || o.name}</div>
+                                          <div className="mt-1 flex items-center gap-2 text-xs">
+                                            {o.publication_file_id ? (
+                                              <span className="text-emerald-700 font-medium">PDF individual listo · {o.publication_source === 'uploaded' ? 'carga manual' : 'generado'}</span>
+                                            ) : (
+                                              <span className="text-amber-700 font-medium">PDF individual pendiente</span>
+                                            )}
+                                            {o.publication_file_name && <span className="text-slate-500 truncate max-w-xs">{o.publication_file_name}</span>}
+                                          </div>
                                         </div>
-                                        {detail.edition.status === 'Borrador' && (
-                                        <button className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors" title="Quitar publicación de esta edición" onClick={async () => {
-                                          if (await confirmAction(`¿Quitar orden #${o.id} de esta edición?`, { title: 'Quitar publicación', danger: true })) {
-                                            const newOrders = detail.orders.filter(ord => ord.id !== o.id).map(ord => ord.id);
-                                            await setEditionOrders(selId!, newOrders);
-                                            const data = await getEdition(selId); setDetail(data);
-                                            load();
-                                          }
-                                        }}>
-                                          <IconTrash className="w-4 h-4" />
-                                        </button>
-                                      )}
+                                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                          {o.publication_file_url && (
+                                            <>
+                                              <a className="btn btn-outline text-xs px-3 py-1.5" href={o.publication_file_url} target="_blank" rel="noreferrer">Ver</a>
+                                              <a className="btn btn-outline text-xs px-3 py-1.5" href={`${o.publication_file_url}?download=1`} target="_blank" rel="noreferrer"><IconDownload className="w-3.5 h-3.5" /> Descargar</a>
+                                            </>
+                                          )}
+                                          {detail.edition.status === 'Borrador' && (
+                                            <>
+                                              <button className="btn btn-outline text-xs px-3 py-1.5" disabled={Boolean(orderPdfBusy[o.id])} onClick={() => void handlePrepareOrderPdf(o.id)}>
+                                                {orderPdfBusy[o.id] || (o.publication_file_id ? 'Regenerar' : 'Generar')}
+                                              </button>
+                                              <label className={`btn btn-outline text-xs px-3 py-1.5 cursor-pointer ${orderPdfBusy[o.id] ? 'opacity-60 pointer-events-none' : ''}`}>
+                                                <IconUpload className="w-3.5 h-3.5" /> {o.publication_file_id ? 'Reemplazar' : 'Cargar PDF'}
+                                                <input
+                                                  type="file"
+                                                  accept="application/pdf,.pdf"
+                                                  className="sr-only"
+                                                  disabled={Boolean(orderPdfBusy[o.id])}
+                                                  onChange={event => {
+                                                    const file = event.target.files?.[0]
+                                                    if (file) void handleOrderPdfFile(o.id, file)
+                                                    event.currentTarget.value = ''
+                                                  }}
+                                                />
+                                              </label>
+                                              <button className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors" title="Quitar publicación de esta edición" onClick={async () => {
+                                                if (await confirmAction(`¿Quitar orden #${o.id} de esta edición?`, { title: 'Quitar publicación', danger: true })) {
+                                                  const newOrders = detail.orders.filter(ord => ord.id !== o.id).map(ord => ord.id)
+                                                  await setEditionOrders(selId!, newOrders)
+                                                  await refreshDetail()
+                                                }
+                                              }}>
+                                                <IconTrash className="w-4 h-4" />
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
                                       </li>
                                     ))}
                                     {detail.orders.length === 0 && (

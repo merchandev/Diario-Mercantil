@@ -66,7 +66,7 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT l.*, COALESCE(e.code, l.edition_code) AS edition_code FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id LEFT JOIN editions e ON e.id=eo.edition_id AND e.deleted_at IS NULL WHERE l.deleted_at IS NULL";
+    $sql = "SELECT l.*, COALESCE(e.code, l.edition_code) AS edition_code, e.id AS edition_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id LEFT JOIN editions e ON e.id=eo.edition_id AND e.deleted_at IS NULL WHERE l.deleted_at IS NULL";
     $params = [];
     
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
@@ -128,7 +128,13 @@ class LegalController {
     $sql .= " ORDER BY l.id DESC LIMIT " . $limit;
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
-    Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+        $item['publication_file_url'] = !empty($item['publication_file_id']) && !empty($item['edition_id'])
+            ? '/api/editions/' . $item['edition_id'] . '/orders/' . $item['id'] . '/pdf'
+            : null;
+    }
+    Response::json(["items"=>$items]);
   }
 
 
@@ -136,7 +142,7 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare('SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id = l.id LEFT JOIN editions e ON e.id = eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL'); $s->execute([$id]);
+    $s = $pdo->prepare('SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id = l.id LEFT JOIN editions e ON e.id = eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL'); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
     
@@ -146,6 +152,9 @@ class LegalController {
         $r['edition_file_url'] = null;
     }
     unset($r['edition_file_id']);
+    $r['publication_file_url'] = !empty($r['publication_file_id']) && !empty($r['edition_id'])
+        ? '/api/editions/' . $r['edition_id'] . '/orders/' . $r['id'] . '/pdf'
+        : null;
     
     $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY date DESC'); $p->execute([$id]);
     $pay = $p->fetchAll(PDO::FETCH_ASSOC);

@@ -18,7 +18,14 @@ final class SettingSchema
         'instructions_documents_image_url' => ['type' => 'string'],
         'instructions_convocatorias_text' => ['type' => 'string'],
         'default_user_role' => ['type' => 'string'],
+        'raptor_mini_preview_enabled' => ['type' => 'boolean'],
     ];
+
+    /** @return list<string> */
+    public static function keys(): array
+    {
+        return array_keys(self::SCHEMA);
+    }
 
     public static function validate(string $key, mixed $value): mixed
     {
@@ -47,6 +54,16 @@ final class SettingSchema
                 throw new HttpException(400, 'invalid_setting_type', "Setting $key must be a string.");
             }
             return $value;
+        }
+
+        if ($rules['type'] === 'boolean') {
+            if (is_bool($value)) {
+                return $value ? '1' : '0';
+            }
+            if (in_array($value, [0, 1, '0', '1'], true)) {
+                return (string) $value;
+            }
+            throw new HttpException(400, 'invalid_setting_type', "Setting $key must be a boolean.");
         }
 
         return (string)$value;
