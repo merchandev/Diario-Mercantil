@@ -31,9 +31,6 @@ export default function Publicaciones() {
   const [qrModal, setQrModal] = useState<{ isOpen: boolean; url: string; title: string }>({ isOpen: false, url: '', title: '' })
 
   const reload = () => {
-    console.log('🔄 [Publicaciones Admin] Recargando lista de publicaciones...')
-    console.log('🔍 [Publicaciones Admin] Filtros:', { q, status, reqFrom, reqTo, pubFrom, pubTo })
-    console.log('🔑 [Publicaciones Admin] Fetching publicaciones...')
     setLoading(true)
     setError(null)
     const filters = {
@@ -45,24 +42,17 @@ export default function Publicaciones() {
       pub_from: pubFrom || undefined,
       pub_to: pubTo || undefined
     }
-    console.log('📤 [Publicaciones Admin] Enviando request con filtros:', filters)
     listLegal(filters)
       .then(r => {
-        console.log('✅ [Publicaciones Admin] Cargadas:', r.items.length, 'publicaciones')
-        console.log('📋 [Publicaciones Admin] Primeras 3:', r.items.slice(0, 3))
-        console.log('📋 [Publicaciones Admin] Todas:', r.items)
         setRows(r.items)
         setError(null)
       })
       .catch(err => {
-        console.error('❌ [Publicaciones Admin] Error:', err)
-        console.error('❌ [Publicaciones Admin] Error completo:', JSON.stringify(err, null, 2))
         setError(err.message || 'Error al cargar publicaciones')
         setRows([])
       })
       .finally(() => setLoading(false))
   }
-  useEffect(() => { reload() }, [])
   // Auto-recargar cuando cambien filtros (ligero debounce)
   useEffect(() => {
     const t = setTimeout(() => { reload() }, 400)

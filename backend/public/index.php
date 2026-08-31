@@ -159,6 +159,7 @@ $router->delete('/api/pages/{id}', [PagesController::class, 'delete'], $adminCsr
 $router->get('/api/stats', [SystemController::class, 'getStats'], $admin);
 $router->post('/api/stats/clear', [SystemController::class, 'clearStats'], $adminCsrf);
 $router->get('/api/rate/bcv', [RateController::class, 'bcv']);
+$router->post('/api/admin/rate/bcv/refresh', [RateController::class, 'refresh'], $adminCsrf);
 $router->get('/api/settings', [SystemController::class, 'getPublicSettings']);
 $router->post('/api/settings', [SystemController::class, 'saveSettings'], $adminCsrf);
 $router->get('/api/admin/settings', [SystemController::class, 'getSettings'], $admin);

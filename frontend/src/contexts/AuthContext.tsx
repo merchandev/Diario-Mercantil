@@ -37,16 +37,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const refreshUser = async () => {
         // Removed token check since we use HttpOnly cookies
-
-
         try {
-            console.log('🔐 [AuthProvider] Fetching user data...')
             const response = await apiMe()
-            console.log('✅ [AuthProvider] Usuario cargado:', response.user.name, 'Rol:', response.user.role)
             setUser(response.user)
             setError(null)
         } catch (err: any) {
-            console.error('❌ [AuthProvider] Error cargando usuario:', err)
             setError(err.message || 'Error loading user')
             setUser(null)
         } finally {
@@ -55,7 +50,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     const clearAuth = () => {
-        console.log('🔐 [AuthProvider] Clearing authentication')
         setUser(null)
         setError(null)
         setLoading(false)

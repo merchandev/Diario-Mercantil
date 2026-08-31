@@ -16,9 +16,16 @@ class RateController {
   }
 
   public function bcv(){
+    return $this->respond(false);
+  }
+
+  public function refresh(){
+    return $this->respond(true);
+  }
+
+  private function respond(bool $force){
     try {
         $pdo = Database::pdo();
-        $force = isset($_GET['force']) && $_GET['force'] === '1';
         $data = BcvScraper::getRates($force);
 
         // Optional fallback provider when BCV markup doesn't expose numbers
@@ -71,7 +78,7 @@ class RateController {
         return Response::json($resp);
     } catch (\Throwable $e) {
         error_log('[RateController] Critical Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-        return Response::json(['error' => 'server_error', 'message' => $e->getMessage()], 500);
+        return Response::json(['error' => 'server_error', 'message' => 'No se pudo obtener la tasa BCV.'], 500);
     }
   }
 

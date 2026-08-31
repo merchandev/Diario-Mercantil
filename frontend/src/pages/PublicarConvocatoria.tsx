@@ -29,7 +29,6 @@ export default function PublicarConvocatoria() {
     listLegal({ status: 'Borrador', pub_type: 'Convocatoria', limit: 1 }).then(res => {
       if (res && res.items && res.items.length > 0) {
         const draft = res.items[0]
-        console.log('📝 Resuming draft:', draft.id)
         setRequestId(draft.id)
         if (draft.meta) {
           setF1((prev: any) => ({ ...prev, ...draft.meta }))

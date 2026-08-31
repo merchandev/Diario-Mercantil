@@ -126,10 +126,9 @@ export async function logout() {
   return res.json()
 }
 
-// Live BCV rate (public endpoint)
-export async function getBcvRate(opts?: { force?: boolean }) {
+// Live BCV rate (public endpoint, always cache-aware)
+export async function getBcvRate() {
   const url = new URL('/api/rate/bcv', API_BASE || window.location.origin)
-  if (opts?.force) url.searchParams.set('force', '1')
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error(await res.text())
   // Backward compatible shape, extended with usd/eur/date fields
@@ -145,7 +144,8 @@ export async function getBcvRate(opts?: { force?: boolean }) {
 }
 
 export async function forceRefreshBcv() {
-  return getBcvRate({ force: true })
+  const res = await fetchAuth('/api/admin/rate/bcv/refresh', { method: 'POST' })
+  return res.json() as ReturnType<typeof getBcvRate>
 }
 
 export async function listFiles(params?: { q?: string; status?: string }) {
@@ -412,12 +412,13 @@ export type LegalPayment = {
   mobile_phone?: string;
   document?: string;
 }
-export async function listLegal(params?: { q?: string; status?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string; limit?: number; pub_type?: string; user_id?: number | string }) {
+export async function listLegal(params?: { q?: string; status?: string; edition_code?: string; req_from?: string; req_to?: string; pub_from?: string; pub_to?: string; limit?: number; pub_type?: string; user_id?: number | string }) {
   // Clean up undefined values - don't send them as "undefined" string
   const cleanParams: Record<string, string> = {}
   if (params) {
     if (params.q) cleanParams.q = params.q
     if (params.status) cleanParams.status = params.status
+    if (params.edition_code) cleanParams.edition_code = params.edition_code
     if (params.req_from && params.req_from !== 'undefined') cleanParams.req_from = params.req_from
     if (params.req_to && params.req_to !== 'undefined') cleanParams.req_to = params.req_to
     if (params.pub_from && params.pub_from !== 'undefined') cleanParams.pub_from = params.pub_from
@@ -429,13 +430,8 @@ export async function listLegal(params?: { q?: string; status?: string; req_from
 
   const qs = new URLSearchParams(cleanParams)
   const url = `/api/legal${qs.toString() ? '?' + qs.toString() : ''}`
-  console.log('🌐 [API] listLegal request URL:', url)
-  console.log('🌐 [API] listLegal params:', cleanParams)
   const res = await fetchAuth(url)
-  console.log('🌐 [API] listLegal response status:', res.status)
-  const data = await res.json() as { items: LegalRequest[] }
-  console.log('🌐 [API] listLegal response data:', data)
-  return data
+  return res.json() as Promise<{ items: LegalRequest[] }>
 }
 export async function createLegal(body: Partial<LegalRequest>) {
   const res = await fetchAuth('/api/legal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })

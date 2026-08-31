@@ -12,16 +12,13 @@ export default function RequireAdmin({ children }: { children: JSX.Element }) {
   }
 
   if (!user) {
-    console.log('🔄 [RequireAdmin] No autenticado. Redirigiendo a login')
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   if (!isAdminRole(user?.role)) {
-    console.warn('⚠️ [RequireAdmin] Acceso denegado. Rol:', user?.role, 'Redirigiendo a /solicitante/historial')
     return <Navigate to="/solicitante/historial" state={{ from: location }} replace />
   }
 
-  console.log('✅ [RequireAdmin] Acceso concedido. Usuario:', user?.name, 'Rol:', user?.role)
   return (
     <>
       <SEO title="Dashboard de Cargas | Diario Mercantil" description="Sistema interno" noindex={true} />

@@ -1,10 +1,4 @@
-// Simple global logging hooks to help diagnose blank screen issues
-
-// eslint-disable-next-line no-console
-console.log('[App] Booting...', {
-  location: window.location.href,
-  env: import.meta.env?.MODE,
-})
+// Global error hooks to help diagnose runtime failures without logging user data.
 
 window.addEventListener('error', (e)=>{
   // eslint-disable-next-line no-console

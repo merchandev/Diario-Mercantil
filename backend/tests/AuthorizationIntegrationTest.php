@@ -20,7 +20,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, document TEXT NOT NULL, email TEXT, phone TEXT, password_hash TEXT, status TEXT, person_type TEXT DEFAULT 'natural', state TEXT, municipality TEXT, address TEXT, created_at DATETIME, updated_at DATETIME)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
         $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, UNIQUE(publication_year, edition_no))");
-        $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT)");
+        $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT, pub_type TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, publication_file_id INTEGER, publication_file_name TEXT, publication_checksum TEXT, publication_source TEXT, publication_prepared_at TEXT, publication_updated_at TEXT, PRIMARY KEY(edition_id, legal_request_id))");
@@ -144,6 +144,30 @@ class AuthorizationIntegrationTest extends TestCase {
     public function testStatsAsSolicitanteIs403() {
         $res = $this->request('GET', '/api/stats', 'user_session_test');
         $this->assertEquals(403, $res['code']);
+    }
+
+    public function testForcedBcvRefreshRequiresAdmin(): void {
+        $withoutSession = $this->request('POST', '/api/admin/rate/bcv/refresh');
+        $this->assertSame(401, $withoutSession['code']);
+
+        $asApplicant = $this->request('POST', '/api/admin/rate/bcv/refresh', 'user_session_test');
+        $this->assertSame(403, $asApplicant['code']);
+    }
+
+    public function testLegalListFiltersPublicationTypeAndPartialEditionCode(): void {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,pub_type,created_at) VALUES(160,2,'Publicada',100,'Documento filtrable','2026-08-30','Documento','2026-08-30 10:00:00')");
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,pub_type,created_at) VALUES(161,2,'Borrador',100,'Convocatoria filtrable','2026-08-30','Convocatoria','2026-08-30 11:00:00')");
+        $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(60,'MMXXVI-0060','Publicada','2026-08-30',0,1,'2026-08-30',2026,NULL)");
+        $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(60,160)");
+
+        $byType = $this->request('GET', '/api/legal?pub_type=Convocatoria', 'admin_session_test');
+        $this->assertSame(200, $byType['code'], json_encode($byType['body']));
+        $this->assertSame([161], array_map('intval', array_column($byType['body']['items'] ?? [], 'id')));
+
+        $byEdition = $this->request('GET', '/api/legal?edition_code=0060', 'admin_session_test');
+        $this->assertSame(200, $byEdition['code'], json_encode($byEdition['body']));
+        $this->assertSame([160], array_map('intval', array_column($byEdition['body']['items'] ?? [], 'id')));
     }
 
     public function testSQLiteEditionCounterCreatesConsecutiveRomanCodes() {

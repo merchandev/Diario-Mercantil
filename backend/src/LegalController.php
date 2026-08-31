@@ -88,11 +88,17 @@ class LegalController {
         $sql .= " AND l.status = ?";
         $params[] = $status;
     }
+
+    $pubType = $_GET['pub_type'] ?? '';
+    if ($pubType !== '') {
+        $sql .= " AND l.pub_type = ?";
+        $params[] = $pubType;
+    }
     
     $editionCode = $_GET['edition_code'] ?? '';
     if ($editionCode !== '') {
-        $sql .= " AND e.code = ?";
-        $params[] = $editionCode;
+        $sql .= " AND e.code LIKE ?";
+        $params[] = "%$editionCode%";
     }
     
     $userIdFilter = $_GET['user_id'] ?? '';

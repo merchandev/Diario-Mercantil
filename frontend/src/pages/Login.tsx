@@ -43,18 +43,12 @@ export default function Login() {
       await refreshUser()
 
       // Redirect based on role
-      console.log('🚀 Redirigiendo basado en rol:', user.role)
-
       if (isSolicitanteRole(user.role)) {
-        console.log('➡️ Navegando a /solicitante/historial')
         navigate('/solicitante/historial')
       } else {
-        console.log('➡️ Navegando a /dashboard')
         navigate('/dashboard')
       }
     } catch (err: any) {
-      console.error('❌ Error en login:', err)
-      console.error('❌ Error en login:', err)
       setError(err?.message || 'Error al iniciar sesión')
     } finally {
       setLoading(false)

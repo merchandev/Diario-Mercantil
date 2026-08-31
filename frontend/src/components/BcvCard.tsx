@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { getBcvRate } from '../lib/api'
+import { forceRefreshBcv, getBcvRate } from '../lib/api'
 
 export default function BcvCard(){
   const [usd, setUsd] = useState<number|null>(null)
@@ -12,7 +12,7 @@ export default function BcvCard(){
   const load = async (force=false)=>{
     try{
       setLoading(true)
-      const r = await getBcvRate({force})
+      const r = force ? await forceRefreshBcv() : await getBcvRate()
       const u = (typeof r.usd?.value === 'number' && isFinite(r.usd.value)) ? r.usd.value : null
       const e = (typeof r.eur?.value === 'number' && isFinite(r.eur.value)) ? r.eur.value : null
       setUsd(u)
