@@ -128,8 +128,8 @@ export default function Publicaciones() {
   const handleDelete = async (id: number) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Mover a papelera',
-      message: '¿Mover esta publicación a la papelera?\n\nSerá eliminada automáticamente después de 30 días.',
+      title: 'Eliminar publicación definitivamente',
+      message: 'Esta acción borrará permanentemente la publicación, sus pagos y archivos. Si pertenece a una edición, esa edición también se eliminará para impedir que el documento siga disponible. ¿Deseas continuar?',
       variant: 'warning',
       onConfirm: async () => {
         try {
@@ -231,9 +231,7 @@ export default function Publicaciones() {
                         <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true }); if (reason === null) return; await rejectLegal(r.id, reason); reload() }}><IconClose /> <span>Rechazar</span></button>
                       )}
                       <button className="text-emerald-700 hover:underline inline-flex items-center gap-1" onClick={() => download(r.id)}><IconDownload /> <span>Descargar</span></button>
-                      {r.status !== 'Publicada' && (
-                        <button className="text-red-700 hover:underline inline-flex items-center gap-1" onClick={() => handleDelete(r.id)}><IconTrash /> <span>Eliminar</span></button>
-                      )}
+                      <button className="text-red-700 hover:underline inline-flex items-center gap-1" onClick={() => handleDelete(r.id)}><IconTrash /> <span>Eliminar</span></button>
                     </div>
                   </td>
                 </tr>

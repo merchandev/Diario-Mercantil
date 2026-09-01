@@ -350,8 +350,8 @@ export default function Ediciones() {
                         }}>
                           {selId === r.id && !isDetailsCollapsed ? <><IconClose className="w-4 h-4" /> <span>Minimizar</span></> : <><IconEdit className="w-4 h-4" /> <span>Ver detalles</span></>}
                         </button>
-                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: r.status === 'Publicada' ? 'Retirar edición' : 'Eliminar borrador', message: r.status === 'Publicada' ? 'La edición dejará de ser pública y sus solicitudes volverán a En trámite para poder corregirlas o publicarlas de nuevo. ¿Deseas continuar?' : '¿Seguro de eliminar este borrador?', onConfirm: async () => { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; load() } })}>
-                          <IconTrash className="w-4 h-4" /> <span>{r.status === 'Publicada' ? 'Retirar' : 'Eliminar'}</span>
+                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar edición definitivamente', message: 'Se borrarán la edición, su PDF consolidado y los PDF individuales generados. Las publicaciones incluidas volverán a En trámite. Esta acción no se puede deshacer. ¿Deseas continuar?', onConfirm: async () => { try { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' }) } } })}>
+                          <IconTrash className="w-4 h-4" /> <span>Eliminar</span>
                         </button>
                       </div>
                     </td>
@@ -707,7 +707,7 @@ export default function Ediciones() {
         <div className="card overflow-hidden border border-amber-200">
           <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
             <h2 className="font-semibold text-amber-900">Ediciones retiradas</h2>
-            <p className="text-xs text-amber-800 mt-1">Se conserva el historial. Restaurar vuelve a publicar la edición solo si sus solicitudes no pertenecen a otra edición activa.</p>
+            <p className="text-xs text-amber-800 mt-1">Puedes restaurarlas o eliminarlas definitivamente junto con sus archivos generados.</p>
           </div>
           <div className="divide-y divide-slate-100">
             {retiredRows.map(edition => (
@@ -716,20 +716,35 @@ export default function Ediciones() {
                   <div className="font-mono font-semibold text-slate-800">{edition.code}</div>
                   <div className="text-xs text-slate-500">Fecha {edition.date} · retirada {edition.deleted_at || ''}</div>
                 </div>
-                <button className="btn btn-outline" onClick={() => setConfirmDialog({
-                  isOpen: true,
-                  title: 'Restaurar edición',
-                  message: `¿Volver a publicar la edición ${edition.code}?`,
-                  onConfirm: async () => {
-                    try {
-                      await restoreEdition(edition.id)
-                      await load()
-                      setAlertDialog({ isOpen: true, title: 'Edición restaurada', message: 'La edición y sus solicitudes vuelven a estar publicadas.', variant: 'success' })
-                    } catch (error) {
-                      setAlertDialog({ isOpen: true, title: 'No se pudo restaurar', message: error instanceof Error ? error.message : 'Error al restaurar la edición.', variant: 'error' })
+                <div className="flex items-center gap-2">
+                  <button className="btn btn-outline" onClick={() => setConfirmDialog({
+                    isOpen: true,
+                    title: 'Restaurar edición',
+                    message: `¿Volver a publicar la edición ${edition.code}?`,
+                    onConfirm: async () => {
+                      try {
+                        await restoreEdition(edition.id)
+                        await load()
+                        setAlertDialog({ isOpen: true, title: 'Edición restaurada', message: 'La edición y sus solicitudes vuelven a estar publicadas.', variant: 'success' })
+                      } catch (error) {
+                        setAlertDialog({ isOpen: true, title: 'No se pudo restaurar', message: error instanceof Error ? error.message : 'Error al restaurar la edición.', variant: 'error' })
+                      }
                     }
-                  }
-                })}>Restaurar</button>
+                  })}>Restaurar</button>
+                  <button className="btn btn-danger" onClick={() => setConfirmDialog({
+                    isOpen: true,
+                    title: 'Eliminar edición definitivamente',
+                    message: `¿Eliminar permanentemente la edición ${edition.code} y todos sus archivos generados?`,
+                    onConfirm: async () => {
+                      try {
+                        await deleteEdition(edition.id)
+                        await load()
+                      } catch (error) {
+                        setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' })
+                      }
+                    }
+                  })}>Eliminar</button>
+                </div>
               </div>
             ))}
           </div>

@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
+require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Http/StoragePath.php';
 
 class EditionController {
@@ -425,44 +426,18 @@ class EditionController {
 
   public function delete($id){
     $u = $this->requireAdmin();
-    $pdo = Database::pdo();
-
     try {
-      $pdo->beginTransaction();
-      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
-      $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL' . $lock);
-      $s->execute([$id]);
-      $status = $s->fetchColumn();
-      if (!$status) throw new RuntimeException('Edición no encontrada.', 404);
-
-      if ($status === 'Publicada') {
-        // A published edition is retired, never destroyed. Its requests return to the
-        // publication queue so they can be corrected and included in a new edition.
-        $pdo->prepare('UPDATE editions SET deleted_at=CURRENT_TIMESTAMP WHERE id=?')->execute([$id]);
-        $pdo->prepare(
-          "UPDATE legal_requests SET status='En trámite',publish_date=NULL,edition_code=NULL "
-          . "WHERE status='Publicada' AND id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?) "
-          . 'AND NOT EXISTS (SELECT 1 FROM edition_orders active_eo '
-          . 'JOIN editions active_e ON active_e.id=active_eo.edition_id '
-          . 'WHERE active_eo.legal_request_id=legal_requests.id AND active_e.deleted_at IS NULL)'
-        )->execute([$id]);
-        $action = 'retire_edition';
-      } else {
-        $pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$id]);
-        $pdo->prepare('DELETE FROM editions WHERE id=?')->execute([$id]);
-        $action = 'delete_edition';
-      }
-
-      $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
-          ->execute([$u['id'], $action, 'edition', $id]);
-      $pdo->commit();
-      Response::json(['ok'=>true, 'retired'=>$status === 'Publicada']);
+      $result = (new PermanentDeletionService(Database::pdo()))
+        ->deleteEdition((int)$id, (int)$u['id']);
+      Response::json($result);
     } catch (Throwable $e) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
-      error_log('[edition.retire] ' . get_class($e) . ': ' . $e->getMessage());
+      error_log('[edition.force-delete] ' . get_class($e) . ': ' . $e->getMessage());
       $code = (int)$e->getCode();
       if ($code < 400 || $code > 599) $code = 500;
-      Response::json(['error'=>$e->getMessage() ?: 'No se pudo retirar la edición.'], $code);
+      Response::json([
+        'error'=>'force_delete_failed',
+        'message'=>$e->getMessage() ?: 'No se pudo eliminar definitivamente la edición.',
+      ], $code);
     }
   }
 

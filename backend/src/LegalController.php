@@ -11,6 +11,7 @@ require_once __DIR__.'/PublicLegalRequestView.php';
 require_once __DIR__.'/Http/IdempotencyService.php';
 require_once __DIR__.'/Services/PdfInspector.php';
 require_once __DIR__.'/Services/DocumentUploadService.php';
+require_once __DIR__.'/Services/PermanentDeletionService.php';
 
 class LegalController {
   
@@ -364,14 +365,31 @@ class LegalController {
   public function softDelete($id){
      $u = AuthController::requireAuth();
      $this->checkAccess($id, $u);
-     $this->ensureMutable($id);
-     
      $pdo = Database::pdo();
+
+     // Administrators requested a real deletion from the Publications screen.
+     // This also invalidates any edition that contains the publication, removes
+     // dependent rows and cleans orphaned PDFs.
+     if (RolePolicy::canManageLegalRequests($u)) {
+         try {
+             $result = (new PermanentDeletionService($pdo))->deleteLegalRequest((int)$id, (int)$u['id']);
+             return Response::json($result);
+         } catch (Throwable $e) {
+             error_log('[legal.force-delete] ' . get_class($e) . ': ' . $e->getMessage());
+             $code = (int)$e->getCode();
+             if ($code < 400 || $code > 599) $code = 500;
+             return Response::json([
+                 'error'=>'force_delete_failed',
+                 'message'=>$e->getMessage() ?: 'No se pudo eliminar definitivamente la publicación.',
+             ], $code);
+         }
+     }
+
+     $this->ensureMutable($id);
      $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
      $currStatus = $s->fetchColumn();
      
-     $isAdmin = RolePolicy::canManageLegalRequests($u);
-     if (!$isAdmin && $currStatus !== 'Borrador') {
+     if ($currStatus !== 'Borrador') {
          return Response::json(['error'=>'Solo puedes eliminar solicitudes en Borrador'], 403);
      }
      
@@ -401,19 +419,36 @@ class LegalController {
   public function permanentDelete($id){
     $u = AuthController::requireAuth();
     $this->requireAdmin($u);
-    // Should NOT permanent delete if Published, though they shouldn't even be soft deleted.
-    $this->ensureMutable($id);
-    Database::pdo()->prepare('DELETE FROM legal_requests WHERE id=?')->execute([$id]);
-    Response::json(['ok'=>true]);
+    try {
+      $result = (new PermanentDeletionService(Database::pdo()))
+        ->deleteLegalRequest((int)$id, (int)$u['id']);
+      Response::json($result);
+    } catch (Throwable $e) {
+      error_log('[legal.trash.force-delete] ' . get_class($e) . ': ' . $e->getMessage());
+      $code = (int)$e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      Response::json(['error'=>'force_delete_failed', 'message'=>$e->getMessage()], $code);
+    }
   }
 
   public function emptyTrash(){
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
      $pdo = Database::pdo();
-     // Do not empty if status is Publicada (just in case they were soft deleted before the fix)
-     $pdo->prepare("DELETE FROM legal_requests WHERE deleted_at IS NOT NULL AND status != 'Publicada'")->execute();
-     Response::json(["ok"=>true]);
+     $ids = $pdo->query("SELECT id FROM legal_requests WHERE deleted_at IS NOT NULL")
+       ->fetchAll(PDO::FETCH_COLUMN);
+     $deleted = 0;
+     $failures = [];
+     foreach ($ids as $requestId) {
+       try {
+         (new PermanentDeletionService($pdo))->deleteLegalRequest((int)$requestId, (int)$u['id']);
+         $deleted++;
+       } catch (Throwable $e) {
+         $failures[] = ['id'=>(int)$requestId, 'message'=>$e->getMessage()];
+       }
+     }
+     $status = $failures ? 207 : 200;
+     Response::json(["ok"=>!$failures, "deleted"=>$deleted, "failures"=>$failures], $status);
   }
 
   public function addPayment($id){

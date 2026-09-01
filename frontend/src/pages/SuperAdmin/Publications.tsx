@@ -107,13 +107,17 @@ export default function Publications() {
     async function handleDelete(id: number) {
         setConfirmDialog({
             isOpen: true,
-            title: 'Mover a Papelera',
-            message: '¿Mover esta solicitud a la papelera?\n\nSerá eliminada automáticamente después de 30 días.',
+            title: 'Eliminar publicación definitivamente',
+            message: 'Esta acción borrará permanentemente la publicación, sus pagos y archivos. Si pertenece a una edición, esa edición también se eliminará para impedir que el documento siga disponible. ¿Deseas continuar?',
             variant: 'warning',
             onConfirm: async () => {
-                await deleteLegal(id)
-                loadSubmissions()
-                setSelected(null)
+                try {
+                    await deleteLegal(id)
+                    await loadSubmissions()
+                    setSelected(null)
+                } catch (error) {
+                    void showAlert(error instanceof Error ? error.message : 'No se pudo eliminar la publicación.', { title: 'Error' })
+                }
             }
         })
     }
@@ -347,15 +351,13 @@ export default function Publications() {
                                                 </button>
                                             )}
 
-                                            {sub.status !== 'Publicada' && (
-                                                <button
-                                                    onClick={() => handleDelete(sub.id)}
-                                                    className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
-                                                    title="Eliminar"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            )}
+                                            <button
+                                                onClick={() => handleDelete(sub.id)}
+                                                className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
+                                                title="Eliminar definitivamente"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -597,7 +599,7 @@ export default function Publications() {
                                         className="w-full px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm flex items-center justify-center gap-2 transition-colors"
                                     >
                                         <Trash2 className="w-4 h-4" />
-                                        Mover a Papelera
+                                        Eliminar definitivamente
                                     </button>
                                 </div>
                             </div>

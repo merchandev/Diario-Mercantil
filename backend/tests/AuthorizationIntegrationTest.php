@@ -299,16 +299,17 @@ class AuthorizationIntegrationTest extends TestCase {
         )->fetchColumn());
     }
 
-    public function testRetiringEditionRequeuesRequestsAndRemovesStaleDownloadLink(): void {
+    public function testDeletingEditionIsPermanentAndRequeuesRequests(): void {
         $pdo = Database::pdo();
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,order_no,date,edition_code,publish_date) VALUES(150,2,'Publicada',100,'Publicada retirada','ORD-150','2026-08-30','MMXXVI-0050','2026-08-30')");
         $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(50,'MMXXVI-0050','Publicada','2026-08-30',50,1,'2026-08-30',2026,NULL)");
         $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(50,150)");
 
-        $retired = $this->request('DELETE', '/api/editions/50', 'admin_session_test');
-        $this->assertSame(200, $retired['code'], json_encode($retired['body']));
-        $this->assertTrue((bool)($retired['body']['retired'] ?? false));
-        $this->assertNotNull($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
+        $deleted = $this->request('DELETE', '/api/editions/50', 'admin_session_test');
+        $this->assertSame(200, $deleted['code'], json_encode($deleted['body']));
+        $this->assertTrue((bool)($deleted['body']['deleted'] ?? false));
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM editions WHERE id=50')->fetchColumn());
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE edition_id=50')->fetchColumn());
         $this->assertSame('En trámite', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
 
         $detail = $this->request('GET', '/api/legal/150', 'admin_session_test');
@@ -317,9 +318,22 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertEmpty($detail['body']['item']['edition_file_url'] ?? null);
 
         $restored = $this->request('POST', '/api/editions/50/restore', 'admin_session_test');
-        $this->assertSame(200, $restored['code'], json_encode($restored['body']));
-        $this->assertSame('Publicada', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
-        $this->assertNull($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
+        $this->assertSame(404, $restored['code'], json_encode($restored['body']));
+    }
+
+    public function testAdminCanPermanentlyDeletePublishedRequestAndItsEdition(): void {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,order_no,date,edition_code,publish_date) VALUES(151,2,'Publicada',100,'Publicación a borrar','ORD-151','2026-08-31','MMXXVI-0051','2026-08-31')");
+        $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(51,'MMXXVI-0051','Publicada','2026-08-31',51,1,'2026-08-31',2026,NULL)");
+        $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(51,151)");
+
+        $deleted = $this->request('DELETE', '/api/legal/151', 'admin_session_test');
+
+        $this->assertSame(200, $deleted['code'], json_encode($deleted['body']));
+        $this->assertTrue((bool)($deleted['body']['deleted'] ?? false));
+        $this->assertSame(1, (int)($deleted['body']['deleted_editions'] ?? 0));
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM legal_requests WHERE id=151')->fetchColumn());
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM editions WHERE id=51')->fetchColumn());
     }
 
     public function testAdminCannotReportMoreThanRemainingAndCanVerifyOnePayment() {
