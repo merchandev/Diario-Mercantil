@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getBcvRate, listPagesPublic, logout } from '../lib/api'
+import { getBcvRate, getSettings, listPagesPublic, logout } from '../lib/api'
 import { useAuth } from '../hooks/useAuth'
 import { isAdminRole } from '../lib/roleUtils'
 import { IconUserCircle, IconLogout, IconHome, IconMenu, IconX } from './icons'
@@ -8,16 +8,21 @@ import { IconUserCircle, IconLogout, IconHome, IconMenu, IconX } from './icons'
 function HeroSlider() {
   const [banner, setBanner] = useState<string | undefined>(undefined);
   useEffect(() => {
-    import('../lib/api').then(({ getSettings }) => {
-      getSettings().then(r => setBanner(r.settings?.banner_main_1));
-    });
+    getSettings()
+      .then(r => {
+        const settings = r.settings as Record<string, unknown>
+        const hasDedicatedHeader = Object.prototype.hasOwnProperty.call(settings, 'banner_header_global')
+        const value = hasDedicatedHeader ? settings.banner_header_global : settings.banner_main_1
+        setBanner(typeof value === 'string' && value.trim() ? value : undefined)
+      })
+      .catch(() => setBanner(undefined))
   }, []);
   
   if (!banner) return null;
   
   return (
     <div className="relative w-full h-28 md:h-32 bg-slate-100 overflow-hidden">
-      <img src={banner} className="w-full h-full object-cover" alt="Banner Principal" />
+      <img src={banner} className="w-full h-full object-cover" alt="Publicidad del Diario Mercantil" />
     </div>
   )
 }

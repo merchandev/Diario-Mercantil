@@ -3,10 +3,9 @@ require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/UploadController.php';
 require_once __DIR__."/Http/StoragePath.php";
+require_once __DIR__."/Http/SettingSchema.php";
 
 class FileController {
-  private const PUBLIC_MEDIA_SETTINGS = ['banner_main_1', 'banner_sidebar', 'promo_popup'];
-
   private function requireAdmin() {
       require_once __DIR__.'/AuthController.php';
       $u = AuthController::requireAuth();
@@ -195,10 +194,11 @@ class FileController {
   }
 
   private function publicSettingReferences(PDO $pdo, int $fileId): array {
-    $placeholders = implode(',', array_fill(0, count(self::PUBLIC_MEDIA_SETTINGS), '?'));
+    $bannerKeys = SettingSchema::bannerKeys();
+    $placeholders = implode(',', array_fill(0, count($bannerKeys), '?'));
     $sql = "SELECT `key`, value FROM settings WHERE `key` IN ($placeholders)";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute(self::PUBLIC_MEDIA_SETTINGS);
+    $stmt->execute($bannerKeys);
 
     $references = [];
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {

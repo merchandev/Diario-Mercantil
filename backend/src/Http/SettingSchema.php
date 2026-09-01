@@ -11,9 +11,13 @@ final class SettingSchema
         'app_name' => ['type' => 'string'],
         'convocatoria_usd' => ['type' => 'float', 'min' => 0.0],
         'unit_tax_bs' => ['type' => 'float', 'min' => 0.0],
+        'banner_header_global' => ['type' => 'string'],
         'banner_main_1' => ['type' => 'string'],
         'banner_sidebar' => ['type' => 'string'],
         'promo_popup' => ['type' => 'string'],
+        'banner_history_1' => ['type' => 'string'],
+        'banner_history_2' => ['type' => 'string'],
+        'banner_history_3' => ['type' => 'string'],
         'instructions_documents_text' => ['type' => 'string'],
         'instructions_documents_image_url' => ['type' => 'string'],
         'instructions_convocatorias_text' => ['type' => 'string'],
@@ -25,6 +29,41 @@ final class SettingSchema
     public static function keys(): array
     {
         return array_keys(self::SCHEMA);
+    }
+
+    /** @return list<string> */
+    public static function bannerKeys(): array
+    {
+        return [
+            'banner_header_global',
+            'banner_main_1',
+            'banner_sidebar',
+            'promo_popup',
+            'banner_history_1',
+            'banner_history_2',
+            'banner_history_3',
+        ];
+    }
+
+    /** @return list<string> */
+    public static function publicKeys(): array
+    {
+        return [
+            'bcv_rate',
+            'price_per_folio_usd',
+            'convocatoria_usd',
+            'iva_percent',
+            'unit_tax_bs',
+            'instructions_documents_text',
+            'instructions_documents_image_url',
+            'instructions_convocatorias_text',
+            ...self::bannerKeys(),
+        ];
+    }
+
+    public static function isBannerKey(string $key): bool
+    {
+        return in_array($key, self::bannerKeys(), true);
     }
 
     public static function validate(string $key, mixed $value): mixed

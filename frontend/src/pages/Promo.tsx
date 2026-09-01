@@ -5,12 +5,84 @@ import { IconImage, IconX, IconCheck } from '../components/icons'
 import { LoadingSpinner } from '../components/LoadingSpinner'
 import { useDialog } from '../contexts/DialogContext'
 
-// Define the keys we care about
-const BANNER_KEYS = {
-    'banner_main_1': { label: 'Banner Principal (Inicio)', description: 'Aparece en la parte superior de la página de inicio. Tamaño recomendado: 1200x400px.' },
-    'banner_sidebar': { label: 'Banner Lateral', description: 'Aparece en la barra lateral de las páginas interiores. Tamaño recomendado: 300x600px.' },
-    'promo_popup': { label: 'Pop-up Promocional', description: 'Aparece como ventana emergente al entrar al sitio. Tamaño recomendado: 800x600px.' },
+type BannerKey =
+    | 'banner_header_global'
+    | 'banner_main_1'
+    | 'banner_sidebar'
+    | 'promo_popup'
+    | 'banner_history_1'
+    | 'banner_history_2'
+    | 'banner_history_3'
+
+type BannerSlot = {
+    key: BannerKey
+    label: string
+    description: string
+    previewClass: string
 }
+
+type BannerPage = {
+    id: string
+    label: string
+    route: string
+    description: string
+    slots: BannerSlot[]
+}
+
+export const BANNER_PAGES: BannerPage[] = [
+    {
+        id: 'global',
+        label: 'Todas las páginas públicas',
+        route: 'Encabezado global',
+        description: 'Este espacio aparece debajo de la navegación en todo el sitio público.',
+        slots: [
+            {
+                key: 'banner_header_global',
+                label: 'Banner del encabezado',
+                description: 'Formato horizontal recomendado: 1200 × 180 px.',
+                previewClass: 'aspect-[20/3]',
+            },
+        ],
+    },
+    {
+        id: 'home',
+        label: 'Página de Inicio',
+        route: '/',
+        description: 'Promociones exclusivas de la portada pública.',
+        slots: [
+            {
+                key: 'banner_main_1',
+                label: 'Banner principal',
+                description: 'Franja destacada al inicio del contenido. Recomendado: 1200 × 400 px.',
+                previewClass: 'aspect-[16/5]',
+            },
+            {
+                key: 'banner_sidebar',
+                label: 'Banner lateral',
+                description: 'Anuncio vertical junto a la edición destacada. Recomendado: 300 × 600 px.',
+                previewClass: 'aspect-[3/5]',
+            },
+            {
+                key: 'promo_popup',
+                label: 'Pop-up promocional',
+                description: 'Ventana emergente al entrar a Inicio. Recomendado: 800 × 600 px.',
+                previewClass: 'aspect-[4/3]',
+            },
+        ],
+    },
+    {
+        id: 'history',
+        label: 'Mis publicaciones',
+        route: '/solicitante/historial',
+        description: 'Imágenes que rotan en el carrusel superior del historial del solicitante.',
+        slots: [1, 2, 3].map((position): BannerSlot => ({
+            key: `banner_history_${position}` as BannerKey,
+            label: `Carrusel · posición ${position}`,
+            description: 'Formato horizontal recomendado: 1200 × 320 px.',
+            previewClass: 'aspect-[15/4]',
+        })),
+    },
+]
 
 export default function Promo() {
     const { showAlert, confirmAction } = useDialog()
@@ -20,7 +92,7 @@ export default function Promo() {
 
     // Modal state
     const [modalOpen, setModalOpen] = useState(false)
-    const [currentKey, setCurrentKey] = useState<string | null>(null)
+    const [currentKey, setCurrentKey] = useState<BannerKey | null>(null)
 
     const API_URL = import.meta.env.VITE_BACKEND_URL || ''
 
@@ -64,12 +136,12 @@ export default function Promo() {
         }
     }
 
-    const openModal = (key: string) => {
+    const openModal = (key: BannerKey) => {
         setCurrentKey(key)
         setModalOpen(true)
     }
 
-    const clearImage = async (key: string) => {
+    const clearImage = async (key: BannerKey) => {
         if (!(await confirmAction('¿Quitar esta imagen?', { title: 'Quitar banner', danger: true }))) return
         const previousSettings = settings
         const newSettings = { ...settings, [key]: '' } as Partial<Settings & Record<string, string>>
@@ -86,58 +158,69 @@ export default function Promo() {
         }
     }
 
+    const valueFor = (key: BannerKey): string => {
+        if (key === 'banner_header_global' && !Object.prototype.hasOwnProperty.call(settings, key)) {
+            return String(settings.banner_main_1 || '')
+        }
+        return String(settings[key] || '')
+    }
+
     return (
         <div className="space-y-6">
             <div>
                 <h1 className="text-xl font-semibold">Promociones y Banners</h1>
-                <p className="text-sm text-slate-600">Configura las imágenes destacadas del sitio.</p>
+                <p className="text-sm text-slate-600">Configura todos los espacios publicitarios, organizados por la página donde aparecen.</p>
             </div>
 
-            <div className="grid gap-6">
-                {Object.entries(BANNER_KEYS).map(([key, info]) => (
-                    <div key={key} className="card p-6 flex flex-col md:flex-row gap-6 items-start">
-                        <div className="flex-1">
-                            <h3 className="text-lg font-medium text-brand-900 mb-1">{info.label}</h3>
-                            <p className="text-sm text-slate-500 mb-4">{info.description}</p>
-
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => openModal(key)}
-                                    className="btn btn-outline"
-                                    disabled={saving}
-                                >
-                                    <IconImage className="w-4 h-4 mr-2" />
-                                    {settings[key] ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
-                                </button>
-                                {settings[key] && (
-                                    <button
-                                        onClick={() => clearImage(key)}
-                                        className="btn btn-ghost text-red-500"
-                                        disabled={saving}
-                                    >
-                                        <IconX className="w-4 h-4 mr-2" />
-                                        Quitar
-                                    </button>
-                                )}
+            <div className="space-y-8">
+                {BANNER_PAGES.map(page => (
+                    <section key={page.id} className="card overflow-hidden">
+                        <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                            <div>
+                                <h2 className="font-semibold text-brand-900">{page.label}</h2>
+                                <p className="text-sm text-slate-600 mt-0.5">{page.description}</p>
                             </div>
+                            <span className="text-xs font-mono text-slate-500 bg-white border border-slate-200 rounded-full px-3 py-1">{page.route}</span>
                         </div>
-
-                        <div className="w-full md:w-1/3 bg-slate-100 rounded-lg aspect-video flex items-center justify-center overflow-hidden border border-slate-200 relative">
-                            {settings[key] ? (
-                                <img
-                                    src={settings[key]}
-                                    alt={info.label}
-                                    className="w-full h-full object-contain"
-                                />
-                            ) : (
-                                <div className="text-slate-400 flex flex-col items-center">
-                                    <IconImage className="w-12 h-12 mb-2" />
-                                    <span className="text-xs">Sin imagen asignada</span>
-                                </div>
-                            )}
-                            {saving && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><LoadingSpinner /></div>}
+                        <div className="divide-y divide-slate-100">
+                            {page.slots.map(slot => {
+                                const imageUrl = valueFor(slot.key)
+                                return (
+                                    <div key={slot.key} className="p-5 flex flex-col lg:flex-row gap-5 items-start">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h3 className="text-base font-medium text-brand-900">{slot.label}</h3>
+                                                {imageUrl && <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><IconCheck className="w-3.5 h-3.5" /> Asignado</span>}
+                                            </div>
+                                            <p className="text-sm text-slate-500 mb-4">{slot.description}</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button onClick={() => openModal(slot.key)} className="btn btn-outline" disabled={saving}>
+                                                    <IconImage className="w-4 h-4 mr-2" />
+                                                    {imageUrl ? 'Cambiar imagen' : 'Seleccionar imagen'}
+                                                </button>
+                                                {imageUrl && (
+                                                    <button onClick={() => clearImage(slot.key)} className="btn btn-ghost text-red-500" disabled={saving}>
+                                                        <IconX className="w-4 h-4 mr-2" /> Quitar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className={`w-full lg:w-2/5 max-h-64 bg-slate-100 rounded-lg ${slot.previewClass} flex items-center justify-center overflow-hidden border border-slate-200 relative`}>
+                                            {imageUrl ? (
+                                                <img src={imageUrl} alt={slot.label} className="w-full h-full object-contain" />
+                                            ) : (
+                                                <div className="text-slate-400 flex flex-col items-center">
+                                                    <IconImage className="w-10 h-10 mb-2" />
+                                                    <span className="text-xs">Sin imagen asignada</span>
+                                                </div>
+                                            )}
+                                            {saving && <div className="absolute inset-0 bg-white/50 flex items-center justify-center"><LoadingSpinner /></div>}
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
-                    </div>
+                    </section>
                 ))}
             </div>
 

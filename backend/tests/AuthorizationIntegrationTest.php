@@ -217,7 +217,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $saved = $this->request('POST', '/api/admin/settings', 'admin_session_test', [
             'price_per_folio_usd' => 4.25,
             'raptor_mini_preview_enabled' => '1',
+            'banner_header_global' => '/api/uploads/200',
             'banner_main_1' => '/api/uploads/200',
+            'banner_history_1' => '/api/uploads/200',
         ]);
         $this->assertSame(200, $saved['code'], json_encode($saved['body']));
         $this->assertSame('4.25', Database::pdo()->query(
@@ -229,7 +231,9 @@ class AuthorizationIntegrationTest extends TestCase {
 
         $public = $this->request('GET', '/api/settings');
         $this->assertSame(200, $public['code'], json_encode($public['body']));
+        $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_header_global'] ?? null);
         $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_main_1'] ?? null);
+        $this->assertSame('/api/uploads/200', $public['body']['settings']['banner_history_1'] ?? null);
     }
 
     public function testAdminCanCreateAndUpdatePaymentMethodVisibleToApplicant(): void {

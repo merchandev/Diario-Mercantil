@@ -620,9 +620,13 @@ export type Settings = {
   instructions_documents_text?: string;
   instructions_documents_image_url?: string;
   instructions_convocatorias_text?: string;
+  banner_header_global?: string;
   banner_main_1?: string;
   banner_sidebar?: string;
   promo_popup?: string;
+  banner_history_1?: string;
+  banner_history_2?: string;
+  banner_history_3?: string;
   default_user_role?: string;
   unit_tax_bs?: number;
   raptor_mini_preview_enabled?: boolean | 0 | 1;

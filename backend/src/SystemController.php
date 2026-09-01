@@ -96,7 +96,10 @@ class SystemController {
     
     public function getPublicSettings(){
         $pdo = Database::pdo();
-        $stmt = $pdo->query("SELECT `key`, value FROM settings WHERE `key` IN ('bcv_rate', 'price_per_folio_usd', 'convocatoria_usd', 'iva_percent', 'unit_tax_bs', 'instructions_documents_text', 'instructions_documents_image_url', 'instructions_convocatorias_text', 'banner_main_1', 'banner_sidebar', 'promo_popup')");
+        $publicKeys = SettingSchema::publicKeys();
+        $placeholders = implode(',', array_fill(0, count($publicKeys), '?'));
+        $stmt = $pdo->prepare("SELECT `key`, value FROM settings WHERE `key` IN ($placeholders)");
+        $stmt->execute($publicKeys);
         $settings = [];
         while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
         Response::json(["settings"=>$settings]);
@@ -117,7 +120,7 @@ class SystemController {
             $validatedValue = SettingSchema::validate((string) $k, $v);
             $validated[(string) $k] = (string) $validatedValue;
             $bannerFileId = null;
-            if (in_array((string)$k, ['banner_main_1', 'banner_sidebar', 'promo_popup'], true) && $validatedValue !== '') {
+            if (SettingSchema::isBannerKey((string)$k) && $validatedValue !== '') {
                 if (!preg_match('~/api/uploads/(\d+)(?:$|[/?#])~', (string)$validatedValue, $m)) {
                     throw new HttpException(422, 'invalid_banner_file', 'La URL del banner no corresponde a un archivo cargado.');
                 }

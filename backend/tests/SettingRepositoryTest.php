@@ -50,4 +50,23 @@ final class SettingRepositoryTest extends TestCase
         $this->expectException(HttpException::class);
         SettingSchema::validate('unknown_setting', 'value');
     }
+
+    public function testSchemaExposesEveryBannerSettingPublicly(): void
+    {
+        $bannerKeys = SettingSchema::bannerKeys();
+
+        $this->assertCount(7, $bannerKeys);
+        $this->assertContains('banner_header_global', $bannerKeys);
+        $this->assertContains('banner_history_1', $bannerKeys);
+        $this->assertContains('banner_history_2', $bannerKeys);
+        $this->assertContains('banner_history_3', $bannerKeys);
+        $this->assertTrue(SettingSchema::isBannerKey('banner_header_global'));
+        $this->assertTrue(SettingSchema::isBannerKey('banner_history_3'));
+        $this->assertFalse(SettingSchema::isBannerKey('app_name'));
+
+        foreach ($bannerKeys as $key) {
+            $this->assertContains($key, SettingSchema::publicKeys());
+            $this->assertSame('/api/uploads/200', SettingSchema::validate($key, '/api/uploads/200'));
+        }
+    }
 }
