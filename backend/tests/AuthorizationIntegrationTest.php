@@ -25,8 +25,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE edition_orders (edition_id INTEGER NOT NULL, legal_request_id INTEGER NOT NULL, publication_file_id INTEGER, publication_file_name TEXT, publication_checksum TEXT, publication_source TEXT, publication_prepared_at TEXT, publication_updated_at TEXT, PRIMARY KEY(edition_id, legal_request_id))");
         $pdo->exec("CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, path TEXT, size INTEGER, type TEXT, checksum TEXT, version INTEGER, status TEXT, owner TEXT, is_public INTEGER DEFAULT 0, deleted_at TEXT, created_at TEXT, updated_at TEXT)");
+        $pdo->exec("CREATE TABLE file_events (id INTEGER PRIMARY KEY AUTOINCREMENT, file_id INTEGER NOT NULL, ts TEXT NOT NULL, type TEXT NOT NULL, message TEXT)");
         $pdo->exec("CREATE TABLE settings (`key` TEXT PRIMARY KEY, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
-        $pdo->exec("CREATE TABLE payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, bank TEXT, account TEXT, holder TEXT, rif TEXT, phone TEXT, created_at TEXT NOT NULL)");
+        $pdo->exec("CREATE TABLE payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, bank TEXT, account TEXT, holder TEXT, rif TEXT, phone TEXT, qr_file_id INTEGER, qr_updated_at TEXT, created_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id INTEGER, action TEXT, resource_type TEXT, resource_id INTEGER)");
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
@@ -104,6 +105,32 @@ class AuthorizationIntegrationTest extends TestCase {
         }
         
         return ['code' => $code, 'body' => json_decode((string)$response, true)];
+    }
+
+    private function requestMultipart(string $uri, string $sessionId, string $field, string $filename, string $mime, string $contents): array {
+        $boundary = '----DiarioMercantil' . bin2hex(random_bytes(8));
+        $payload = "--{$boundary}\r\n"
+            . "Content-Disposition: form-data; name=\"{$field}\"; filename=\"{$filename}\"\r\n"
+            . "Content-Type: {$mime}\r\n\r\n"
+            . $contents . "\r\n--{$boundary}--\r\n";
+        $context = ['http' => [
+            'method' => 'POST',
+            'ignore_errors' => true,
+            'header' => "Content-Type: multipart/form-data; boundary={$boundary}\r\n"
+                . "Cookie: dm_session={$sessionId}; dm_csrf=test_csrf\r\n"
+                . "X-CSRF-Token: test_csrf\r\n",
+            'content' => $payload,
+        ]];
+        $response = @file_get_contents(
+            'http://127.0.0.1:' . self::$port . $uri,
+            false,
+            stream_context_create($context)
+        );
+        $code = 0;
+        if (isset($http_response_header[0]) && preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches)) {
+            $code = (int)$matches[1];
+        }
+        return ['code'=>$code, 'body'=>json_decode((string)$response, true)];
     }
     
     public function testListUsersWithoutTokenIs401() {
@@ -239,6 +266,37 @@ class AuthorizationIntegrationTest extends TestCase {
             'phone' => '04161234567',
         ]);
         $this->assertSame(403, $blocked['code']);
+    }
+
+    public function testAdminCanUploadReplaceAndRemoveAuthenticatedPaymentQr(): void {
+        $created = $this->request('POST', '/api/payments', 'admin_session_test', [
+            'bank' => 'Banco de Venezuela',
+            'holder' => 'Diario Mercantil QR',
+            'rif' => 'J-12345678-9',
+            'phone' => '04121234567',
+        ]);
+        $id = (int)($created['body']['id'] ?? 0);
+        $this->assertGreaterThan(0, $id, json_encode($created['body']));
+
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $this->assertIsString($png);
+        $uploaded = $this->requestMultipart('/api/payments/' . $id . '/qr', 'admin_session_test', 'qr', 'pago.png', 'image/png', $png);
+        $this->assertSame(200, $uploaded['code'], json_encode($uploaded['body']));
+        $this->assertNotEmpty($uploaded['body']['qr_url'] ?? null);
+
+        $visible = $this->request('GET', '/api/payment-methods', 'user_session_test');
+        $row = array_values(array_filter($visible['body']['items'] ?? [], static fn(array $item): bool => (int)$item['id'] === $id))[0] ?? [];
+        $this->assertSame('/api/payment-methods/' . $id . '/qr', $row['qr_url'] ?? null);
+        $this->assertSame(200, $this->request('GET', '/api/payment-methods/' . $id . '/qr', 'user_session_test')['code']);
+        $this->assertSame(403, $this->request('DELETE', '/api/payments/' . $id . '/qr', 'user_session_test')['code']);
+
+        $removed = $this->request('DELETE', '/api/payments/' . $id . '/qr', 'admin_session_test');
+        $this->assertSame(200, $removed['code'], json_encode($removed['body']));
+        $qrState = Database::pdo()->query("SELECT qr_file_id FROM payment_methods WHERE id={$id}")->fetch(PDO::FETCH_ASSOC);
+        $this->assertNull($qrState['qr_file_id'] ?? null);
+        $this->assertSame('delete_payment_qr', Database::pdo()->query(
+            "SELECT action FROM audit_logs WHERE resource_type='payment_method' AND resource_id={$id} ORDER BY id DESC LIMIT 1"
+        )->fetchColumn());
     }
 
     public function testRetiringEditionRequeuesRequestsAndRemovesStaleDownloadLink(): void {

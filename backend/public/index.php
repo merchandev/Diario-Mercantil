@@ -168,8 +168,11 @@ $router->get('/api/payments', [SystemController::class, 'listPayments'], $admin)
 $router->post('/api/payments', [PaymentController::class, 'create'], $adminCsrf);
 $router->put('/api/payments/{id}', [PaymentController::class, 'update'], $adminCsrf);
 $router->delete('/api/payments/{id}', [PaymentController::class, 'delete'], $adminCsrf);
+$router->post('/api/payments/{id}/qr', [PaymentController::class, 'uploadQr'], $adminCsrf);
+$router->delete('/api/payments/{id}/qr', [PaymentController::class, 'deleteQr'], $adminCsrf);
 // Lectura pública de métodos de pago para solicitantes autenticados (Fix: 403 en panel de pago)
 $router->get('/api/payment-methods', [SystemController::class, 'listPayments'], $auth);
+$router->get('/api/payment-methods/{id}/qr', [PaymentController::class, 'serveQr'], $auth);
 $router->get('/api/public/editions', [EditionController::class, 'listPublic']);
 $router->get('/api/public/pages', [PagesController::class, 'publicList']);
 $router->get('/api/page/{slug}', [PagesController::class, 'publicGet']);

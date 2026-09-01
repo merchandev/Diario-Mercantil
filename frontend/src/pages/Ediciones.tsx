@@ -13,8 +13,7 @@ export default function Ediciones() {
   const [rows, setRows] = useState<Edition[]>([])
   const [retiredRows, setRetiredRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
-  const nextEditionNo = rows.length > 0 ? Math.max(...rows.map(r => typeof r.edition_no === 'number' ? r.edition_no : parseInt(r.edition_no) || 0)) + 1 : 1
-  const [form, setForm] = useState<{ date: string; edition_no: number; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
+  const [form, setForm] = useState<{ date: string; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), selectedOrders: [] })
   const [selId, setSelId] = useState<number | undefined>(undefined)
   const [detail, setDetail] = useState<{ edition: Edition; orders: EditionOrder[] } | null>(null)
   const [qrGenerated, setQrGenerated] = useState(false)
@@ -44,10 +43,6 @@ export default function Ediciones() {
     }
   };
   useEffect(() => { load() }, [])
-  useEffect(() => {
-    setForm(prev => ({ ...prev, edition_no: nextEditionNo }));
-  }, [rows]);
-
   const openDetail = async (id: number) => {
     setSelId(id)
     const [det, leg] = await Promise.all([getEdition(id), listLegal()])
@@ -57,27 +52,45 @@ export default function Ediciones() {
   const onCreateAndPublish = async (e: any) => {
     e.preventDefault()
     setPublishingState({ active: true, progress: 0, message: 'Creando registro...' })
-    let newId: number | undefined
     try {
-      const payload = { status: 'Borrador', date: form.date, edition_no: form.edition_no, orders: form.selectedOrders }
-      const res = await createEdition(payload) as any
-      newId = res?.id
-      if (newId) {
+      let newId: number
+      try {
+        const payload = { status: 'Borrador', date: form.date, orders: form.selectedOrders }
+        const res = await createEdition(payload) as any
+        if (!res?.id) throw new Error('El servidor no confirmó la creación del borrador.')
+        newId = Number(res.id)
+      } catch (error) {
+        await load()
+        setAlertDialog({
+          isOpen: true,
+          title: 'No se pudo crear la edición',
+          message: error instanceof Error ? error.message : String(error),
+          variant: 'error',
+        })
+        return
+      }
+
+      try {
         setPublishingState({ active: true, progress: 10, message: 'Preparando PDFs individuales...' })
         await publishEdition(newId, (prog, msg) => {
           setPublishingState(prev => ({ ...prev, progress: Math.max(10, prog), message: msg }))
         })
+      } catch (error) {
+        await load()
+        await openDetail(newId)
+        setAlertDialog({
+          isOpen: true,
+          title: 'Edición conservada como borrador',
+          message: `La edición fue creada, pero no se pudo publicar: ${error instanceof Error ? error.message : String(error)}. Puede corregirla o cargar el PDF faltante desde el detalle.`,
+          variant: 'warning',
+        })
+        return
       }
-      setForm({ date: new Date().toISOString().slice(0, 10), edition_no: nextEditionNo, selectedOrders: [] })
+      setForm({ date: new Date().toISOString().slice(0, 10), selectedOrders: [] })
       setQrGenerated(false)
       setGeneratedCode('')
       await load()
       setAlertDialog({ isOpen: true, title: 'Edición publicada', message: `Edición publicada exitosamente.`, variant: 'success' })
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error)
-      await load()
-      if (newId) await openDetail(newId)
-      setAlertDialog({ isOpen: true, title: 'Edición guardada como borrador', message: `No se pudo completar la publicación: ${errorMsg}. El borrador se conservó para corregir o cargar el PDF faltante.`, variant: 'warning' })
     } finally {
       setPublishingState({ active: false, progress: 0, message: '' })
     }
@@ -184,18 +197,18 @@ export default function Ediciones() {
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de la Edición</span>
               <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => {
-                // Validate: date cannot be before the last published edition
+                // One edition per date: publication requires a date after the latest active edition.
                 const lastPublished = rows.filter(r => r.status === 'Publicada').map(r => r.date).sort().reverse()[0]
-                if (lastPublished && e.target.value < lastPublished) {
-                  setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha de la edición no puede ser anterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
+                if (lastPublished && e.target.value <= lastPublished) {
+                  setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha debe ser posterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
                   return
                 }
                 setForm({ ...form, date: e.target.value })
               }} required />
             </label>
             <label className="block">
-              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Número de Edición</span>
-              <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value={form.edition_no} title="El número de edición se genera automáticamente en orden consecutivo" />
+              <span className="block text-sm font-semibold mb-1.5 text-slate-700">Número de edición</span>
+              <input type="text" disabled className="input w-full bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200" value="Automático" title="El backend asignará y confirmará el correlativo definitivo al crear la edición" />
             </label>
 
             {!qrGenerated ? (

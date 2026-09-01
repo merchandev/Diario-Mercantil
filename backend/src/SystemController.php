@@ -188,7 +188,13 @@ class SystemController {
     public function listPayments(){
         $pdo = Database::pdo();
         $stmt = $pdo->query("SELECT * FROM payment_methods ORDER BY id DESC");
-        Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        $items = array_map(static function (array $item): array {
+            $item['qr_url'] = (int)($item['qr_file_id'] ?? 0) > 0
+                ? '/api/payment-methods/' . (int)$item['id'] . '/qr'
+                : null;
+            return $item;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+        Response::json(["items"=>$items]);
     }
 
     // --- PAGES (CMS) ---

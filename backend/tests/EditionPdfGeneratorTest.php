@@ -8,6 +8,7 @@ require_once __DIR__ . '/../src/fpdf.php';
 require_once __DIR__ . '/../src/Services/EditionPdfGenerator.php';
 require_once __DIR__ . '/../src/Services/PdfInspector.php';
 require_once __DIR__ . '/../src/Services/EditionPublicationService.php';
+require_once __DIR__ . '/../src/Services/EditionOrderService.php';
 
 final class EditionPdfGeneratorTest extends TestCase
 {
@@ -128,6 +129,63 @@ final class EditionPdfGeneratorTest extends TestCase
                 $this->uploadDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $consolidated)
             )
         );
+    }
+
+    public function testPublishedRequestCanBeRetiredReusedAndPublishedAgain(): void
+    {
+        $source = $this->createPdf('source-reusable.pdf', 'SOLICITUD REUTILIZABLE');
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec(
+            'CREATE TABLE editions (id INTEGER PRIMARY KEY,code TEXT,status TEXT,date TEXT,file_id INTEGER,'
+            . 'file_name TEXT,deleted_at TEXT,published_at TEXT,published_by INTEGER,'
+            . 'published_file_checksum TEXT,orders_count INTEGER)'
+        );
+        $pdo->exec(
+            'CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,path TEXT,size INTEGER,type TEXT,'
+            . 'checksum TEXT,version INTEGER,status TEXT,owner TEXT,deleted_at TEXT,created_at TEXT,updated_at TEXT)'
+        );
+        $pdo->exec(
+            'CREATE TABLE legal_requests (id INTEGER PRIMARY KEY,user_id INTEGER,status TEXT,deleted_at TEXT,publish_date TEXT)'
+        );
+        $pdo->exec('CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT,legal_request_id INTEGER,kind TEXT,file_id INTEGER)');
+        $pdo->exec(
+            'CREATE TABLE edition_orders (edition_id INTEGER,legal_request_id INTEGER,publication_file_id INTEGER,'
+            . 'publication_file_name TEXT,publication_checksum TEXT,publication_source TEXT,'
+            . 'publication_prepared_at TEXT,publication_updated_at TEXT,PRIMARY KEY(edition_id,legal_request_id))'
+        );
+        $pdo->exec('CREATE INDEX idx_edition_orders_request ON edition_orders(legal_request_id)');
+        $pdo->exec('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,actor_user_id INTEGER,action TEXT,resource_type TEXT,resource_id INTEGER)');
+        $pdo->exec("INSERT INTO editions(id,code,status,date,orders_count) VALUES(1,'MMXXVI-0001','Borrador','2026-08-30',1)");
+        $pdo->exec("INSERT INTO legal_requests VALUES(14,101,'En trámite',NULL,NULL)");
+
+        $insertFile = $pdo->prepare(
+            'INSERT INTO files(id,name,path,size,type,checksum,version,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)'
+        );
+        $insertFile->execute([
+            14, basename($source), basename($source), filesize($source), 'pdf', hash_file('sha256', $source),
+            1, 'processed', '2026-08-30 12:00:00', '2026-08-30 12:00:00',
+        ]);
+        $pdo->exec("INSERT INTO legal_files(legal_request_id,kind,file_id) VALUES(14,'document_pdf',14)");
+        $pdo->exec('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(1,14)');
+
+        $publication = new EditionPublicationService($pdo);
+        $publication->publish(1, 1);
+        $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=1')->fetchColumn());
+
+        $pdo->beginTransaction();
+        $pdo->exec("UPDATE editions SET deleted_at='2026-08-30 18:00:00' WHERE id=1");
+        $pdo->exec("UPDATE legal_requests SET status='En trámite',publish_date=NULL WHERE id=14");
+        $pdo->commit();
+
+        $pdo->exec("INSERT INTO editions(id,code,status,date,orders_count) VALUES(2,'MMXXVI-0002','Borrador','2026-08-31',0)");
+        (new EditionOrderService($pdo))->setOrdersForEdition(2, [14]);
+        $publication->publish(2, 1);
+
+        $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=2')->fetchColumn());
+        $this->assertSame('Publicada', $pdo->query('SELECT status FROM legal_requests WHERE id=14')->fetchColumn());
+        $this->assertSame(2, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=14')->fetchColumn());
+        $this->assertSame(1, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=14 AND e.deleted_at IS NULL')->fetchColumn());
     }
 
     private function createPdf(string $name, string $text): string

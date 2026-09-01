@@ -376,7 +376,29 @@ class EditionController {
         if ($pdo->inTransaction()) $pdo->rollBack();
         if ((string)$e->getCode() === '23000') {
             $responseCode = 409;
-            $responseBody = ['error'=>'El correlativo o CVE de la edición ya existe. Intente crear la edición nuevamente.'];
+            $databaseMessage = (string)($e->errorInfo[2] ?? $e->getMessage());
+            if (str_contains($databaseMessage, 'uq_edition_year_number')) {
+                $responseBody = [
+                    'error'=>'duplicate_edition_number',
+                    'message'=>'El correlativo anual de la edición ya existe. Recargue la lista e intente nuevamente.',
+                ];
+            } elseif (str_contains($databaseMessage, 'uq_editions_code') || str_contains($databaseMessage, 'editions.code')) {
+                $responseBody = [
+                    'error'=>'duplicate_edition_code',
+                    'message'=>'El CVE de la edición ya existe. Recargue la lista e intente nuevamente.',
+                ];
+            } elseif (str_contains($databaseMessage, 'uq_edition_orders_request')) {
+                $responseBody = [
+                    'error'=>'legacy_edition_order_constraint',
+                    'message'=>'La base de datos conserva una restricción obsoleta que impide reutilizar una solicitud retirada.',
+                ];
+            } else {
+                error_log('Edition create integrity error: ' . $databaseMessage);
+                $responseBody = [
+                    'error'=>'edition_integrity_conflict',
+                    'message'=>'La edición no pudo crearse por un conflicto de integridad de datos.',
+                ];
+            }
         } else {
             error_log('Edition create database error: ' . $e->getMessage());
             $responseCode = 500;
@@ -554,7 +576,13 @@ class EditionController {
       $limit = (int)($in['limit'] ?? 100);
       
       try {
-          $s = $pdo->prepare("SELECT id FROM legal_requests WHERE status='En trámite' AND id NOT IN (SELECT legal_request_id FROM edition_orders) ORDER BY created_at ASC LIMIT " . max(1, $limit));
+          $s = $pdo->prepare(
+              "SELECT lr.id FROM legal_requests lr WHERE lr.status='En trámite' "
+              . 'AND NOT EXISTS ('
+              . 'SELECT 1 FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id '
+              . 'WHERE eo.legal_request_id=lr.id AND e.deleted_at IS NULL'
+              . ') ORDER BY lr.created_at ASC LIMIT ' . max(1, $limit)
+          );
           $s->execute();
           $ids = $s->fetchAll(PDO::FETCH_COLUMN);
           

@@ -20,3 +20,6 @@ backend/storage/uploads/*
 backend/storage/results/*
 !backend/storage/results/.gitignore
 backend/*.sqlite
+backend/storage/*.log
+backend/storage/database.sqlite*
+backend/.phpunit.result.cache

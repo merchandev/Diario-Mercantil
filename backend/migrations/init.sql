@@ -64,7 +64,11 @@ CREATE TABLE IF NOT EXISTS payment_methods (
   holder VARCHAR(255),
   rif VARCHAR(50),
   phone VARCHAR(50),
-  created_at DATETIME NOT NULL
+  qr_file_id INT NULL,
+  qr_updated_at DATETIME NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_payment_methods_qr_file (qr_file_id),
+  CONSTRAINT fk_payment_methods_qr_file FOREIGN KEY(qr_file_id) REFERENCES files(id) ON DELETE SET NULL
 );
 
 -- Legal directory requests
@@ -130,7 +134,7 @@ CREATE TABLE IF NOT EXISTS edition_orders (
   FOREIGN KEY(edition_id) REFERENCES editions(id) ON DELETE CASCADE,
   FOREIGN KEY(legal_request_id) REFERENCES legal_requests(id),
   FOREIGN KEY(publication_file_id) REFERENCES files(id) ON DELETE SET NULL,
-  UNIQUE KEY uq_edition_orders_request (legal_request_id)
+  KEY idx_edition_orders_request (legal_request_id)
 );
 
 -- Payments linked to legal requests

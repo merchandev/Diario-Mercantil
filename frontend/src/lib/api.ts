@@ -45,7 +45,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
       const contentType = res.headers.get('content-type');
       if (contentType?.includes('application/json')) {
         data = await res.json();
-        errorMsg = data.error || data.message || errorMsg;
+        errorMsg = data.message || data.error || errorMsg;
       } else {
         errorMsg = await res.text() || errorMsg;
       }
@@ -251,7 +251,7 @@ export async function listEditions() {
   const res = await fetchAuth('/api/editions')
   return res.json() as Promise<{ items: Edition[] }>
 }
-export async function createEdition(body: { code?: string; status?: string; date?: string; edition_no?: number; orders?: number[]; file_id?: number | null; file_name?: string }) {
+export async function createEdition(body: { status?: string; date?: string; orders?: number[]; file_id?: number | null; file_name?: string }) {
   const res = await fetchAuth('/api/editions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return res.json()
 }
@@ -333,7 +333,7 @@ export async function deleteEdition(id: number) {
 }
 
 // Payment methods
-export type PaymentMethod = { id: number; type: string; bank: string; account: string; holder: string; rif: string; phone: string }
+export type PaymentMethod = { id: number; type: string; bank: string; account: string; holder: string; rif: string; phone: string; qr_file_id?: number | null; qr_updated_at?: string | null; qr_url?: string | null }
 
 /**
  * Para el panel de administración (requiere rol admin).
@@ -354,6 +354,16 @@ export async function updatePayment(id: number, body: Partial<PaymentMethod>) {
 export async function deletePayment(id: number) {
   const res = await fetchAuth(`/api/payments/${id}`, { method: 'DELETE' })
   return res.json()
+}
+export async function uploadPaymentQr(id: number, file: File) {
+  const body = new FormData()
+  body.append('qr', file)
+  const res = await fetchAuth(`/api/payments/${id}/qr`, { method: 'POST', body })
+  return res.json() as Promise<{ ok: true; file_id: number; qr_url: string }>
+}
+export async function deletePaymentQr(id: number) {
+  const res = await fetchAuth(`/api/payments/${id}/qr`, { method: 'DELETE' })
+  return res.json() as Promise<{ ok: true }>
 }
 
 /**
