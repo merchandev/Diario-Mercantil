@@ -22,7 +22,7 @@ return static function (PDO $pdo): void {
             . 'WHERE table_schema=? AND table_name=? AND index_name=? ORDER BY seq_in_index'
         );
         $stmt->execute([$database, $table, $index]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return $stmt->fetchAll(PDO::FETCH_NUM);
     };
     $assertIndex = static function (
         string $table,
@@ -31,8 +31,8 @@ return static function (PDO $pdo): void {
         bool $unique
     ) use ($indexColumns): void {
         $rows = $indexColumns($table, $index);
-        $columns = array_column($rows, 'column_name');
-        $isUnique = $rows !== [] && (int)$rows[0]['non_unique'] === 0;
+        $columns = array_column($rows, 0);
+        $isUnique = $rows !== [] && (int)$rows[0][1] === 0;
         if ($columns !== $expectedColumns || $isUnique !== $unique) {
             throw new RuntimeException("El índice {$table}.{$index} no coincide con el contrato esperado.");
         }
