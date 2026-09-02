@@ -218,6 +218,8 @@ docker compose exec backend php migrate.php
 - **v2026.08.11** — Login por email, edición de perfil admin, log de actividad con IP real. Corrección scraper BCV.
 - **v2026.08.10** — Estabilización de pagos y persistencia de PDFs. Precio por folio actualizado.
 
+Puedes consultar el registro completo de cambios técnicos en el **[Historial de Commits](historial.md)**.
+
 ---
 
 © Diario Mercantil de Venezuela — Todos los derechos reservados.
