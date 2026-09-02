@@ -58,7 +58,13 @@ class EditionPdfGenerator {
                 if ($e instanceof RuntimeException && $e->getCode() === 422) {
                     throw $e;
                 }
-                throw new RuntimeException("No se pudo incorporar el PDF de la orden {$orderId}: " . $e->getMessage(), 422, $e);
+                error_log("[edition.pdf] No se pudo incorporar el PDF de la orden {$orderId}: " . $e->getMessage());
+                throw new RuntimeException(
+                    'No fue posible procesar automáticamente uno de los documentos PDF. '
+                    . 'La edición se mantuvo como borrador para que pueda sustituir o corregir el archivo antes de publicarla.',
+                    422,
+                    $e
+                );
             }
             $done++;
             if ($progressCallback) {

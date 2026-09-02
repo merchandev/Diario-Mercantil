@@ -65,6 +65,34 @@ final class EditionPdfGeneratorTest extends TestCase
         $this->assertNotSame(hash_file('sha256', $first), hash_file('sha256', $second));
     }
 
+    public function testInvalidPdfReturnsHumanReadableMessageWithoutLibraryDetails(): void
+    {
+        $invalid = $this->uploadDir . DIRECTORY_SEPARATOR . 'invalid.pdf';
+        file_put_contents($invalid, '%PDF-1.7 invalid content');
+
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('CREATE TABLE editions (id INTEGER PRIMARY KEY,code TEXT NOT NULL)');
+        $pdo->exec('CREATE TABLE files (id INTEGER PRIMARY KEY,path TEXT,checksum TEXT,status TEXT,deleted_at TEXT)');
+        $pdo->exec('CREATE TABLE edition_orders (edition_id INTEGER,legal_request_id INTEGER,publication_file_id INTEGER,publication_checksum TEXT)');
+        $pdo->exec("INSERT INTO editions(id,code) VALUES(1,'MMXXVI-0001')");
+
+        $insertFile = $pdo->prepare('INSERT INTO files(id,path,checksum,status) VALUES(?,?,?,?)');
+        $insertFile->execute([14, basename($invalid), hash_file('sha256', $invalid), 'processed']);
+        $insertOrder = $pdo->prepare('INSERT INTO edition_orders VALUES(?,?,?,?)');
+        $insertOrder->execute([1, 14, 14, hash_file('sha256', $invalid)]);
+
+        try {
+            (new EditionPdfGenerator($pdo))->generate(1, [14]);
+            $this->fail('Se esperaba que el PDF inválido fuera rechazado.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(422, $exception->getCode());
+            $this->assertStringContainsString('La edición se mantuvo como borrador', $exception->getMessage());
+            $this->assertStringNotContainsString('setasign', strtolower($exception->getMessage()));
+            $this->assertStringNotContainsString('compression technique', strtolower($exception->getMessage()));
+        }
+    }
+
     public function testPublicationPreparesAndKeepsTwoIndependentRequestPdfs(): void
     {
         $first = $this->createPdf('source-14.pdf', 'SOLICITUD 14');

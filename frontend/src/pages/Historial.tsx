@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LoadingSpinner, ErrorMessage, EmptyState } from '../components/LoadingSpinner'
 import { listLegal, type LegalRequest } from '../lib/api'
+import { editionDownloadUrl } from '../lib/editionDownload'
 
 export default function Historial() {
   const [rows, setRows] = useState<LegalRequest[]>([])
@@ -118,12 +119,12 @@ export default function Historial() {
                         {(r.publish_date) ? (
                           <span className="flex items-center gap-2">
                             {r.publish_date.split('-').reverse().join('/')}
-                            {(r.status === 'Publicada' || r.status === 'Publicado') && (r.publication_file_url || r.edition_code) && (
+                            {editionDownloadUrl(r) && (
                               <a
                                 className="text-brand-600 hover:text-brand-800"
                                 title="Descargar publicación"
                                 aria-label={`Descargar publicación ${r.order_no || r.id}`}
-                                href={`${r.publication_file_url || `/api/e/code/${encodeURIComponent(r.edition_code || '')}/download`}?download=1`}
+                                href={editionDownloadUrl(r)!}
                               >
                                 ⬇
                               </a>

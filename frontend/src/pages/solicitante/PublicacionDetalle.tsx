@@ -6,6 +6,7 @@ import { IconArrowLeft, IconDownload, IconCheck } from '../../components/icons'
 import QRCode from 'qrcode.react'
 import AlertDialog from '../../components/AlertDialog'
 import LegalRequestDetails, { formatCaracasDateTime } from '../../components/LegalRequestDetails'
+import { editionDownloadUrl } from '../../lib/editionDownload'
 
 export default function PublicacionDetalleSolicitante() {
   const { id } = useParams<{ id: string }>()
@@ -88,6 +89,7 @@ export default function PublicacionDetalleSolicitante() {
   const isPublicada = req.status === 'Publicada'
   // Public QR/URL must belong exclusively to the edition. Never fall back to request/order IDs.
   const publicUrl = req.edition_code ? `${window.location.origin}/edicion/${encodeURIComponent(req.edition_code)}` : ''
+  const publicationDownloadUrl = editionDownloadUrl(req)
 
   const fechaSolicitud = formatCaracasDateTime(req.submitted_at || req.created_at || req.date)
 
@@ -275,19 +277,12 @@ export default function PublicacionDetalleSolicitante() {
             <div className="card p-6 bg-green-50 border border-green-200">
               <h3 className="font-semibold mb-3 text-green-800">Publicación en Edición</h3>
               <p className="text-xs text-green-700 mb-4">Su documento ya forma parte de una edición del Diario Mercantil de Venezuela.</p>
-              {req.publication_file_url ? (
+              {publicationDownloadUrl ? (
                 <a
-                  href={`${req.publication_file_url}?download=1`}
+                  href={publicationDownloadUrl}
                   className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
                 >
-                  <IconDownload /> Descargar publicación individual
-                </a>
-              ) : req.edition_file_url ? (
-                <a
-                  href={`${req.edition_file_url}?download=1`}
-                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
-                >
-                  <IconDownload /> Descargar edición completa
+                  <IconDownload /> Descargar publicación
                 </a>
               ) : req.edition_code ? (
                 <a

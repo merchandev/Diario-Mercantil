@@ -5,9 +5,8 @@ import { addLegalPayment, attachLegalFile, createLegal, downloadLegal, getBcvRat
 import AlertDialog from '../../components/AlertDialog'
 import YearPicker from '../../components/YearPicker'
 import ProtectedPdfViewer from '../../components/ProtectedPdfViewer'
+import PaymentMethodsPanel from '../../components/PaymentMethodsPanel'
 import { BANCOS_VENEZUELA } from '../../constants/banks'
-import QRCode from 'qrcode.react'
-import { usePaymentMethods } from '../../hooks/usePaymentMethods'
 
 const ESTADOS_VENEZUELA = [
   'Amazonas', 'Anzoátegui', 'Apure', 'Aragua', 'Barinas', 'Bolívar', 'Carabobo', 'Cojedes',
@@ -455,8 +454,6 @@ export default function Documento() {
   const step1Ref = useRef<HTMLDivElement>(null)
   const step2Ref = useRef<HTMLDivElement>(null)
   const step3Ref = useRef<HTMLDivElement>(null)
-
-  const { paymentMethods, paymentMethodsLoading, paymentMethodsError, reloadPaymentMethods } = usePaymentMethods()
 
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setPay(p => ({ ...p, document: p.document || u.document || '', name: p.name || u.name || '', phone: p.phone || u.phone || '', email: p.email || u.email || '', address: p.address || u.address || '' })); } catch { } })(); }, [])
@@ -1201,75 +1198,6 @@ export default function Documento() {
           </div>
         ) : (
           <div className="p-6 space-y-6 step-anim">
-            {/* Datos de Cuentas Bancarias - NUEVO */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-              <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-blue-900">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                Instrucciones para el Pago
-              </h3>
-              <p className="text-sm text-blue-800 mb-4">
-                Por favor realice el pago a una de las siguientes cuentas bancarias antes de registrar su referencia:
-              </p>
-              <div className="grid md:grid-cols-2 gap-4">
-                {paymentMethodsLoading && <p className="text-sm text-slate-600">Cargando datos bancarios...</p>}
-                {!paymentMethodsLoading && paymentMethodsError && (
-                  <div className="md:col-span-2 rounded-lg border border-rose-200 bg-white p-3 text-sm text-rose-800">
-                    {paymentMethodsError} <button type="button" className="font-semibold underline" onClick={() => void reloadPaymentMethods()}>Reintentar</button>
-                  </div>
-                )}
-                {paymentMethods.map(pm => {
-                  const amountText = pdfAnalysis
-                    ? `VES ${pdfAnalysis.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : 'Monto indicado en la orden'
-                  const paymentData = [
-                    `Pago Móvil - Diario Mercantil`,
-                    `Banco destino: ${pm.bank || '-'}`,
-                    `RIF: ${pm.rif || '-'}`,
-                    `Teléfono: ${pm.phone || '-'}`,
-                    `Monto: ${amountText}`
-                  ].join('\n')
-
-                  return (
-                    <div key={pm.id} className="bg-white p-4 rounded-lg shadow-sm border border-blue-100 text-sm space-y-3">
-                      <div>
-                        <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
-                        <div className="flex justify-between"><span className="text-slate-500">Tipo:</span> <span className="font-medium">Pago Móvil</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Teléfono:</span> <span className="font-mono font-medium">{pm.phone || '-'}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Titular:</span> <span className="font-medium">{pm.holder}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
-                        <div className="flex justify-between"><span className="text-slate-500">Monto:</span> <span className="font-semibold text-brand-700">{amountText}</span></div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row items-center gap-3 pt-3 border-t border-blue-100">
-                        <div className="bg-white p-2 rounded border border-slate-200 shrink-0" aria-label={`QR de Pago Móvil ${pm.bank}`}>
-                          <QRCode value={paymentData} size={112} level="M" renderAs="canvas" />
-                        </div>
-                        <div className="flex-1 w-full">
-                          <p className="text-xs text-slate-500 mb-2">Escanee el QR o copie los datos para realizar el Pago Móvil.</p>
-                          <button
-                            type="button"
-                            className="btn btn-outline w-full justify-center text-sm"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(paymentData)
-                                setAlertDialog({ isOpen: true, title: 'Datos copiados', message: 'Los datos de Pago Móvil se copiaron al portapapeles.', variant: 'success' })
-                              } catch {
-                                setAlertDialog({ isOpen: true, title: 'No se pudo copiar', message: paymentData, variant: 'info' })
-                              }
-                            }}
-                          >
-                            Copiar datos
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-                {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No hay medios de pago configurados. Comuníquese con administración antes de efectuar el pago.</p>}
-              </div>
-            </div>
-
             {/* Resumen de la Orden + Datos del Solicitante (Solo Lectura) */}
             {pdfAnalysis && (
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
@@ -1356,6 +1284,9 @@ export default function Documento() {
                 </div>
               </div>
             )}
+
+            {/* El QR y los datos oficiales aparecen después del resumen y antes del reporte. */}
+            <PaymentMethodsPanel amountBs={pdfAnalysis?.total_bs} />
 
             {/* Datos del Pago */}
             <div className="bg-white rounded-xl border border-slate-200 p-6">

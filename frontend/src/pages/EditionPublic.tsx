@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
 import { listPublicEditions, type Edition as ApiEdition } from '../lib/api'
 import { SEO } from '../components/SEO'
+import PublicPdfViewer from '../components/PublicPdfViewer'
 
 type Edition = ApiEdition & { seo?: { title?: string, description?: string, og_image?: string } }
 type Order = { id: number; name: string; document: string; status: string; date: string }
@@ -50,7 +51,7 @@ export default function EditionPublic() {
     navigate(`/ediciones?${params.toString()}`)
   }
 
-  const pdfUrl = useMemo(() => edition ? (edition.file_url || `/api/e/code/${encodeURIComponent(edition.code)}/download`) : '', [edition])
+  const pdfUrl = useMemo(() => edition ? `/api/e/code/${encodeURIComponent(edition.code)}/download` : '', [edition])
 
   if (err) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">{err}</div></div>
   if (!edition) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">Cargando...</div></div>
@@ -136,11 +137,11 @@ export default function EditionPublic() {
         </div>
 
         {/* 2. Revista PDF Central */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden h-[800px]">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
           {edition.file_id ? (
-            <iframe src={`${pdfUrl}#view=FitH`} className="w-full h-full border-0 rounded" title={`Edición ${edition.edition_no}`} />
+            <PublicPdfViewer src={pdfUrl} title={`Edición ${edition.edition_no}`} />
           ) : (
-            <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200 h-full flex flex-col items-center justify-center">
+            <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200 min-h-[680px] flex flex-col items-center justify-center">
               <IconSearch className="w-12 h-12 mx-auto text-slate-300 mb-3" />
               Esta edición aún no tiene un archivo PDF disponible para visualizar.
             </div>

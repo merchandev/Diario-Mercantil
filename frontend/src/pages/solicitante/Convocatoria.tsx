@@ -4,7 +4,7 @@ import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings,
 import YearPicker from '../../components/YearPicker'
 import { BANCOS_VENEZUELA } from '../../constants/banks'
 import { useDialog } from '../../contexts/DialogContext'
-import { usePaymentMethods } from '../../hooks/usePaymentMethods'
+import PaymentMethodsPanel from '../../components/PaymentMethodsPanel'
 
 type ConvocatoriaPaymentForm = {
   type: 'pago_movil'
@@ -30,7 +30,6 @@ export default function Convocatoria() {
   const [accept, setAccept] = useState(false)
   const [pay, setPay] = useState<ConvocatoriaPaymentForm>({ type: 'pago_movil', bank: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_phone_prefix: '0414' })
   const [user, setUser] = useState<any>({})
-  const { paymentMethods, paymentMethodsLoading, paymentMethodsError, reloadPaymentMethods } = usePaymentMethods()
 
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setUser(u); } catch { } })(); }, [])
@@ -186,37 +185,6 @@ export default function Convocatoria() {
       <div className="card p-4 space-y-6">
         <h2 className="font-semibold text-lg border-b pb-2">Paso 3. Reportar el pago de la publicación</h2>
 
-        {/* Datos de Cuentas Bancarias - NUEVO */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-          <h3 className="font-bold text-base mb-3 flex items-center gap-2 text-blue-900">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Instrucciones para el Pago
-          </h3>
-          <p className="text-sm text-blue-800 mb-3">
-            Realice el pago a una de las siguientes cuentas antes de registrar su referencia:
-          </p>
-          <div className="grid md:grid-cols-2 gap-3">
-            {paymentMethodsLoading && <p className="text-sm text-slate-600">Cargando datos bancarios...</p>}
-            {!paymentMethodsLoading && paymentMethodsError && (
-              <div className="md:col-span-2 rounded-lg border border-rose-200 bg-white p-3 text-sm text-rose-800">
-                {paymentMethodsError} <button type="button" className="font-semibold underline" onClick={() => void reloadPaymentMethods()}>Reintentar</button>
-              </div>
-            )}
-            {paymentMethods.map(pm => (
-              <div key={pm.id} className="bg-white p-3 rounded-lg shadow-sm border border-blue-100 text-xs">
-                <div className="font-bold text-blue-900 mb-1">{pm.bank}</div>
-                <div className="flex justify-between"><span className="text-slate-500">Tipo:</span> <span className="font-medium">{pm.type}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Cuenta:</span> <span className="font-mono font-medium">{pm.account || pm.phone}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Titular:</span> <span className="font-medium">{pm.holder}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">RIF:</span> <span className="font-medium">{pm.rif}</span></div>
-              </div>
-            ))}
-            {!paymentMethodsLoading && !paymentMethodsError && paymentMethods.length === 0 && <p className="md:col-span-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">No hay medios de pago configurados. Comuníquese con administración antes de efectuar el pago.</p>}
-          </div>
-        </div>
-
         {/* Resumen de la Orden */}
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
           <h3 className="font-bold text-base mb-3 text-slate-800">Resumen de la Orden</h3>
@@ -260,6 +228,8 @@ export default function Convocatoria() {
             </div>
           </div>
         </div>
+
+        <PaymentMethodsPanel amountBs={totals.total} />
 
         {/* Formulario de Pago */}
         <div className="space-y-4 pt-2">
