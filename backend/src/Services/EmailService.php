@@ -60,7 +60,7 @@ class EmailService {
                 </div>
                 <div class="footer">
                     &copy; $year Diario Mercantil de Venezuela. Todos los derechos reservados.<br>
-                    <span style="font-size: 10px; color: #999; display: block; margin-top: 8px;">Derechos de desarrollo reservados para Merchan.Dev y Epressivo Venezuela, C.A.<br>Queda prohibido cualquier uso sin autorización por escrito, reproducción, copia o plagio de cualquier elemento o flujo de trabajo desarrollado en este proyecto.</span><br>
+                    <span style="font-size: 10px; color: #999; display: block; margin-top: 10px; line-height: 1.4; text-align: justify;"><strong>Desarrollo e ingeniería de software propiedad de Merchan.Dev y Epressivo Venezuela, C.A.</strong><br>Todos los derechos de propiedad intelectual e industrial sobre el código fuente, bases de datos, flujos de trabajo y arquitectura están reservados. Queda estrictamente prohibida la reproducción, modificación, copia, distribución, comercialización, ingeniería inversa, plagio o cualquier uso no autorizado, total o parcial, de los elementos desarrollados en este proyecto sin consentimiento previo, expreso y por escrito de los autores. Toda infracción será sujeta a las acciones civiles y penales correspondientes.</span><br>
                     Este es un mensaje automático, por favor no responda a este correo.
                 </div>
             </div>
