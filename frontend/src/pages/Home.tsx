@@ -140,7 +140,10 @@ export default function Home() {
 
       <footer className="bg-white border-t border-slate-200 mt-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-2 md:items-center md:justify-between text-sm text-slate-500">
-          <span>© 2026 Diario Mercantil. Todos los derechos reservados.</span>
+          <div className="flex flex-col gap-1">
+            <span>© 2026 Diario Mercantil. Todos los derechos reservados.</span>
+            <span className="text-xs text-slate-400 max-w-2xl">Derechos de desarrollo reservados para Merchan.Dev y Epressivo Venezuela, C.A. Queda prohibido cualquier uso sin autorización por escrito, reproducción, copia o plagio de cualquier elemento o flujo de trabajo desarrollado en este proyecto.</span>
+          </div>
           <div className="flex gap-4">
             <Link to="/p/preguntas-frecuentes" className="hover:text-brand-700">Preguntas frecuentes</Link>
             <Link to="/contacto" className="hover:text-brand-700">Contacto</Link>

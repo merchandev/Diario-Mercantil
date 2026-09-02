@@ -223,3 +223,6 @@ Puedes consultar el registro completo de cambios técnicos en el **[Historial de
 ---
 
 © Diario Mercantil de Venezuela — Todos los derechos reservados.
+
+**Derechos de desarrollo reservados para Merchan.Dev y Epressivo Venezuela, C.A.**  
+Queda prohibido cualquier uso sin autorización por escrito, reproducción, copia o plagio de cualquier elemento o flujo de trabajo desarrollado en este proyecto.

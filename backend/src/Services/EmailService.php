@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -60,6 +60,7 @@ class EmailService {
                 </div>
                 <div class="footer">
                     &copy; $year Diario Mercantil de Venezuela. Todos los derechos reservados.<br>
+                    <span style="font-size: 10px; color: #999; display: block; margin-top: 8px;">Derechos de desarrollo reservados para Merchan.Dev y Epressivo Venezuela, C.A.<br>Queda prohibido cualquier uso sin autorización por escrito, reproducción, copia o plagio de cualquier elemento o flujo de trabajo desarrollado en este proyecto.</span><br>
                     Este es un mensaje automático, por favor no responda a este correo.
                 </div>
             </div>
