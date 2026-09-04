@@ -7,13 +7,13 @@
 
 **Repositorio:** `Diario-Mercantil`  
 **Rama principal:** `main`  
-**Última actualización:** 2 de septiembre de 2026
+**Última actualización:** 4 de septiembre de 2026
 
 ## 📊 Resumen general
 
 | ✨ Features | 🐛 Fixes | 🔐 Seguridad | 🔧 Mantenimiento | 📚 Docs | 🧪 Tests | 📦 Otros |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 79 | 250 | 4 | 44 | 4 | 2 | 59 |
+| 79 | 251 | 4 | 45 | 6 | 2 | 59 |
 
 ## 🏷️ Tipos de cambios
 
@@ -47,21 +47,33 @@
 >
 > Durante septiembre se trabajó principalmente en:
 >
-> - ✨ Completa administracion de banners por...
+> - 📖 Restauración del visor de ediciones tipo revista (Flipbook) en las vistas pública y administrativa.
+> - 🧾 Separación segura entre la creación del borrador y la publicación final de una edición.
+> - 🛡️ Validación de integridad y disponibilidad de los PDFs individuales y consolidados.
+> - ✨ Administración completa de banners por página.
 
 ### 📊 Actividad
 
 | Categoría | Cambios |
 |---|---:|
-| 🐛 Fix | 4 |
-| 📚 Docs | 2 |
-| 🔧 Chore | 2 |
+| 🐛 Fix | 5 |
+| 📚 Docs | 4 |
+| 🔧 Chore | 3 |
 | ✨ Feature | 1 |
+
+### 4 de septiembre
+
+| Hora | Tipo | Cambio | Commit |
+|:---:|:---:|---|:---:|
+| 13:53 | 🐛 `fix` | Separa la creación de borradores, restaura el visor Flipbook, valida la integridad de PDFs y muestra avisos de disponibilidad | [`414a16e`](https://github.com/merchandev/Diario-Mercantil/commit/414a16e) |
 
 ### 2 de septiembre
 
 | Hora | Tipo | Cambio | Commit |
 |:---:|:---:|---|:---:|
+| 14:52 | 📚 `docs` | Mejora la redacción legal de los derechos de desarrollo e intelectuales | [`4d2ad4f`](https://github.com/merchandev/Diario-Mercantil/commit/4d2ad4f) |
+| 14:50 | 🔧 `chore` | Agrega derechos de desarrollo de Merchan.Dev y Epressivo y leyenda de prohibición legal | [`e0902d5`](https://github.com/merchandev/Diario-Mercantil/commit/e0902d5) |
+| 14:47 | 📚 `docs` | Mejora la estructura visual y el diseño técnico del historial | [`da3dbd6`](https://github.com/merchandev/Diario-Mercantil/commit/da3dbd6) |
 | 14:26 | 🐛 `fix` | Corrige pagos descargas y visor de ediciones | [`0bdc964`](https://github.com/merchandev/Diario-Mercantil/commit/0bdc964) |
 | 14:14 | 📚 `docs` | Mejora la estructura y diseño del historial por meses | [`82bd0d6`](https://github.com/merchandev/Diario-Mercantil/commit/82bd0d6) |
 | 14:10 | 📚 `docs` | Agrega enlace a historial.md en el README | [`639d8f5`](https://github.com/merchandev/Diario-Mercantil/commit/639d8f5) |
