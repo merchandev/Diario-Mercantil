@@ -7,6 +7,9 @@ import { HelmetProvider } from 'react-helmet-async'
 import './setupLogging'
 import './index.css'
 import { DialogProvider } from './contexts/DialogContext'
+import { printOwnershipConsoleSignature } from './lib/brandConsole'
+
+printOwnershipConsoleSignature()
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
