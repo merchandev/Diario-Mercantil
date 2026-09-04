@@ -13,7 +13,7 @@
 
 | ✨ Features | 🐛 Fixes | 🔐 Seguridad | 🔧 Mantenimiento | 📚 Docs | 🧪 Tests | 📦 Otros |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 79 | 252 | 4 | 45 | 6 | 2 | 59 |
+| 79 | 253 | 4 | 45 | 6 | 2 | 59 |
 
 ## 🏷️ Tipos de cambios
 
@@ -52,12 +52,13 @@
 > - 🛡️ Validación de integridad y disponibilidad de los PDFs individuales y consolidados.
 > - ✨ Administración completa de banners por página.
 > - 💻 Firma de propiedad del desarrollo trasladada del footer público a una presentación binaria en la consola.
+> - 📐 Footer público más compacto y sin espacio residual debajo del contenido.
 
 ### 📊 Actividad
 
 | Categoría | Cambios |
 |---|---:|
-| 🐛 Fix | 6 |
+| 🐛 Fix | 7 |
 | 📚 Docs | 4 |
 | 🔧 Chore | 3 |
 | ✨ Feature | 1 |
@@ -66,6 +67,7 @@
 
 | Hora | Tipo | Cambio | Commit |
 |:---:|:---:|---|:---:|
+| 14:29 | 🐛 `fix` | Compacta el footer público y elimina el espacio residual inferior en escritorio y móvil | [`879eeb3`](https://github.com/merchandev/Diario-Mercantil/commit/879eeb3) |
 | 14:19 | 🐛 `fix` | Retira el aviso de propiedad del footer público y lo presenta con diseño binario en la consola del navegador | [`7a5ff91`](https://github.com/merchandev/Diario-Mercantil/commit/7a5ff91) |
 | 13:53 | 🐛 `fix` | Separa la creación de borradores, restaura el visor Flipbook, valida la integridad de PDFs y muestra avisos de disponibilidad | [`414a16e`](https://github.com/merchandev/Diario-Mercantil/commit/414a16e) |
 
