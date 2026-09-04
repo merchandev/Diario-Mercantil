@@ -3,6 +3,7 @@ require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
+require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Http/StoragePath.php';
 
 class EditionController {
@@ -65,7 +66,8 @@ class EditionController {
 
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
-    $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->fileIsAvailable((int)($edition['file_id'] ?? 0));
+    $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
 
     $edition['seo'] = [
         'title' => 'Edición N° ' . $edition['edition_no'] . ' | Diario Mercantil Venezuela',
@@ -106,6 +108,12 @@ class EditionController {
       return;
     }
 
+    if (!(new EditionIntegrityService($pdo))->fileHasValidChecksum($fileId)) {
+      http_response_code(404);
+      echo 'El PDF final de esta edición no está disponible o no superó la validación de integridad';
+      return;
+    }
+
     $f = $pdo->prepare('SELECT name FROM files WHERE id=?');
     $f->execute([$fileId]);
     $originalName = $f->fetchColumn() ?: '';
@@ -143,8 +151,10 @@ class EditionController {
         ORDER BY e.id DESC LIMIT 200
     ');
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
-      $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_is_valid'] = $editionIntegrity->fileIsAvailable((int)($row['file_id'] ?? 0));
+      $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
     }
     Response::json(['items'=>$items]);
   }
@@ -213,8 +223,10 @@ class EditionController {
         if ($name !== '') $companyNames[(int)$company['edition_id']][$name] = true;
       }
     }
+    $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
-      $row['file_url'] = $row['file_id'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_is_valid'] = $editionIntegrity->fileIsAvailable((int)($row['file_id'] ?? 0));
+      $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
       $row['company_name'] = implode(' · ', array_keys($companyNames[(int)$row['id']] ?? []));
     }
     Response::json(['items'=>$items]);
@@ -268,7 +280,8 @@ class EditionController {
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
-    $edition['file_url'] = $edition['file_id'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->fileIsAvailable((int)($edition['file_id'] ?? 0));
+    $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
     $ord = $pdo->prepare(
         'SELECT l.id,l.name,l.document,l.status,l.date,l.meta,'
         . 'eo.publication_file_id,eo.publication_file_name,eo.publication_checksum,'
@@ -321,6 +334,10 @@ class EditionController {
     $date = trim((string)($input['date'] ?? gmdate('Y-m-d')));
     $orders = $input['orders'] ?? [];
     if (!is_array($orders)) $orders = [];
+    $orders = array_values(array_unique(array_filter(array_map('intval', $orders), static fn(int $id): bool => $id > 0)));
+    if ($orders === []) {
+        Response::json(['error'=>'La edición debe tener al menos una solicitud asociada.'], 422);
+    }
 
     $dateObj = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
     if (!$dateObj || $dateObj->format('Y-m-d') !== $date) {
@@ -527,6 +544,10 @@ class EditionController {
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $ids = $in['order_ids'] ?? ($in['orders'] ?? []);
     if (!is_array($ids)) $ids = [];
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn(int $id): bool => $id > 0)));
+    if ($ids === []) {
+        return Response::json(['error'=>'La edición debe conservar al menos una solicitud asociada.'], 422);
+    }
     
     try {
         $orderService = new EditionOrderService($pdo);

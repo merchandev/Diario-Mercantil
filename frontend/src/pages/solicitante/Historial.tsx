@@ -235,6 +235,9 @@ export default function Historial() {
                         )}
                         <button className="text-brand-700 hover:underline" onClick={() => navigate(`/solicitante/publicaciones/${r.id}`)}>Ver detalles</button>
                         <button className="text-blue-600 hover:underline" onClick={async () => { const b = await downloadLegal(r.id); const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `orden-servicio-${r.id}.pdf`; a.click(); URL.revokeObjectURL(url) }}>Descargar orden</button>
+                        {r.status === 'Publicada' && !editionDownloadUrl(r) && (
+                          <span className="text-amber-600 text-xs italic" title="El archivo de esta edición aún no está disponible. Contacte al administrador si necesita asistencia.">PDF no disponible</span>
+                        )}
                         {editionDownloadUrl(r) && (
                           <a href={editionDownloadUrl(r)!} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
                             Descargar publicación

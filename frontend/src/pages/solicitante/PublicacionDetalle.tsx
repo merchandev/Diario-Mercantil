@@ -90,6 +90,7 @@ export default function PublicacionDetalleSolicitante() {
   // Public QR/URL must belong exclusively to the edition. Never fall back to request/order IDs.
   const publicUrl = req.edition_code ? `${window.location.origin}/edicion/${encodeURIComponent(req.edition_code)}` : ''
   const publicationDownloadUrl = editionDownloadUrl(req)
+  const hasAvailableEdition = isPublicada && Boolean(publicationDownloadUrl)
 
   const fechaSolicitud = formatCaracasDateTime(req.submitted_at || req.created_at || req.date)
 
@@ -233,7 +234,7 @@ export default function PublicacionDetalleSolicitante() {
           </div>
 
           {/* QR Code — only when published (obs. 9) */}
-          {isPublicada && publicUrl && (
+          {hasAvailableEdition && publicUrl && (
             <div className="card p-6">
               <h3 className="font-semibold mb-3 text-brand-800">Código QR</h3>
               <p className="text-xs text-slate-600 mb-4">Comparte este código para acceder a tu publicación</p>
@@ -253,7 +254,7 @@ export default function PublicacionDetalleSolicitante() {
           )}
 
           {/* URL Pública — only when published (obs. 9) */}
-          {isPublicada && publicUrl && (
+          {hasAvailableEdition && publicUrl && (
             <div className="card p-6">
               <h3 className="font-semibold mb-3 text-brand-800">Enlace Público</h3>
               <p className="text-xs text-slate-600 mb-3">Comparte este enlace para que otros vean tu publicación</p>
@@ -285,12 +286,7 @@ export default function PublicacionDetalleSolicitante() {
                   <IconDownload /> Descargar publicación
                 </a>
               ) : req.edition_code ? (
-                <a
-                  href={`/edicion/${encodeURIComponent(req.edition_code)}`}
-                  className="btn btn-primary w-full inline-flex items-center justify-center gap-2 text-sm"
-                >
-                  Ver edición en línea
-                </a>
+                <span className="text-amber-700 text-xs italic block border border-amber-200 bg-amber-50 p-2 rounded">El archivo de esta edición aún no está disponible. Contacte al administrador si necesita asistencia.</span>
               ) : (
                 <p className="text-xs text-green-800">La publicación está marcada como publicada, pero aún no tiene una edición vinculada. Contacte al administrador.</p>
               )}

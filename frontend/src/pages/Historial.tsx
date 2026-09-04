@@ -119,6 +119,12 @@ export default function Historial() {
                         {(r.publish_date) ? (
                           <span className="flex items-center gap-2">
                             {r.publish_date.split('-').reverse().join('/')}
+                            {r.status === 'Publicada' && !editionDownloadUrl(r) && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700" role="status">
+                                <span aria-hidden="true">⚠️</span>
+                                PDF de la edición no disponible
+                              </span>
+                            )}
                             {editionDownloadUrl(r) && (
                               <a
                                 className="text-brand-600 hover:text-brand-800"

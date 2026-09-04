@@ -4,7 +4,6 @@ import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconC
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
 import AlertDialog from '../components/AlertDialog'
-import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import FlipbookViewer from '../components/FlipbookViewer'
 import { useDialog } from '../contexts/DialogContext'
 
@@ -49,7 +48,7 @@ export default function Ediciones() {
     setDetail(det); setAllOrders(leg.items)
   }
 
-  const onCreateAndPublish = async (e: any) => {
+  const handleCreateEdition = async (e: any) => {
     e.preventDefault()
     setPublishingState({ active: true, progress: 0, message: 'Creando registro...' })
     try {
@@ -70,27 +69,17 @@ export default function Ediciones() {
         return
       }
 
-      try {
-        setPublishingState({ active: true, progress: 10, message: 'Preparando PDFs individuales...' })
-        await publishEdition(newId, (prog, msg) => {
-          setPublishingState(prev => ({ ...prev, progress: Math.max(10, prog), message: msg }))
-        })
-      } catch (error) {
-        await load()
-        await openDetail(newId)
-        setAlertDialog({
-          isOpen: true,
-          title: 'Edición conservada como borrador',
-          message: `La edición fue creada, pero no se pudo publicar: ${error instanceof Error ? error.message : String(error)}. Puede corregirla o cargar el PDF faltante desde el detalle.`,
-          variant: 'warning',
-        })
-        return
-      }
       setForm({ date: new Date().toISOString().slice(0, 10), selectedOrders: [] })
       setQrGenerated(false)
       setGeneratedCode('')
       await load()
-      setAlertDialog({ isOpen: true, title: 'Edición publicada', message: `Edición publicada exitosamente.`, variant: 'success' })
+      await openDetail(newId)
+      setAlertDialog({
+        isOpen: true,
+        title: 'Edición creada como borrador',
+        message: 'La edición fue creada como borrador. Revise las publicaciones, prepare o cargue el PDF final y publique la edición cuando esté lista.',
+        variant: 'success'
+      })
     } finally {
       setPublishingState({ active: false, progress: 0, message: '' })
     }
@@ -98,19 +87,26 @@ export default function Ediciones() {
 
   const handlePublish = async () => {
     if (!selId) return
-    setPublishingState({ active: true, progress: 0, message: 'Iniciando...' })
-    try {
-      await publishEdition(selId, (prog, msg) => {
-        setPublishingState(prev => ({ ...prev, progress: prog, message: msg }))
-      })
-      const det = await getEdition(selId)
-      setDetail(det)
-      await load()
-      setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Edición publicada y PDF generado', variant: 'success' })
-    } catch (error) {
-      setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'Error al publicar', variant: 'error' })
-    } finally {
-      setPublishingState({ active: false, progress: 0, message: '' })
+    const confirmed = await confirmAction('Una vez publicada, las solicitudes incluidas pasarán a Publicada, la edición estará disponible públicamente, el QR y el enlace público quedarán activos, y los usuarios podrán descargar el PDF completo de la edición.', {
+      title: '¿Publicar esta edición?',
+      confirmText: 'Publicar edición'
+    })
+
+    if (confirmed) {
+      setPublishingState({ active: true, progress: 0, message: 'Iniciando...' })
+      try {
+        await publishEdition(selId, (prog, msg) => {
+          setPublishingState(prev => ({ ...prev, progress: prog, message: msg }))
+        })
+        const det = await getEdition(selId)
+        setDetail(det)
+        await load()
+        setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Edición publicada y PDF generado', variant: 'success' })
+      } catch (error) {
+        setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'Error al publicar', variant: 'error' })
+      } finally {
+        setPublishingState({ active: false, progress: 0, message: '' })
+      }
     }
   }
 
@@ -119,7 +115,7 @@ export default function Ediciones() {
     setUploadingPdf(true)
     try {
       const result = await uploadEditionPdf(selId, file)
-      setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_url: result.edition?.file_url || `/api/e/code/${encodeURIComponent(prev.edition.code)}/download` } } : prev)
+      setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_is_valid: true, file_url: result.edition?.file_url || `/api/editions/${selId}/download` } } : prev)
       await load()
       setAlertDialog({ isOpen: true, title: 'Éxito', message: 'PDF actualizado', variant: 'success' })
     } catch (error) {
@@ -164,8 +160,9 @@ export default function Ediciones() {
     }
   }
 
-  const pdfUrl = detail?.edition.code ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download` : (selId ? `/api/e/id/${selId}/download` : '')
-  const viewerUrl = detail?.edition.code ? `/visor-espresivo/${encodeURIComponent(detail.edition.code)}` : ''
+  const pdfUrl = detail?.edition.status === 'Publicada' && detail.edition.code
+    ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download`
+    : (selId ? `/api/editions/${selId}/download` : '')
   useEffect(() => {
     if (detail && pdfSectionRef.current) {
       const el = pdfSectionRef.current
@@ -294,8 +291,8 @@ export default function Ediciones() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-slate-100">
-                <button type="button" onClick={onCreateAndPublish} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={publishingState.active || form.selectedOrders.length === 0}>
-                  {publishingState.active ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Publicar edición</span></>)}
+                <button type="button" onClick={handleCreateEdition} className="btn btn-primary px-6 py-2.5 text-sm font-semibold shadow-md inline-flex items-center gap-2" disabled={publishingState.active || form.selectedOrders.length === 0}>
+                  {publishingState.active ? 'Procesando...' : (<><IconCheck className="w-5 h-5" /> <span>Crear edición</span></>)}
                 </button>
               </div>
             </>
@@ -370,6 +367,19 @@ export default function Ediciones() {
                               </div>
                             </div>
 
+                            {detail.edition.status === 'Borrador' && (
+                              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                                <strong className="block mb-1">Estado: Borrador</strong>
+                                La edición fue creada como borrador. Revise las publicaciones, prepare o cargue el PDF final y publique la edición cuando esté lista. El enlace y el QR públicos permanecerán inactivos hasta entonces.
+                              </div>
+                            )}
+                            {detail.edition.status === 'Publicada' && !detail.edition.file_is_valid && (
+                              <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                                <strong className="block mb-1">La edición publicada no posee un PDF final válido.</strong>
+                                Requiere revisión mediante el proceso controlado de mantenimiento antes de volver a publicarse.
+                              </div>
+                            )}
+
                             <div className="grid sm:grid-cols-2 gap-4">
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Código de Verificación Electrónica (CVE)</span>
@@ -443,7 +453,7 @@ export default function Ediciones() {
                                   <div className="flex flex-wrap gap-2">
                                     <label className={`btn btn-outline inline-flex items-center gap-2 cursor-pointer ${uploadingPdf ? 'opacity-60 pointer-events-none' : ''}`}>
                                       <IconUpload className="w-4 h-4" />
-                                      <span>{uploadingPdf ? 'Cargando...' : 'Cargar consolidado'}</span>
+                                      <span>{uploadingPdf ? 'Cargando...' : (detail.edition.file_id ? 'Reemplazar PDF final' : 'Cargar PDF final')}</span>
                                       <input
                                         type="file"
                                         accept="application/pdf,.pdf"
@@ -465,7 +475,7 @@ export default function Ediciones() {
                               {!isPdfCollapsed && !detail.edition.file_id && (
                                 <p className="text-sm text-slate-600">El consolidado se generará al publicar, después de preparar cada PDF individual. También puedes cargar uno manualmente.</p>
                               )}
-                              {!isPdfCollapsed && detail.edition.file_id && (
+                              {!isPdfCollapsed && detail.edition.file_id && detail.edition.file_is_valid && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm bg-slate-50 flex items-center justify-between p-4">
                                     <div className="flex items-center gap-3 text-slate-700">
@@ -499,7 +509,13 @@ export default function Ediciones() {
                                       </a>
                                     </div>
                                   </div>
+                                  <div className="rounded-xl overflow-hidden border border-slate-300">
+                                    <FlipbookViewer src={pdfUrl} height={650} minHeight={500} />
+                                  </div>
                                 </div>
+                              )}
+                              {!isPdfCollapsed && detail.edition.file_id && !detail.edition.file_is_valid && (
+                                <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3">El archivo registrado no existe físicamente o no es válido. Reemplácelo antes de publicar.</p>
                               )}
                             </div>
 
@@ -557,7 +573,7 @@ export default function Ediciones() {
                                                   }}
                                                 />
                                               </label>
-                                              <button className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-md transition-colors" title="Quitar publicación de esta edición" onClick={async () => {
+                                              <button disabled={detail.orders.length <= 1} className="text-rose-500 hover:text-rose-700 hover:bg-rose-50 disabled:text-slate-300 disabled:hover:bg-transparent disabled:cursor-not-allowed p-1.5 rounded-md transition-colors" title={detail.orders.length <= 1 ? 'La edición debe conservar al menos una publicación' : 'Quitar publicación de esta edición'} onClick={async () => {
                                                 if (await confirmAction(`¿Quitar orden #${o.id} de esta edición?`, { title: 'Quitar publicación', danger: true })) {
                                                   const newOrders = detail.orders.filter(ord => ord.id !== o.id).map(ord => ord.id)
                                                   await setEditionOrders(selId!, newOrders)
@@ -617,7 +633,7 @@ export default function Ediciones() {
                               <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
                                 Código QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
-                              {expanded.qr && (() => {
+                              {expanded.qr && detail.edition.status === 'Publicada' && detail.edition.file_is_valid && (() => {
                                 const qrUrl = `${location.origin}/edicion/${detail.edition.code}`
                                 return (
                                   <>
@@ -639,11 +655,14 @@ export default function Ediciones() {
                                   </>
                                 )
                               })()}
+                              {expanded.qr && (detail.edition.status !== 'Publicada' || !detail.edition.file_is_valid) && (
+                                <p className="text-sm text-slate-600">El QR y el enlace público se activarán únicamente cuando la edición tenga un PDF final válido y sea publicada.</p>
+                              )}
                             </div>
 
                             <div className="border rounded-lg p-4 bg-white space-y-3">
                               <h3 className="font-semibold text-brand-800">Descargas</h3>
-                              {detail.edition.file_id ? (
+                              {detail.edition.file_id && detail.edition.file_is_valid ? (
                                 <>
                                   <a
                                     className="btn btn-primary w-full inline-flex items-center justify-center gap-2"

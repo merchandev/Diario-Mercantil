@@ -11,11 +11,20 @@ describe('editionDownloadUrl', () => {
     } as any)).toBe('/api/e/code/MMXXVI-0001/download?download=1')
   })
 
-  it('builds the edition endpoint when the API omits edition_file_url', () => {
+  it('returns null when edition_file_url is missing even if published', () => {
     expect(editionDownloadUrl({
       status: 'Publicada',
       edition_code: 'MMXXVI/0002',
-    })).toBe('/api/e/code/MMXXVI%2F0002/download?download=1')
+    })).toBeNull()
+  })
+
+  it('trusts an explicit backend availability rejection over a stale URL', () => {
+    expect(editionDownloadUrl({
+      status: 'Publicada',
+      edition_code: 'MMXXVI-0003',
+      edition_file_url: '/api/e/code/MMXXVI-0003/download',
+      edition_has_file: false,
+    })).toBeNull()
   })
 
   it('does not expose a download before publication or without an edition', () => {

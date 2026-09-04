@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
 import { listPublicEditions, type Edition as ApiEdition } from '../lib/api'
 import { SEO } from '../components/SEO'
-import PublicPdfViewer from '../components/PublicPdfViewer'
+import FlipbookViewer from '../components/FlipbookViewer'
 
 type Edition = ApiEdition & { seo?: { title?: string, description?: string, og_image?: string } }
 type Order = { id: number; name: string; document: string; status: string; date: string }
@@ -51,7 +51,7 @@ export default function EditionPublic() {
     navigate(`/ediciones?${params.toString()}`)
   }
 
-  const pdfUrl = useMemo(() => edition ? `/api/e/code/${encodeURIComponent(edition.code)}/download` : '', [edition])
+  const pdfUrl = useMemo(() => edition?.file_url || '', [edition])
 
   if (err) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">{err}</div></div>
   if (!edition) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">Cargando...</div></div>
@@ -130,16 +130,22 @@ export default function EditionPublic() {
             </div>
           </div>
           <div>
-            <a className="btn btn-outline text-brand-700 border-brand-200 hover:bg-brand-50" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">
-              Descargar PDF
-            </a>
+            {pdfUrl ? (
+              <a className="btn btn-outline text-brand-700 border-brand-200 hover:bg-brand-50" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">
+                Descargar PDF
+              </a>
+            ) : (
+              <span className="text-sm text-amber-700">PDF no disponible</span>
+            )}
           </div>
         </div>
 
         {/* 2. Revista PDF Central */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
-          {edition.file_id ? (
-            <PublicPdfViewer src={pdfUrl} title={`Edición ${edition.edition_no}`} />
+          {pdfUrl ? (
+            <div className="bg-neutral-900 rounded-lg overflow-hidden flex flex-col p-2 sm:p-4 shadow-inner">
+              <FlipbookViewer src={pdfUrl} className="w-full h-full" minHeight={800} />
+            </div>
           ) : (
             <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200 min-h-[680px] flex flex-col items-center justify-center">
               <IconSearch className="w-12 h-12 mx-auto text-slate-300 mb-3" />

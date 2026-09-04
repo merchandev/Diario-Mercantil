@@ -233,6 +233,7 @@ export type Edition = {
   file_id?: number | null;
   file_name?: string | null;
   file_url?: string | null;
+  file_is_valid?: boolean;
   created_at?: string;
   updated_at?: string;
   published_by_name?: string;
@@ -311,7 +312,7 @@ export async function uploadEditionPdf(id: number, file: File) {
   const fd = new FormData()
   fd.append('file', file)
   const res = await fetchAuth(`/api/editions/${id}/pdf`, { method: 'POST', body: fd })
-  return res.json() as Promise<{ ok: true; file_id: number; file_name: string; edition: Edition }>
+  return res.json() as Promise<{ ok: true; file_id: number; file_name: string; edition?: Edition }>
 }
 export async function listRetiredEditions() {
   const res = await fetchAuth('/api/editions-retired')
@@ -401,7 +402,9 @@ export type LegalRequest = {
   edition_code?: string;
   edition_no?: number;
   edition_id?: number | null;
+  edition_file_id?: number | null;
   edition_file_url?: string | null;
+  edition_has_file?: boolean;
   publication_file_id?: number | null;
   publication_file_url?: string | null;
 }

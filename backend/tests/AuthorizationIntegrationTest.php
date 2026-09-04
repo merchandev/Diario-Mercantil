@@ -7,13 +7,17 @@ class AuthorizationIntegrationTest extends TestCase {
     private static $pipes = [];
     private static $port = 0;
     private static string $dbPath;
+    private static string $uploadDir;
     
     public static function setUpBeforeClass(): void {
         self::$port = random_int(18080, 18980);
         self::$dbPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dm_authorization_' . getmypid() . '.sqlite';
         if (is_file(self::$dbPath)) unlink(self::$dbPath);
+        self::$uploadDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dm_authorization_uploads_' . getmypid();
+        if (!is_dir(self::$uploadDir)) mkdir(self::$uploadDir, 0750, true);
         putenv('DB_CONNECTION=sqlite');
         putenv('DB_PATH=' . self::$dbPath);
+        putenv('UPLOAD_DIR=' . self::$uploadDir);
 
         require_once __DIR__ . '/../src/Database.php';
         $pdo = Database::pdo();
@@ -75,6 +79,17 @@ class AuthorizationIntegrationTest extends TestCase {
         $property = new ReflectionProperty(Database::class, 'pdo');
         $property->setValue(null, null);
         if (isset(self::$dbPath) && is_file(self::$dbPath)) unlink(self::$dbPath);
+        if (isset(self::$uploadDir) && is_dir(self::$uploadDir)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator(self::$uploadDir, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::CHILD_FIRST
+            );
+            foreach ($iterator as $item) {
+                $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
+            }
+            rmdir(self::$uploadDir);
+        }
+        putenv('UPLOAD_DIR');
     }
     
     private function request($method, $uri, $sessionId = null, $body = []) {
@@ -197,20 +212,81 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame([160], array_map('intval', array_column($byEdition['body']['items'] ?? [], 'id')));
     }
 
+    public function testLegalDownloadContractReportsOnlyPhysicallyAvailableEditionFiles(): void
+    {
+        $pdo = Database::pdo();
+        $contents = '%PDF-1.4 available edition';
+        file_put_contents(self::$uploadDir . DIRECTORY_SEPARATOR . 'available-edition.pdf', $contents);
+        $checksum = hash('sha256', $contents);
+        $pdo->prepare("INSERT INTO files(id,name,path,size,type,checksum,status,created_at,updated_at) VALUES(201,'available.pdf','available-edition.pdf',?,'pdf',?,'processed','2026-09-01','2026-09-01')")
+            ->execute([strlen($contents), $checksum]);
+        $pdo->exec("INSERT INTO files(id,name,path,size,type,checksum,status,created_at,updated_at) VALUES(202,'missing.pdf','missing-edition.pdf',25,'pdf','deadbeef','processed','2026-09-01','2026-09-01')");
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,created_at) VALUES(164,2,'Publicada',100,'Con PDF','2026-09-01','2026-09-01'),(165,2,'Publicada',100,'Sin PDF','2026-09-01','2026-09-01')");
+        $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(61,'MMXXV-0061','Publicada','2025-09-01',61,1,'2025-09-01',2025,201),(62,'MMXXV-0062','Publicada','2025-09-01',62,1,'2025-09-01',2025,202)");
+        $pdo->exec('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(61,164),(62,165)');
+
+        $response = $this->request('GET', '/api/legal', 'admin_session_test');
+        $this->assertSame(200, $response['code'], json_encode($response['body']));
+        $items = [];
+        foreach ($response['body']['items'] ?? [] as $item) $items[(int) $item['id']] = $item;
+        $this->assertTrue($items[164]['edition_has_file'] ?? false);
+        $this->assertSame('/api/e/code/MMXXV-0061/download', $items[164]['edition_file_url'] ?? null);
+        $this->assertFalse($items[165]['edition_has_file'] ?? true);
+        $this->assertNull($items[165]['edition_file_url'] ?? null);
+    }
+
     public function testSQLiteEditionCounterCreatesConsecutiveRomanCodes() {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,created_at) VALUES(162,2,'En trámite',100,'Correlativo uno','2026-08-29','2026-08-29'),(163,2,'En trámite',100,'Correlativo dos','2026-08-30','2026-08-30')");
         $first = $this->request('POST', '/api/editions', 'admin_session_test', [
             'date' => '2026-08-29',
-            'orders' => [],
+            'orders' => [162],
         ]);
         $second = $this->request('POST', '/api/editions', 'admin_session_test', [
             'date' => '2026-08-30',
-            'orders' => [],
+            'orders' => [163],
         ]);
 
         $this->assertSame(200, $first['code'], json_encode($first['body']));
         $this->assertSame('MMXXVI-0001', $first['body']['code'] ?? null);
         $this->assertSame(200, $second['code'], json_encode($second['body']));
         $this->assertSame('MMXXVI-0002', $second['body']['code'] ?? null);
+        $this->assertSame('Borrador', $pdo->query('SELECT status FROM editions WHERE id=' . (int)$first['body']['id'])->fetchColumn());
+        $this->assertSame('En trámite', $pdo->query('SELECT status FROM legal_requests WHERE id=162')->fetchColumn());
+    }
+
+    public function testEditionCreationStaysDraftForOneTwoThreeAndTenRequests(): void
+    {
+        $pdo = Database::pdo();
+        $nextRequestId = 170;
+        foreach ([1, 2, 3, 10] as $scenario => $count) {
+            $ids = [];
+            for ($index = 0; $index < $count; $index++) {
+                $id = $nextRequestId++;
+                $ids[] = $id;
+                $pdo->prepare('INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,created_at) VALUES(?,?,?,?,?,?,?)')
+                    ->execute([$id, 2, 'En trámite', 100, "Solicitud {$id}", '2026-09-01', '2026-09-01']);
+            }
+            $created = $this->request('POST', '/api/editions', 'admin_session_test', [
+                'date' => sprintf('2026-09-%02d', $scenario + 1),
+                'orders' => $ids,
+            ]);
+            $this->assertSame(200, $created['code'], json_encode($created['body']));
+            $editionId = (int) ($created['body']['id'] ?? 0);
+            $this->assertSame('Borrador', $pdo->query("SELECT status FROM editions WHERE id={$editionId}")->fetchColumn());
+            $this->assertSame($count, (int) $pdo->query("SELECT COUNT(*) FROM edition_orders WHERE edition_id={$editionId}")->fetchColumn());
+            $this->assertSame($count, (int) $pdo->query('SELECT COUNT(*) FROM legal_requests WHERE status=\'En trámite\' AND id IN (' . implode(',', $ids) . ')')->fetchColumn());
+        }
+    }
+
+    public function testEditionCreationRejectsAnEmptySelection(): void
+    {
+        $created = $this->request('POST', '/api/editions', 'admin_session_test', [
+            'date' => '2026-09-10',
+            'orders' => [],
+        ]);
+        $this->assertSame(422, $created['code'], json_encode($created['body']));
+        $this->assertStringContainsString('al menos una solicitud', $created['body']['error'] ?? '');
     }
 
     public function testAdminCanPersistSettingsAndPublishBanner(): void {

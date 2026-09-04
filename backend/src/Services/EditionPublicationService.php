@@ -198,6 +198,12 @@ final class EditionPublicationService
                         422
                     );
                 }
+                if (!$this->hasValidPreparedPdf($editionId, (int) $row['legal_request_id'])) {
+                    throw new RuntimeException(
+                        "El PDF individual de la solicitud {$row['legal_request_id']} no superó la validación de integridad.",
+                        422
+                    );
+                }
             }
 
             $fileId = (int) ($edition['file_id'] ?? 0);

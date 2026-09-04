@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAuth } from "../lib/api";
 import * as pdfjs from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { desktopSpread, maxDesktopSpread } from "../lib/flipbookLayout";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -30,12 +31,14 @@ type Trans = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function spreadPages(pages: FlipPage[], s: number) {
-  if (s === 0) return { left: undefined, right: pages[0] };
-  const base = 2 * s - 1;
-  return { left: pages[base], right: pages[base + 1] };
+  const slots = desktopSpread(pages.length, s);
+  return {
+    left: slots.leftIndex === null ? undefined : pages[slots.leftIndex],
+    right: slots.rightIndex === null ? undefined : pages[slots.rightIndex],
+  };
 }
 function maxSpreadFor(p: FlipPage[]) {
-  return p.length === 0 ? 0 : Math.ceil((p.length - 1) / 2);
+  return maxDesktopSpread(p.length);
 }
 function spreadToPageIdx(s: number) {
   return s === 0 ? 0 : 2 * s - 1;
@@ -69,7 +72,7 @@ function PageFace({
         ...style,
       }}
     >
-      {page && (
+      {page?.dataUrl ? (
         <img
           src={page.dataUrl}
           alt={`p${page.num}`}
@@ -85,7 +88,15 @@ function PageFace({
             pointerEvents: "none",
           }}
         />
-      )}
+      ) : page ? (
+        <div
+          role="status"
+          aria-label={`Cargando página ${page.num}`}
+          style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#64748b", fontSize: 13, background: "#f8fafc" }}
+        >
+          Cargando página {page.num}…
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -299,12 +310,15 @@ function ReadOverlay({
   pages,
   startIdx,
   onClose,
+  onPageRequest,
 }: {
   pages: FlipPage[];
   startIdx: number;
   onClose: () => void;
+  onPageRequest: (index: number) => void;
 }) {
   const [idx, setIdx] = useState(startIdx);
+  useEffect(() => onPageRequest(idx), [idx, onPageRequest]);
   const btnStyle = (dis: boolean): React.CSSProperties => ({
     padding: "7px 20px",
     borderRadius: 30,
@@ -340,6 +354,7 @@ function ReadOverlay({
         </span>
         <button
           onClick={onClose}
+          aria-label="Cerrar modo lectura"
           style={{ ...btnStyle(false), padding: "4px 12px" }}
         >
           ✕
@@ -355,17 +370,17 @@ function ReadOverlay({
           overflow: "hidden",
         }}
       >
-        {pages[idx] && (
+        {pages[idx]?.dataUrl ? (
           <img
             src={pages[idx].dataUrl}
-            alt=""
+            alt={`Página ${idx + 1}`}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
               objectFit: "contain",
             }}
           />
-        )}
+        ) : <span role="status" style={{ color: "#fff" }}>Cargando página…</span>}
       </div>
       <div
         style={{
@@ -378,6 +393,7 @@ function ReadOverlay({
       >
         <button
           disabled={idx === 0}
+          aria-label="Página anterior en modo lectura"
           onClick={() => setIdx((i) => i - 1)}
           style={btnStyle(idx === 0)}
         >
@@ -385,6 +401,7 @@ function ReadOverlay({
         </button>
         <button
           disabled={idx >= pages.length - 1}
+          aria-label="Página siguiente en modo lectura"
           onClick={() => setIdx((i) => i + 1)}
           style={btnStyle(idx >= pages.length - 1)}
         >
@@ -607,6 +624,7 @@ function NavBtn({
     <button
       onClick={onClick}
       disabled={disabled}
+      aria-label={dir === "prev" ? "Página anterior" : "Página siguiente"}
       style={{
         display: "flex",
         alignItems: "center",
@@ -1363,10 +1381,19 @@ export default function FlipbookViewer({
 
   const rootRef = useRef<HTMLDivElement>(null);
   const [rootW, setRootW] = useState(900);
+  const rootWRef = useRef(900);
+  const pdfRef = useRef<any>(null);
+  const loadTaskRef = useRef<any>(null);
+  const renderTasksRef = useRef<Map<number, any>>(new Map());
+  const renderedUrlsRef = useRef<Map<number, string>>(new Map());
+  const generationRef = useRef(0);
 
   useEffect(() => {
     if (!rootRef.current) return;
-    const ro = new ResizeObserver(([e]) => setRootW(e.contentRect.width));
+    const ro = new ResizeObserver(([e]) => {
+      rootWRef.current = e.contentRect.width;
+      setRootW(e.contentRect.width);
+    });
     ro.observe(rootRef.current);
     return () => ro.disconnect();
   }, []);
@@ -1377,8 +1404,85 @@ export default function FlipbookViewer({
     return () => document.removeEventListener("fullscreenchange", h);
   }, []);
 
+  const disposePdf = useCallback(() => {
+    generationRef.current += 1;
+    for (const task of renderTasksRef.current.values()) {
+      try { task.cancel(); } catch { /* already completed */ }
+    }
+    renderTasksRef.current.clear();
+    for (const url of renderedUrlsRef.current.values()) URL.revokeObjectURL(url);
+    renderedUrlsRef.current.clear();
+    try { loadTaskRef.current?.destroy(); } catch { /* already completed */ }
+    try { pdfRef.current?.destroy(); } catch { /* already completed */ }
+    loadTaskRef.current = null;
+    pdfRef.current = null;
+  }, []);
+
+  const renderPagesAround = useCallback(async (center: number, pdfOverride?: any, generationOverride?: number) => {
+    const pdf = pdfOverride || pdfRef.current;
+    if (!pdf) return;
+    const generation = generationOverride ?? generationRef.current;
+    const total = Number(pdf.numPages || 0);
+    const start = Math.max(0, center - 3);
+    const end = Math.min(total - 1, center + 4);
+    const targetIndexes = Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
+
+    for (const index of targetIndexes) {
+      if (generation !== generationRef.current || renderedUrlsRef.current.has(index) || renderTasksRef.current.has(index)) continue;
+      const page = await pdf.getPage(index + 1);
+      const baseViewport = page.getViewport({ scale: 1 });
+      const measuredWidth = rootWRef.current;
+      const displayWidth = measuredWidth < 620 ? Math.min(Math.max(measuredWidth - 16, 240), 420) : Math.min(Math.max((measuredWidth - 60) / 2, 320), 720);
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const targetPixels = Math.min(1600, Math.max(700, displayWidth * pixelRatio));
+      const viewport = page.getViewport({ scale: targetPixels / baseViewport.width });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('No se pudo preparar el lienzo de la página.');
+      const renderTask = page.render({ canvasContext: context, viewport } as any);
+      renderTasksRef.current.set(index, renderTask);
+      try {
+        await renderTask.promise;
+        if (generation !== generationRef.current) continue;
+        const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
+          value => value ? resolve(value) : reject(new Error('No se pudo optimizar la página.')),
+          'image/jpeg',
+          0.9,
+        ));
+        const objectUrl = URL.createObjectURL(blob);
+        renderedUrlsRef.current.set(index, objectUrl);
+        setPages(previous => previous.map((item, pageIndex) => pageIndex === index ? { ...item, dataUrl: objectUrl } : item));
+        setProgress(Math.min(100, Math.round((renderedUrlsRef.current.size / Math.min(total, 8)) * 100)));
+      } finally {
+        renderTasksRef.current.delete(index);
+        page.cleanup();
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    }
+
+    if (generation !== generationRef.current) return;
+    const keepStart = Math.max(0, center - 6);
+    const keepEnd = Math.min(total - 1, center + 7);
+    const released = new Set<number>();
+    for (const [index, url] of renderedUrlsRef.current.entries()) {
+      if (index < keepStart || index > keepEnd) {
+        URL.revokeObjectURL(url);
+        renderedUrlsRef.current.delete(index);
+        released.add(index);
+      }
+    }
+    if (released.size > 0) {
+      setPages(previous => previous.map((item, index) => released.has(index) ? { ...item, dataUrl: '' } : item));
+    }
+  }, []);
+
   const loadPdf = useCallback(async () => {
     if (!src) return;
+    disposePdf();
+    const generation = generationRef.current;
     setLoading(true);
     setError(null);
     setPages([]);
@@ -1401,33 +1505,38 @@ export default function FlipbookViewer({
       }
       const copy = new ArrayBuffer(buf.byteLength);
       new Uint8Array(copy).set(new Uint8Array(buf));
-      const pdf = await pdfjs.getDocument({ data: copy }).promise;
-      const total = pdf.numPages;
-      const out: FlipPage[] = [];
-      for (let i = 1; i <= total; i++) {
-        const pg = await pdf.getPage(i);
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const vp = pg.getViewport({ scale: 2.2 * dpr });
-        const cv = document.createElement("canvas");
-        cv.width = vp.width;
-        cv.height = vp.height;
-        const ctx = cv.getContext("2d");
-        if (!ctx) continue;
-        await pg.render({ canvasContext: ctx, viewport: vp } as any).promise;
-        out.push({ num: i, dataUrl: cv.toDataURL("image/jpeg", 0.92) });
-        setProgress(Math.round((i / total) * 100));
+      const loadingTask = pdfjs.getDocument({ data: copy });
+      loadTaskRef.current = loadingTask;
+      const pdf = await loadingTask.promise;
+      if (generation !== generationRef.current) {
+        await pdf.destroy();
+        return;
       }
-      setPages(out);
+      pdfRef.current = pdf;
+      const total = pdf.numPages;
+      setPages(Array.from({ length: total }, (_, index) => ({ num: index + 1, dataUrl: '' })));
+      await renderPagesAround(0, pdf, generation);
     } catch (e: any) {
-      setError(e?.message ?? "Error inesperado");
+      if (generation === generationRef.current && e?.name !== 'RenderingCancelledException') {
+        setError(e?.message ?? "Error inesperado");
+      }
     } finally {
-      setLoading(false);
+      if (generation === generationRef.current) setLoading(false);
     }
-  }, [src]);
+  }, [src, disposePdf, renderPagesAround]);
 
   useEffect(() => {
-    loadPdf();
-  }, [loadPdf]);
+    void loadPdf();
+    return disposePdf;
+  }, [loadPdf, disposePdf]);
+
+  useEffect(() => {
+    if (!loading && pdfRef.current) {
+      void renderPagesAround(currentIdx).catch(error => {
+        if (error?.name !== 'RenderingCancelledException') setError(error?.message || 'No se pudo renderizar la página.');
+      });
+    }
+  }, [currentIdx, loading, renderPagesAround]);
 
   const isMobile = rootW < 620;
   const pageW = isMobile
@@ -1451,6 +1560,8 @@ export default function FlipbookViewer({
 
       <div
         ref={rootRef}
+        role="region"
+        aria-label="Visor de edición tipo revista"
         className={`relative w-full select-none ${className}`}
         style={{
           minHeight: isFs ? "100vh" : viewerH,
@@ -1494,6 +1605,7 @@ export default function FlipbookViewer({
             >
               <button
                 title="Modo lectura"
+                aria-label="Abrir modo lectura"
                 onClick={() => setShowRead(true)}
                 style={iconBtn}
               >
@@ -1511,6 +1623,7 @@ export default function FlipbookViewer({
               </button>
               <button
                 title={isFs ? "Salir" : "Pantalla completa"}
+                aria-label={isFs ? "Salir de pantalla completa" : "Abrir en pantalla completa"}
                 onClick={() =>
                   !document.fullscreenElement
                     ? rootRef.current?.requestFullscreen().catch(() => { })
@@ -1693,6 +1806,7 @@ export default function FlipbookViewer({
           pages={pages}
           startIdx={currentIdx}
           onClose={() => setShowRead(false)}
+          onPageRequest={(index) => { void renderPagesAround(index); }}
         />
       )}
       {showGrid && (

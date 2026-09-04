@@ -159,6 +159,91 @@ final class EditionPdfGeneratorTest extends TestCase
         );
     }
 
+    /** @dataProvider requestCountProvider */
+    public function testPublicationUsesTheSameDraftCycleForAnyRequestCount(int $requestCount): void
+    {
+        $source = $this->createPdf("source-{$requestCount}.pdf", "FUENTE {$requestCount}");
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec(
+            'CREATE TABLE editions (id INTEGER PRIMARY KEY,code TEXT,status TEXT,date TEXT,file_id INTEGER,'
+            . 'file_name TEXT,deleted_at TEXT,published_at TEXT,published_by INTEGER,'
+            . 'published_file_checksum TEXT,orders_count INTEGER)'
+        );
+        $pdo->exec(
+            'CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,path TEXT,size INTEGER,type TEXT,'
+            . 'checksum TEXT,version INTEGER,status TEXT,owner TEXT,deleted_at TEXT,created_at TEXT,updated_at TEXT)'
+        );
+        $pdo->exec('CREATE TABLE legal_requests (id INTEGER PRIMARY KEY,user_id INTEGER,status TEXT,deleted_at TEXT,publish_date TEXT)');
+        $pdo->exec('CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT,legal_request_id INTEGER,kind TEXT,file_id INTEGER)');
+        $pdo->exec(
+            'CREATE TABLE edition_orders (edition_id INTEGER,legal_request_id INTEGER,publication_file_id INTEGER,'
+            . 'publication_file_name TEXT,publication_checksum TEXT,publication_source TEXT,'
+            . 'publication_prepared_at TEXT,publication_updated_at TEXT,PRIMARY KEY(edition_id,legal_request_id))'
+        );
+        $pdo->exec('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,actor_user_id INTEGER,action TEXT,resource_type TEXT,resource_id INTEGER)');
+        $pdo->exec("INSERT INTO editions(id,code,status,date,orders_count) VALUES(1,'MMXXVI-0100','Borrador','2026-09-10',{$requestCount})");
+        $insertSource = $pdo->prepare('INSERT INTO files(id,name,path,size,type,checksum,version,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
+        $insertSource->execute([100, basename($source), basename($source), filesize($source), 'pdf', hash_file('sha256', $source), 1, 'processed', '2026-09-10', '2026-09-10']);
+        $insertRequest = $pdo->prepare("INSERT INTO legal_requests(id,user_id,status) VALUES(?,?,'En trámite')");
+        $insertLegalFile = $pdo->prepare("INSERT INTO legal_files(legal_request_id,kind,file_id) VALUES(?,'document_pdf',100)");
+        $insertOrder = $pdo->prepare('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(1,?)');
+        for ($id = 1; $id <= $requestCount; $id++) {
+            $insertRequest->execute([$id, 1000 + $id]);
+            $insertLegalFile->execute([$id]);
+            $insertOrder->execute([$id]);
+        }
+
+        (new EditionPublicationService($pdo))->publish(1, 1);
+
+        $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=1')->fetchColumn());
+        $this->assertSame($requestCount, (int) $pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn());
+        $this->assertSame($requestCount, (int) $pdo->query('SELECT orders_count FROM editions WHERE id=1')->fetchColumn());
+        $this->assertGreaterThan(0, (int) $pdo->query('SELECT file_id FROM editions WHERE id=1')->fetchColumn());
+    }
+
+    public static function requestCountProvider(): array
+    {
+        return ['one request' => [1], 'two requests' => [2], 'three requests' => [3], 'ten requests' => [10]];
+    }
+
+    /** @dataProvider invalidFinalPdfProvider */
+    public function testPublicationKeepsDraftWhenFinalPdfIsMissingOrCorrupt(bool $createPhysicalFile): void
+    {
+        $prepared = $this->createPdf('prepared.pdf', 'PREPARADO');
+        $finalRelative = 'final-invalid.pdf';
+        if ($createPhysicalFile) file_put_contents($this->uploadDir . DIRECTORY_SEPARATOR . $finalRelative, '%PDF-1.4 corrupt checksum');
+
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->exec('CREATE TABLE editions (id INTEGER PRIMARY KEY,code TEXT,status TEXT,date TEXT,file_id INTEGER,file_name TEXT,deleted_at TEXT,published_at TEXT,published_by INTEGER,published_file_checksum TEXT,orders_count INTEGER)');
+        $pdo->exec('CREATE TABLE files (id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT,path TEXT,size INTEGER,type TEXT,checksum TEXT,version INTEGER,status TEXT,owner TEXT,deleted_at TEXT,created_at TEXT,updated_at TEXT)');
+        $pdo->exec('CREATE TABLE legal_requests (id INTEGER PRIMARY KEY,user_id INTEGER,status TEXT,deleted_at TEXT,publish_date TEXT)');
+        $pdo->exec('CREATE TABLE edition_orders (edition_id INTEGER,legal_request_id INTEGER,publication_file_id INTEGER,publication_file_name TEXT,publication_checksum TEXT,publication_source TEXT,publication_prepared_at TEXT,publication_updated_at TEXT,PRIMARY KEY(edition_id,legal_request_id))');
+        $pdo->exec('CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT,actor_user_id INTEGER,action TEXT,resource_type TEXT,resource_id INTEGER)');
+        $pdo->exec("INSERT INTO editions(id,code,status,date,file_id,file_name,orders_count) VALUES(1,'MMXXVI-0200','Borrador','2026-09-20',200,'final-invalid.pdf',1)");
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status) VALUES(1,1001,'En trámite')");
+        $insert = $pdo->prepare('INSERT INTO files(id,name,path,size,type,checksum,version,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
+        $insert->execute([100, basename($prepared), basename($prepared), filesize($prepared), 'pdf', hash_file('sha256', $prepared), 1, 'processed', '2026-09-20', '2026-09-20']);
+        $insert->execute([200, 'final-invalid.pdf', $finalRelative, 25, 'pdf', 'deadbeef', 1, 'uploaded', '2026-09-20', '2026-09-20']);
+        $checksum = hash_file('sha256', $prepared);
+        $pdo->prepare("INSERT INTO edition_orders VALUES(1,1,100,'prepared.pdf',?,'uploaded','2026-09-20','2026-09-20')")->execute([$checksum]);
+
+        try {
+            (new EditionPublicationService($pdo))->publish(1, 1);
+            $this->fail('La publicación debía rechazar el PDF final inválido.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame(422, $exception->getCode());
+        }
+        $this->assertSame('Borrador', $pdo->query('SELECT status FROM editions WHERE id=1')->fetchColumn());
+        $this->assertSame('En trámite', $pdo->query('SELECT status FROM legal_requests WHERE id=1')->fetchColumn());
+    }
+
+    public static function invalidFinalPdfProvider(): array
+    {
+        return ['missing physical file' => [false], 'invalid checksum' => [true]];
+    }
+
     public function testPublishedRequestCanBeRetiredReusedAndPublishedAgain(): void
     {
         $source = $this->createPdf('source-reusable.pdf', 'SOLICITUD REUTILIZABLE');
