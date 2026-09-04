@@ -88,14 +88,14 @@ const services = [
 
 export default function Home() {
   return (
-    <div className="bg-slate-50/60 min-h-screen">
+    <div className="bg-slate-50/60 flex flex-1 flex-col">
       <SEO
         title="Diario Mercantil Venezuela | Avisos Legales y Edictos"
         description="Publica avisos legales, edictos, actas y balances en el Diario Mercantil digital líder en Venezuela. Válido para Registros Mercantiles."
       />
       <PromoPopup />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-7 md:py-10 space-y-8">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8 py-7 md:py-10 space-y-8">
         <BannerBox settingKey="banner_main_1" className="aspect-[16/6] md:aspect-[21/7]" />
 
         <section className="grid lg:grid-cols-[1fr_310px] gap-7 items-start">
@@ -138,10 +138,10 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-white border-t border-slate-200 mt-8">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-2 md:items-center md:justify-between text-sm text-slate-500">
+      <footer className="bg-white border-t border-slate-200 mt-4">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row gap-1.5 sm:items-center sm:justify-between text-xs sm:text-sm text-slate-500">
           <span>© 2026 Diario Mercantil. Todos los derechos reservados.</span>
-          <div className="flex gap-4">
+          <div className="flex gap-3">
             <Link to="/p/preguntas-frecuentes" className="hover:text-brand-700">Preguntas frecuentes</Link>
             <Link to="/contacto" className="hover:text-brand-700">Contacto</Link>
           </div>

@@ -4,7 +4,7 @@ import PublicHeader from './PublicHeader'
 
 export default function PublicLayout(){
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <PublicHeader />
       <Outlet />
     </div>
