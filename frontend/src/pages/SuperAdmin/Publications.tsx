@@ -327,7 +327,7 @@ export default function Publications() {
                                             <button
                                                 onClick={() => handleDownload(sub.id)}
                                                 className="p-2 hover:bg-green-500/10 rounded-lg text-green-400 hover:text-green-300 transition-colors"
-                                                title="Descargar PDF"
+                                                title="Descargar orden de servicio"
                                             >
                                                 <Download className="w-4 h-4" />
                                             </button>
@@ -578,9 +578,7 @@ export default function Publications() {
                                         onClick={() => handleDownload(selected.id)}
                                         className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm flex items-center justify-center gap-2 transition-colors"
                                     >
-                                        <Download className="w-4 h-4" />
-                                        Descargar PDF
-                                    </button>
+                                        <Download className="w-4 h-4" /> Descargar orden de servicio </button>
                                     {selected.status === 'Publicada' && selected.edition_code && (
                                         <button
                                             onClick={() => setQrModal({

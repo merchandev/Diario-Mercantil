@@ -45,3 +45,7 @@ yarn-error.log*
 # Database (we'll create fresh in container)
 *.sqlite
 *.db
+
+# Runtime data and backups must never be included in images
+storage/
+*.bak*

@@ -40,6 +40,7 @@ require_once __DIR__."/../src/PagesController.php";
 require_once __DIR__."/../src/FileController.php";
 require_once __DIR__."/../src/EditionController.php";
 require_once __DIR__."/../src/HealthController.php";
+require_once __DIR__."/../src/VersionController.php";
 require_once __DIR__."/../src/MetricsController.php";
 require_once __DIR__."/../src/UploadController.php";
 require_once __DIR__."/../src/DirectoryController.php";
@@ -133,6 +134,9 @@ $router->post('/api/editions', [EditionController::class, 'create'], $adminCsrf)
 $router->get('/api/editions/{id}', [EditionController::class, 'get'], $admin);
 $router->put('/api/editions/{id}', [EditionController::class, 'update'], $adminCsrf);
 $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adminCsrf);
+$router->post('/api/editions/{id}/retire', [EditionController::class, 'retire'], $adminCsrf);
+$router->delete('/api/editions/{id}/permanent', [EditionController::class, 'permanentDelete'], $adminCsrf);
+$router->get('/api/editions/{id}/readiness', [EditionController::class, 'readiness'], $admin);
 $router->post('/api/editions/{id}/restore', [EditionController::class, 'restore'], $adminCsrf);
 $router->post('/api/editions/{id}/orders', [EditionController::class, 'setOrders'], $adminCsrf);
 $router->post('/api/editions/{id}/auto-select', [EditionController::class, 'autoSelect'], $adminCsrf);
@@ -151,6 +155,7 @@ $router->get('/api/dm/e-{code}', [EditionController::class, 'publicByCode']);
 
 // SYSTEM & PAGES
 $router->get('/api/pages', [PagesController::class, 'list'], $admin);
+$router->get('/api/version', [VersionController::class, 'get']);
 $router->post('/api/pages', [PagesController::class, 'create'], $adminCsrf);
 $router->get('/api/pages/{id}', [PagesController::class, 'get'], $admin);
 $router->put('/api/pages/{id}', [PagesController::class, 'update'], $adminCsrf);

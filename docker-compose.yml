@@ -4,6 +4,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-unknown}
     restart: unless-stopped
     volumes:
       - diario_mercantil_storage_data:/var/www/html/storage
@@ -47,6 +50,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-unknown}
     command: php /var/www/html/bin/email_worker.php
     restart: unless-stopped
     volumes:
@@ -76,6 +82,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILT_AT: ${BUILT_AT:-unknown}
     restart: unless-stopped
     depends_on:
       backend:

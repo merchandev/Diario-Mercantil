@@ -68,7 +68,17 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT l.*, e.code AS edition_code, e.id AS edition_id, e.file_id AS edition_file_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.deleted_at IS NULL";
+    $sql = "SELECT l.*, 
+                   e.id AS edition_id, 
+                   e.code AS edition_code, 
+                   e.file_id AS edition_file_id, 
+                   e.status AS edition_status,
+                   e.published_file_checksum,
+                   eo.publication_file_id 
+            FROM legal_requests l 
+            LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') 
+            LEFT JOIN editions e ON e.id=eo.edition_id 
+            WHERE l.deleted_at IS NULL";
     $params = [];
     
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
@@ -141,7 +151,11 @@ class LegalController {
         $item['publication_file_url'] = !empty($item['publication_file_id']) && !empty($item['edition_id'])
             ? '/api/editions/' . $item['edition_id'] . '/orders/' . $item['id'] . '/pdf'
             : null;
-        $item['edition_has_file'] = $editionIntegrity->fileIsAvailable((int) ($item['edition_file_id'] ?? 0));
+        $item['edition_has_file'] = $editionIntegrity->publishedFileIsValid([
+            'file_id' => $item['edition_file_id'], 
+            'status' => $item['edition_status'], 
+            'published_file_checksum' => $item['published_file_checksum']
+        ]);
         $item['edition_file_url'] = $item['edition_has_file'] && !empty($item['edition_code'])
             ? '/api/e/code/' . urlencode($item['edition_code']) . '/download'
             : null;
@@ -154,13 +168,15 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare("SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL"); $s->execute([$id]);
+    $s = $pdo->prepare("SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, e.status AS edition_status, e.published_file_checksum, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL"); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
     
-    $r['edition_has_file'] = (new EditionIntegrityService($pdo))->fileIsAvailable(
-        (int) ($r['edition_file_id'] ?? 0)
-    );
+    $r['edition_has_file'] = (new EditionIntegrityService($pdo))->publishedFileIsValid([
+        'file_id' => $r['edition_file_id'],
+        'status' => $r['edition_status'],
+        'published_file_checksum' => $r['published_file_checksum']
+    ]);
     if ($r['edition_has_file'] && !empty($r['edition_code'])) {
         $r['edition_file_url'] = '/api/e/code/' . urlencode((string)$r['edition_code']) . '/download';
     } else {

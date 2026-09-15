@@ -131,10 +131,13 @@ final class PermanentDeletionService
     private function deleteEditionRecord(int $editionId, ?int $excludedRequestId = null): ?array
     {
         $edition = $this->selectOneForUpdate(
-            'SELECT id,file_id FROM editions WHERE id=?',
+            'SELECT * FROM editions WHERE id=?',
             [$editionId]
         );
         if (!$edition) return null;
+        if (($edition['status'] ?? '') === 'Publicada' || !empty($edition['published_at']) || !empty($edition['published_file_checksum'])) {
+            throw new RuntimeException('Una edición publicada conserva su identidad. Utilice Retirar edición.', 409);
+        }
 
         $requestIds = $this->columnValues(
             'SELECT legal_request_id FROM edition_orders WHERE edition_id=?',

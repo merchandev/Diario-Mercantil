@@ -5,6 +5,8 @@ require_once __DIR__.'/Services/EditionOrderService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Http/StoragePath.php';
+require_once __DIR__.'/Services/EditorialClock.php';
+require_once __DIR__.'/Services/EditionReadinessService.php';
 
 class EditionController {
   private function requireAdmin() {
@@ -59,14 +61,15 @@ class EditionController {
         $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
         $ed->execute([$code, '%'.$code]);
     } else {
-        $today = gmdate('Y-m-d');
+        $today = EditorialClock::today();
         $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' AND date <= ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
         $ed->execute([$code, '%'.$code, $today]);
     }
 
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
-    $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->fileIsAvailable((int)($edition['file_id'] ?? 0));
+    $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->editionFileIsPublishable($edition);
+    if (!$isAdmin && !$edition['file_is_valid']) return Response::json(['error'=>'not_found'],404);
     $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
 
     $edition['seo'] = [
@@ -92,7 +95,7 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) { http_response_code(404); echo 'Not found'; return; }
 
-    $today = gmdate('Y-m-d');
+    $today = EditorialClock::today();
     if ($edition['status'] !== 'Publicada' || $edition['date'] > $today) {
         require_once __DIR__.'/AuthController.php';
         $u = AuthController::userFromToken();
@@ -108,7 +111,7 @@ class EditionController {
       return;
     }
 
-    if (!(new EditionIntegrityService($pdo))->fileHasValidChecksum($fileId)) {
+    if (!(new EditionIntegrityService($pdo))->editionFileIsPublishable($edition)) {
       http_response_code(404);
       echo 'El PDF final de esta edición no está disponible o no superó la validación de integridad';
       return;
@@ -132,7 +135,7 @@ class EditionController {
 
   public function downloadByCode($code){
     $pdo = Database::pdo();
-    $today = gmdate('Y-m-d');
+    $today = EditorialClock::today();
     $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada' AND date <= ? AND deleted_at IS NULL");
     $ed->execute([$code, $today]);
     $id = (int)($ed->fetchColumn() ?: 0);
@@ -153,7 +156,7 @@ class EditionController {
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
-      $row['file_is_valid'] = $editionIntegrity->fileIsAvailable((int)($row['file_id'] ?? 0));
+      $row['file_is_valid'] = $editionIntegrity->editionFileIsPublishable($row);
       $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
     }
     Response::json(['items'=>$items]);
@@ -172,7 +175,7 @@ class EditionController {
 
   public function listPublic(){
     $pdo = Database::pdo();
-    $today = gmdate('Y-m-d');
+    $today = EditorialClock::today();
     $q = $_GET['q'] ?? '';
     $from = $_GET['from'] ?? '';
     $to = $_GET['to'] ?? '';
@@ -225,10 +228,11 @@ class EditionController {
     }
     $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
-      $row['file_is_valid'] = $editionIntegrity->fileIsAvailable((int)($row['file_id'] ?? 0));
+      $row['file_is_valid'] = $editionIntegrity->editionFileIsPublishable($row);
       $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
       $row['company_name'] = implode(' · ', array_keys($companyNames[(int)$row['id']] ?? []));
     }
+    $items = array_values(array_filter($items, static fn(array $item): bool => $item['file_is_valid']));
     Response::json(['items'=>$items]);
   }
 
@@ -280,7 +284,12 @@ class EditionController {
     $ed->execute([$id]);
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) Response::json(['error'=>'not_found'],404);
-    $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->fileIsAvailable((int)($edition['file_id'] ?? 0));
+    $integrityService = new EditionIntegrityService($pdo);
+    if ($edition['status'] === 'Publicada') {
+        $edition['file_is_valid'] = $integrityService->publishedFileIsValid($edition);
+    } else {
+        $edition['file_is_valid'] = $integrityService->editionFileIsPublishable($edition);
+    }
     $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
     $ord = $pdo->prepare(
         'SELECT l.id,l.name,l.document,l.status,l.date,l.meta,'
@@ -303,6 +312,7 @@ class EditionController {
             ? '/api/editions/' . $id . '/orders/' . $order['id'] . '/pdf'
             : null;
     }
+    $edition['readiness'] = (new EditionReadinessService($pdo))->check((int)$id);
     Response::json(['edition'=>$edition, 'orders'=>$orders]);
   }
 
@@ -331,7 +341,7 @@ class EditionController {
     $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
     $status = 'Borrador';
-    $date = trim((string)($input['date'] ?? gmdate('Y-m-d')));
+    $date = trim((string)($input['date'] ?? EditorialClock::today()));
     $orders = $input['orders'] ?? [];
     if (!is_array($orders)) $orders = [];
     $orders = array_values(array_unique(array_filter(array_map('intval', $orders), static fn(int $id): bool => $id > 0)));
@@ -366,12 +376,20 @@ class EditionController {
             $pdo->beginTransaction();
         } else {
             // SQLite development fallback: reserve the writer lock up front.
-            $pdo->exec('BEGIN IMMEDIATE TRANSACTION');
+            $pdo->beginTransaction();
         }
 
         $q = $pdo->prepare('SELECT MAX(edition_no) FROM editions WHERE publication_year = ?');
         $q->execute([$year]);
-        $editionNo = ((int)$q->fetchColumn()) + 1;
+        $maxExisting = (int)$q->fetchColumn();
+        $seed = $isSqlite
+            ? 'INSERT OR IGNORE INTO edition_sequences(publication_year,last_number) VALUES(?,?)'
+            : 'INSERT IGNORE INTO edition_sequences(publication_year,last_number) VALUES(?,?)';
+        $pdo->prepare($seed)->execute([$year, $maxExisting]);
+        $sequence = $pdo->prepare('SELECT last_number FROM edition_sequences WHERE publication_year=?' . ($isSqlite ? '' : ' FOR UPDATE'));
+        $sequence->execute([$year]);
+        $editionNo = max((int)$sequence->fetchColumn(), $maxExisting) + 1;
+        $pdo->prepare('UPDATE edition_sequences SET last_number=? WHERE publication_year=?')->execute([$editionNo, $year]);
         $code = $this->generateCode($date, $editionNo);
 
         $stmt = $pdo->prepare(
@@ -382,7 +400,7 @@ class EditionController {
         $editionId = (int)$pdo->lastInsertId();
 
         $orderService = new EditionOrderService($pdo);
-        $orderService->setOrdersForEdition($editionId, $orders);
+        $orderService->setOrdersForEdition($editionId, $orders, (int)$u['id']);
 
         $pdo->prepare(
             'INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)'
@@ -441,8 +459,9 @@ class EditionController {
     Response::json($responseBody, $responseCode);
   }
 
-  public function delete($id){
+  public function permanentDelete($id){
     $u = $this->requireAdmin();
+    if ($u['role'] !== 'superadmin') return Response::json(['error'=>'Solo SuperAdmin puede eliminar definitivamente.'],403);
     try {
       $result = (new PermanentDeletionService(Database::pdo()))
         ->deleteEdition((int)$id, (int)$u['id']);
@@ -458,19 +477,63 @@ class EditionController {
     }
   }
 
+  public function delete($id){
+      $u = $this->requireAdmin();
+      try {
+          Response::json((new PermanentDeletionService(Database::pdo()))->deleteEdition((int)$id, (int)$u['id']));
+      } catch (Throwable $e) {
+          $code = (int)$e->getCode();
+          Response::json(['error'=>$e->getMessage()], $code >= 400 && $code <= 599 ? $code : 500);
+      }
+  }
+
+  public function retire($id){
+    $u = $this->requireAdmin();
+    $pdo = Database::pdo();
+    try {
+      $pdo->beginTransaction();
+      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
+      $ed = $pdo->prepare('SELECT id, status, code FROM editions WHERE id=? AND deleted_at IS NULL' . $lock);
+      $ed->execute([$id]);
+      $edition = $ed->fetch(PDO::FETCH_ASSOC);
+      if (!$edition) throw new RuntimeException('Edición no encontrada o ya retirada.', 404);
+
+      $pdo->prepare('UPDATE editions SET deleted_at=? WHERE id=?')->execute([EditorialClock::now()->format('Y-m-d H:i:s'), $id]);
+      
+      // Liberar las solicitudes (reencolar) sólo si corresponde (e.g. si status es Borrador)
+      if ($edition['status'] === 'Borrador') {
+        $pdo->prepare("UPDATE legal_requests SET status='En trámite' WHERE id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?)")->execute([$id]);
+      }
+      
+      require_once __DIR__ . '/Services/EditionOrderService.php';
+      $pdo->prepare('INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)')->execute([(int)$u['id'], 'edition_retired', 'edition', (int)$edition['id']]);
+      $pdo->commit();
+      Response::json(['ok'=>true]);
+    } catch (Throwable $e) {
+      if ($pdo->inTransaction()) $pdo->rollBack();
+      $code = (int)$e->getCode();
+      if ($code < 400 || $code > 599) $code = 500;
+      Response::json(['error'=>'retire_failed', 'message'=>$e->getMessage()], $code);
+    }
+  }
+
   public function restore($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
     try {
       $pdo->beginTransaction();
       $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
-      $stmt = $pdo->prepare('SELECT status,date FROM editions WHERE id=? AND deleted_at IS NOT NULL' . $lock);
+      $stmt = $pdo->prepare('SELECT * FROM editions WHERE id=? AND deleted_at IS NOT NULL' . $lock);
       $stmt->execute([$id]);
       $edition = $stmt->fetch(PDO::FETCH_ASSOC);
       if (!$edition) throw new RuntimeException('Edición retirada no encontrada.', 404);
       if (($edition['status'] ?? '') !== 'Publicada') {
         throw new RuntimeException('Solo se pueden restaurar ediciones previamente publicadas.', 409);
       }
+
+      $candidate = $edition;
+      $candidate['deleted_at'] = null;
+      if (!(new EditionIntegrityService($pdo))->publishedFileIsValid($candidate)) throw new RuntimeException('El PDF final no supera la validación de integridad.', 422);
 
       $conflict = $pdo->prepare(
         'SELECT eo.legal_request_id,e.code FROM edition_orders own '
@@ -610,30 +673,36 @@ class EditionController {
       $u = $this->requireAdmin();
       $pdo = Database::pdo();
       
+      require_once __DIR__ . '/Services/EditionReadinessService.php';
+      $readiness = (new EditionReadinessService($pdo))->check((int)$id);
+      if (!$readiness['ready']) {
+          return Response::json([
+              'error' => 'not_ready',
+              'message' => 'La edición no está lista para ser publicada.',
+              'blockers' => $readiness['blockers']
+          ], 409);
+      }
+
       require_once __DIR__ . '/Services/EditionPublicationService.php';
       $service = new EditionPublicationService($pdo);
       
-      // We will stream the progress back as SSE (Server-Sent Events)
-      // or JSON streaming if preferred. We'll use SSE.
-      header('Content-Type: text/event-stream');
-      header('Cache-Control: no-cache');
-      header('Connection: keep-alive');
-
       try {
-          $service->publish($id, $u['id'], function($done, $total, $msg) {
-              $progress = $total > 0 ? floor(($done / $total) * 100) : 100;
-              echo "data: " . json_encode(['progress' => $progress, 'msg' => $msg]) . "\n\n";
-              if (ob_get_level() > 0) ob_flush();
-              flush();
-          });
-          echo "data: " . json_encode(['ok' => true]) . "\n\n";
+          $service->publish((int)$id, (int)$u['id']);
+          Response::json(['ok' => true]);
       } catch (RuntimeException $e) {
           $code = $e->getCode() ?: 500;
-          echo "data: " . json_encode(['error' => $e->getMessage()]) . "\n\n";
+          Response::json(['error' => $e->getMessage()], $code);
       } catch (Throwable $e) {
-          echo "data: " . json_encode(['error' => $e->getMessage()]) . "\n\n";
+          Response::json(['error' => 'Error inesperado durante la publicación.'], 500);
       }
-      die();
+    }
+
+    public function readiness($id) {
+        $this->requireAdmin();
+        $pdo = Database::pdo();
+        require_once __DIR__ . '/Services/EditionReadinessService.php';
+        $readiness = (new EditionReadinessService($pdo))->check((int)$id);
+        Response::json($readiness);
     }
 
     public function notify($id) {
@@ -702,7 +771,9 @@ class EditionController {
     $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     if ($ext !== 'pdf') return Response::json(['error'=>'Solo se aceptan archivos PDF'],400);
     if ($size <= 0 || !is_uploaded_file($tmp)) return Response::json(['error'=>'Archivo invalido'],400);
-    if ($size > 80 * 1024 * 1024) return Response::json(['error'=>'PDF demasiado grande (max 80MB)'],400);
+    
+    $maxMb = min(50, max(1, (int) (getenv('MAX_FILE_MB') ?: 50)));
+    if ($size > $maxMb * 1024 * 1024) return Response::json(['error'=>"PDF demasiado grande (max {$maxMb}MB)"],400);
 
     // MIME Validation
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -718,6 +789,17 @@ class EditionController {
     fclose($handle);
     if ($header !== '%PDF-') {
         return Response::json(['error'=>'Firma de archivo PDF inválida.'], 400);
+    }
+    
+    // Check page count and parseability
+    try {
+        require_once __DIR__ . '/Services/PdfInspector.php';
+        $pages = (new PdfInspector())->pageCount($tmp);
+        if ($pages < 1) {
+            return Response::json(['error'=>'El PDF debe tener al menos una página.'], 422);
+        }
+    } catch (Throwable $e) {
+        return Response::json(['error'=>'El PDF final cargado no pudo ser inspeccionado (podría estar dañado o usar un formato no soportado).'], 422);
     }
 
     $uploadDir = StoragePath::getUploadsDir();

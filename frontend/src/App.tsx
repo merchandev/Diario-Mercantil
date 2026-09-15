@@ -1,4 +1,4 @@
-import { Route, Routes, Navigate } from 'react-router-dom'
+import { Route, Routes, Navigate, useParams } from 'react-router-dom'
 import { lazy, Suspense, useState, useEffect } from 'react'
 import LoadingFallback from './components/LoadingFallback'
 import { AuthProvider } from './contexts/AuthContext'
@@ -54,6 +54,7 @@ const Configuracion = lazyImport(() => import('./pages/Configuracion'))
 const Paginas = lazyImport(() => import('./pages/Paginas'))
 const SeoManager = lazyImport(() => import('./pages/SeoManager'))
 const FileManager = lazyImport(() => import('./pages/FileManager'))
+const FileDetail = lazyImport(() => import('./pages/FileDetail'))
 const Medios = lazyImport(() => import('./pages/Medios'))
 const Promo = lazyImport(() => import('./pages/Promo'))
 
@@ -99,6 +100,11 @@ const SuperAdminPaginas = lazyImport(() => import('./pages/SuperAdmin/Paginas'))
 // Wrapper component for lazy-loaded routes
 function LazyRoute({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<LoadingFallback />}>{children}</Suspense>
+}
+
+function LegacyFileRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/dashboard/archivos/${encodeURIComponent(id || '')}`} replace />
 }
 
 export default function App() {
@@ -157,6 +163,7 @@ export default function App() {
           <Route path="p/:slug" element={<LazyRoute><PagePublic /></LazyRoute>} />
           <Route path="contacto" element={<LazyRoute><Contacto /></LazyRoute>} />
           <Route path="ver/:order" element={<LazyRoute><PublicLegalRequest /></LazyRoute>} />
+          <Route path="files/:id" element={<LegacyFileRedirect />} />
           <Route path="*" element={<NotFound />} />
         </Route>
 
@@ -229,6 +236,7 @@ export default function App() {
                         <Route path="usuarios" element={<RequireAdmin><LazyRoute><Usuarios /></LazyRoute></RequireAdmin>} />
                         <Route path="usuarios/:id" element={<RequireAdmin><LazyRoute><UsuarioDetalle /></LazyRoute></RequireAdmin>} />
                         <Route path="archivos" element={<RequireAdmin><LazyRoute><FileManager /></LazyRoute></RequireAdmin>} />
+                        <Route path="archivos/:id" element={<RequireAdmin><LazyRoute><FileDetail /></LazyRoute></RequireAdmin>} />
                         <Route path="medios" element={<RequireAdmin><LazyRoute><Medios /></LazyRoute></RequireAdmin>} />
                         <Route path="promo" element={<RequireAdmin><LazyRoute><Promo /></LazyRoute></RequireAdmin>} />
                         <Route path="configuracion" element={<RequireAdmin><LazyRoute><Configuracion /></LazyRoute></RequireAdmin>} />

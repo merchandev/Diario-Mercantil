@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { createEdition, deleteEdition, listEditions, listRetiredEditions, restoreEdition, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
+import { editorialToday } from '../lib/editorialDate'
+import { createEdition, deleteEdition, permanentDeleteEdition, retireEdition, listEditions, listRetiredEditions, restoreEdition, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -12,7 +13,7 @@ export default function Ediciones() {
   const [rows, setRows] = useState<Edition[]>([])
   const [retiredRows, setRetiredRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
-  const [form, setForm] = useState<{ date: string; selectedOrders: number[] }>({ date: new Date().toISOString().slice(0, 10), selectedOrders: [] })
+  const [form, setForm] = useState<{ date: string; selectedOrders: number[] }>({ date: editorialToday(), selectedOrders: [] })
   const [selId, setSelId] = useState<number | undefined>(undefined)
   const [detail, setDetail] = useState<{ edition: Edition; orders: EditionOrder[] } | null>(null)
   const [qrGenerated, setQrGenerated] = useState(false)
@@ -69,7 +70,7 @@ export default function Ediciones() {
         return
       }
 
-      setForm({ date: new Date().toISOString().slice(0, 10), selectedOrders: [] })
+      setForm({ date: editorialToday(), selectedOrders: [] })
       setQrGenerated(false)
       setGeneratedCode('')
       await load()
@@ -101,7 +102,7 @@ export default function Ediciones() {
         const det = await getEdition(selId)
         setDetail(det)
         await load()
-        setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Edición publicada y PDF generado', variant: 'success' })
+        setAlertDialog({ isOpen: true, title: 'Éxito', message: 'Edición publicada con su PDF final validado', variant: 'success' })
       } catch (error) {
         setAlertDialog({ isOpen: true, title: 'Error', message: error instanceof Error ? error.message : 'Error al publicar', variant: 'error' })
       } finally {
@@ -114,8 +115,9 @@ export default function Ediciones() {
     if (!selId) return
     setUploadingPdf(true)
     try {
-      const result = await uploadEditionPdf(selId, file)
-      setDetail(prev => prev ? { ...prev, edition: { ...prev.edition, file_id: result.file_id, file_name: result.file_name, file_is_valid: true, file_url: result.edition?.file_url || `/api/editions/${selId}/download` } } : prev)
+      if (file.size > 50 * 1024 * 1024) throw new Error('El PDF final no puede superar 50 MB.')
+      await uploadEditionPdf(selId, file)
+      setDetail(await getEdition(selId))
       await load()
       setAlertDialog({ isOpen: true, title: 'Éxito', message: 'PDF actualizado', variant: 'success' })
     } catch (error) {
@@ -196,8 +198,8 @@ export default function Ediciones() {
               <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => {
                 // One edition per date: publication requires a date after the latest active edition.
                 const lastPublished = rows.filter(r => r.status === 'Publicada').map(r => r.date).sort().reverse()[0]
-                if (lastPublished && e.target.value <= lastPublished) {
-                  setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha debe ser posterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
+                if (lastPublished && e.target.value < lastPublished) {
+                  setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha debe ser igual o posterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
                   return
                 }
                 setForm({ ...form, date: e.target.value })
@@ -221,7 +223,7 @@ export default function Ediciones() {
               </div>
             ) : (
               <div className="flex items-end text-sm text-slate-500 pb-2">
-                * El documento PDF será generado automáticamente al publicar.
+                La edición se creará como borrador. Después podrá cargar el PDF final o generarlo de forma opcional antes de publicarla.
               </div>
             )}
           </div>
@@ -347,8 +349,14 @@ export default function Ediciones() {
                         }}>
                           {selId === r.id && !isDetailsCollapsed ? <><IconClose className="w-4 h-4" /> <span>Minimizar</span></> : <><IconEdit className="w-4 h-4" /> <span>Ver detalles</span></>}
                         </button>
-                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => setConfirmDialog({ isOpen: true, title: 'Eliminar edición definitivamente', message: 'Se borrarán la edición, su PDF consolidado y los PDF individuales generados. Las publicaciones incluidas volverán a En trámite. Esta acción no se puede deshacer. ¿Deseas continuar?', onConfirm: async () => { try { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' }) } } })}>
-                          <IconTrash className="w-4 h-4" /> <span>Eliminar</span>
+                        <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => {
+                          if (r.status === 'Publicada') {
+                             setConfirmDialog({ isOpen: true, title: 'Retirar edición', message: 'La edición se retirará del área pública pero se mantendrá su registro y número (CVE). ¿Deseas continuar?', onConfirm: async () => { try { await retireEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo retirar', message: error instanceof Error ? error.message : 'Error al retirar la edición.', variant: 'error' }) } } })
+                          } else {
+                             setConfirmDialog({ isOpen: true, title: 'Eliminar edición definitivamente', message: 'Se borrarán la edición, su PDF consolidado y los PDF individuales generados. Las publicaciones incluidas volverán a En trámite. Esta acción no se puede deshacer. ¿Deseas continuar?', onConfirm: async () => { try { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' }) } } })
+                          }
+                        }}>
+                          <IconTrash className="w-4 h-4" /> <span>{r.status === 'Publicada' ? 'Retirar' : 'Eliminar'}</span>
                         </button>
                       </div>
                     </td>
@@ -466,7 +474,7 @@ export default function Ediciones() {
                                         }}
                                       />
                                     </label>
-                                    <button className="btn btn-primary inline-flex items-center gap-2" onClick={handlePublish} disabled={publishingState.active || detail.orders.length === 0}>
+                                    <button className="btn btn-primary inline-flex items-center gap-2" onClick={handlePublish} disabled={publishingState.active || detail.orders.length === 0 || !detail.edition.file_is_valid || detail.edition.readiness?.ready !== true}>
                                       <IconCheck className="w-4 h-4" /> <span>Publicar edición</span>
                                     </button>
                                   </div>
@@ -673,7 +681,7 @@ export default function Ediciones() {
                                     <IconDownload className="w-4 h-4" /> <span>Descargar PDF de edición</span>
                                   </a>
                                   <p className="text-xs text-slate-600">
-                                    PDF generado automáticamente y listo para compartir.
+                                    PDF final validado y listo para compartir.
                                   </p>
                                 </>
                               ) : (
@@ -756,7 +764,7 @@ export default function Ediciones() {
                     message: `¿Eliminar permanentemente la edición ${edition.code} y todos sus archivos generados?`,
                     onConfirm: async () => {
                       try {
-                        await deleteEdition(edition.id)
+                        await permanentDeleteEdition(edition.id)
                         await load()
                       } catch (error) {
                         setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' })

@@ -15,7 +15,9 @@ RUN npm install --legacy-peer-deps --no-audit --no-fund
 COPY . .
 
 # Build application
-RUN npm run build
+ARG GIT_SHA=unknown
+ARG BUILT_AT=unknown
+RUN npm run build && node -e 'require("fs").writeFileSync("dist/build-info.json",JSON.stringify({git_sha:process.argv[1],built_at:process.argv[2]}))' "$GIT_SHA" "$BUILT_AT"
 
 # ============================================
 # STAGE 2: Serve with Nginx

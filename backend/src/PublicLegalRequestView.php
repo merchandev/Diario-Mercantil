@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/Services/EditionIntegrityService.php';
+require_once __DIR__ . '/Services/EditorialClock.php';
+
 final class PublicLegalRequestView
 {
     public static function fetch(
@@ -9,7 +12,7 @@ final class PublicLegalRequestView
     ): ?array {
         $stmt = $pdo->prepare(
             "SELECT
-                e.code AS edition_code
+                e.*, e.code AS edition_code
              FROM legal_requests lr
              JOIN edition_orders eo
                ON eo.legal_request_id = lr.id
@@ -24,6 +27,7 @@ final class PublicLegalRequestView
         $stmt->execute([$order]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $row ?: null;
+        if (!$row || $row['date'] > EditorialClock::today() || !(new EditionIntegrityService($pdo))->publishedFileIsValid($row)) return null;
+        return ['edition_code' => $row['edition_code']];
     }
 }

@@ -33,6 +33,10 @@ export default function Sidebar({
 }) {
   const location = useLocation()
   const { user } = useAuth()
+  const [sysVersion, setSysVersion] = useState<string>('- - -')
+  useEffect(() => {
+    fetch('/api/version').then(r=>r.json()).then(d=>setSysVersion(d.git_sha)).catch(()=>setSysVersion('unknown'))
+  }, [])
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => { onCollapseChange?.(collapsed) }, [collapsed, onCollapseChange])
@@ -123,6 +127,7 @@ export default function Sidebar({
           )}
         </nav>
         <div className="mt-auto pt-4 md:pt-0">
+          {!collapsed && isAdmin && <div className="text-center text-[10px] text-brand-300/50 mb-2 font-mono" title="Versión del sistema">Versión: {sysVersion}</div>}
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={`w-full bg-brand-700 hover:bg-brand-600 transition rounded-lg flex items-center justify-center gap-2 ${collapsed ? 'h-10 px-2' : 'h-10 px-4'}`}

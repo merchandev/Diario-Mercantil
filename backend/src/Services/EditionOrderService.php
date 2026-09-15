@@ -8,7 +8,7 @@ final class EditionOrderService {
         $this->pdo = $pdo;
     }
 
-    public function setOrdersForEdition(int $editionId, array $orderIds): int {
+    public function setOrdersForEdition(int $editionId, array $orderIds, ?int $actorId = null): int {
         // Normalizar y eliminar duplicados
         $orderIds = array_values(array_unique(array_filter(array_map('intval', $orderIds))));
         
@@ -119,6 +119,9 @@ final class EditionOrderService {
                 $this->pdo->prepare(
                     'UPDATE editions SET file_id=NULL,file_name=NULL WHERE id=?'
                 )->execute([$editionId]);
+                $this->pdo->prepare(
+                    "INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES (?, 'edition_final_invalidated_due_composition', 'edition', ?)"
+                )->execute([$actorId, $editionId]);
             }
             
             // Actualizar contador

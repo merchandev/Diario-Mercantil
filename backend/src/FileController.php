@@ -50,6 +50,20 @@ class FileController {
     $file = $f->fetch(PDO::FETCH_ASSOC);
     if (!$file) Response::json(['error'=>'Not found'], 404);
 
+    $file['file_exists'] = false;
+    $file['content_url'] = null;
+    $file['download_url'] = null;
+    if (empty($file['deleted_at']) && !empty($file['path'])) {
+      try {
+        StoragePath::getFile((string)$file['path']);
+        $file['file_exists'] = true;
+        $file['content_url'] = '/api/uploads/' . rawurlencode((string)$file['id']);
+        $file['download_url'] = $file['content_url'] . '?download=1';
+      } catch (RuntimeException $e) {
+        // The detail endpoint must remain usable so administrators can diagnose missing files.
+      }
+    }
+
     $e = $pdo->prepare('SELECT ts,type,message FROM file_events WHERE file_id=? ORDER BY id ASC');
     $e->execute([$id]);
     $events = $e->fetchAll(PDO::FETCH_ASSOC);
@@ -242,7 +256,7 @@ class FileController {
   // Serve raw file content
   public function serve($id) {
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare('SELECT id, name, path, type, created_at, is_public FROM files WHERE id=?');
+    $stmt = $pdo->prepare("SELECT id, name, path, type, created_at, is_public FROM files WHERE id=? AND (deleted_at IS NULL OR deleted_at='')");
     $stmt->execute([$id]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
 

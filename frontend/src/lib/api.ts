@@ -5,7 +5,8 @@ function getUrl(path: string) {
 }
 
 export type FileRow = {
-  id: number; name: string; size: number; type: string; checksum?: string; status: string; created_at: string; updated_at: string
+  id: number; name: string; size: number; type: string; checksum?: string; status: string; created_at: string; updated_at: string;
+  deleted_at?: string | null; file_exists?: boolean; content_url?: string | null; download_url?: string | null
 }
 
 export class ApiError extends Error {
@@ -45,7 +46,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
       const contentType = res.headers.get('content-type');
       if (contentType?.includes('application/json')) {
         data = await res.json();
-        errorMsg = data.message || data.error || errorMsg;
+        errorMsg = Array.isArray(data.blockers) && data.blockers.length ? data.blockers.map((b: {message: string}) => b.message).join(' ') : data.message || data.error || errorMsg;
       } else {
         errorMsg = await res.text() || errorMsg;
       }
@@ -287,26 +288,13 @@ export async function notifyEdition(id: number) {
   return res.json() as Promise<{ ok: true; sent: number }>
 }
 export async function publishEdition(id: number, onProgress?: (prog: number, msg: string) => void): Promise<{ ok: true }> {
+  if (onProgress) onProgress(50, 'Publicando edición...');
   const res = await fetchAuth(`/api/editions/${id}/publish`, { method: 'POST' })
-  if (!res.body) return { ok: true }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder('utf-8')
-  let buffer = ''
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const chunks = buffer.split('\n\n')
-    buffer = chunks.pop() ?? ''
-    for (const chunk of chunks) {
-      if (!chunk.startsWith('data: ')) continue
-      const data = JSON.parse(chunk.slice(6))
-      if (data.error) throw new Error(data.error)
-      if (typeof data.progress === 'number') onProgress?.(data.progress, data.msg ?? '')
-      if (data.ok) return { ok: true }
-    }
-  }
-  return { ok: true }
+  const data = await res.json()
+  if (data.error) throw new Error(data.error)
+  if (data.ok !== true) throw new Error('El servidor no confirmó la publicación.')
+  if (onProgress) onProgress(100, 'Edición publicada con éxito');
+  return data
 }
 export async function uploadEditionPdf(id: number, file: File) {
   const fd = new FormData()
@@ -330,6 +318,14 @@ export async function uploadEditionOrderPdf(editionId: number, orderId: number, 
 }
 export async function deleteEdition(id: number) {
   const res = await fetchAuth(`/api/editions/${id}`, { method: 'DELETE' })
+  return res.json()
+}
+export async function retireEdition(id: number) {
+  const res = await fetchAuth(`/api/editions/${id}/retire`, { method: 'POST' })
+  return res.json()
+}
+export async function permanentDeleteEdition(id: number) {
+  const res = await fetchAuth(`/api/editions/${id}/permanent`, { method: 'DELETE' })
   return res.json()
 }
 

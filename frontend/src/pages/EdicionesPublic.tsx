@@ -17,7 +17,7 @@ export default function EdicionesPublic() {
     setLoading(true)
     try {
       const r = await listPublicEditions({ q: q || undefined, from: from || undefined, to: to || undefined })
-      setRows(r.items ?? [])
+      setRows((r.items ?? []).filter(e => e.file_is_valid === true && !!e.file_url))
     } catch {
       setRows([])
     } finally {
@@ -157,8 +157,8 @@ export default function EdicionesPublic() {
                   <tbody>
                     {filtered.map((ed: any) => {
                       const dateTxt = ed.date || ed.created_at
-                      const pdfUrl = ed.file_url || (ed.code ? `/api/e/code/${encodeURIComponent(ed.code)}/download` : '')
-                      const hasPdf = Boolean(ed.file_id || ed.file_url)
+                      const pdfUrl = ed.file_is_valid ? ed.file_url || '' : ''
+                      const hasPdf = ed.file_is_valid === true && Boolean(ed.file_url)
                       return (
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>

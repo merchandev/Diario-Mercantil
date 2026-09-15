@@ -35,7 +35,7 @@ final class EditionIntegrityService
             $recordedSize = (int) ($file['size'] ?? 0);
             return $this->availabilityCache[$fileId] = $physicalSize !== false
                 && $physicalSize > 0
-                && ($recordedSize < 1 || $recordedSize === $physicalSize);
+                && $recordedSize === $physicalSize;
         } catch (RuntimeException) {
             return $this->availabilityCache[$fileId] = false;
         }
@@ -58,6 +58,45 @@ final class EditionIntegrityService
             return false;
         }
     }
+    public function editionFileIsPublishable(array $edition): bool
+    {
+        if (!empty($edition['deleted_at'])) return false;
+        $fileId = (int) ($edition['file_id'] ?? 0);
+        if ($fileId < 1) return false;
+        if (!$this->fileHasValidChecksum($fileId)) return false;
+
+        $status = (string) ($edition['status'] ?? '');
+        if ($status === 'Publicada') {
+            $publishedChecksum = (string) ($edition['published_file_checksum'] ?? '');
+            if ($publishedChecksum === '') return false;
+            
+            $stmt = $this->pdo->prepare('SELECT checksum FROM files WHERE id=?');
+            $stmt->execute([$fileId]);
+            $fileChecksum = (string) $stmt->fetchColumn();
+            if (!hash_equals($publishedChecksum, $fileChecksum)) return false;
+        }
+        
+        // Comprobar páginas
+        $stmt = $this->pdo->prepare('SELECT path FROM files WHERE id=?');
+        $stmt->execute([$fileId]);
+        $path = (string) $stmt->fetchColumn();
+        try {
+            require_once __DIR__ . '/PdfInspector.php';
+            $physicalPath = StoragePath::getFile($path);
+            $count = (new PdfInspector())->pageCount($physicalPath);
+            if ($count < 1) return false;
+        } catch (Throwable) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function publishedFileIsValid(array $edition): bool
+    {
+        if (($edition['status'] ?? '') !== 'Publicada') return false;
+        return $this->editionFileIsPublishable($edition);
+    }
 
     /** @return list<array<string,mixed>> */
     public function findInvalidPublishedEditions(?int $editionId = null): array
@@ -75,7 +114,7 @@ final class EditionIntegrityService
 
         $invalid = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $edition) {
-            if (!$this->fileHasValidChecksum((int) ($edition['file_id'] ?? 0))) {
+            if (!$this->publishedFileIsValid($edition)) {
                 $edition['reason'] = empty($edition['file_id'])
                     ? 'missing_file_id'
                     : 'missing_or_invalid_physical_file';
@@ -93,7 +132,7 @@ final class EditionIntegrityService
         $this->pdo->beginTransaction();
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT id,status,file_id FROM editions WHERE id=? AND deleted_at IS NULL{$lock}"
+                "SELECT * FROM editions WHERE id=? AND deleted_at IS NULL{$lock}"
             );
             $stmt->execute([$editionId]);
             $edition = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -101,7 +140,7 @@ final class EditionIntegrityService
             if (($edition['status'] ?? '') !== 'Publicada') {
                 throw new RuntimeException('La edición no está publicada.', 409);
             }
-            if ($this->fileHasValidChecksum((int) ($edition['file_id'] ?? 0))) {
+            if ($this->publishedFileIsValid($edition)) {
                 throw new RuntimeException('La edición posee un PDF final válido y no requiere reparación.', 409);
             }
 

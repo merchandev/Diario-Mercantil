@@ -13,7 +13,7 @@ final class EditionOrderPdfService
     public function __construct(private PDO $pdo)
     {
         $this->uploadDir = StoragePath::getUploadsDir();
-        $this->maxBytes = max(1, (int) (getenv('MAX_FILE_MB') ?: 50)) * 1024 * 1024;
+        $this->maxBytes = min(50, max(1, (int) (getenv('MAX_FILE_MB') ?: 50))) * 1024 * 1024;
     }
 
     /** @return array<string, mixed> */
@@ -193,19 +193,10 @@ final class EditionOrderPdfService
             }
 
             $previousFileId = (int) ($current['publication_file_id'] ?? $oldFileId);
-            if ($previousFileId > 0 && $previousFileId !== $fileId) {
+            if ($previousFileId > 0 && $previousFileId !== $fileId && $previousFileId !== (int)($current['edition_file_id'] ?? 0)) {
                 $this->pdo->prepare(
                     "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
                 )->execute([$now, $now, $previousFileId]);
-            }
-            $editionFileId = (int) ($current['edition_file_id'] ?? 0);
-            if ($editionFileId > 0) {
-                $this->pdo->prepare(
-                    "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
-                )->execute([$now, $now, $editionFileId]);
-                $this->pdo->prepare(
-                    'UPDATE editions SET file_id=NULL,file_name=NULL WHERE id=? AND status=?'
-                )->execute([$editionId, 'Borrador']);
             }
             $this->pdo->prepare(
                 'INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)'
