@@ -29,7 +29,7 @@ class FileController {
     if ($status !== '') { $baseSql .= ' AND status = ?'; $params[] = $status; }
     
     try {
-        $sql = "SELECT * $baseSql AND (deleted_at IS NULL OR deleted_at = '') ORDER BY id DESC LIMIT 200";
+        $sql = "SELECT * $baseSql AND deleted_at IS NULL ORDER BY id DESC LIMIT 200";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -107,7 +107,7 @@ class FileController {
     $pdo = Database::pdo();
     // Use try-catch or ensure the column exists, falling back to empty if it fails.
     try {
-        $stmt = $pdo->prepare("SELECT * FROM files WHERE deleted_at IS NOT NULL AND deleted_at != '' ORDER BY deleted_at DESC LIMIT 200");
+        $stmt = $pdo->prepare("SELECT * FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 200");
         $stmt->execute();
         Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
     } catch (Exception $e) {
