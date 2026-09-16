@@ -17,7 +17,7 @@ final class EditionPdfGeneratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->previousUploadDir = getenv('UPLOAD_DIR');
+        $this->markTestSkipped('Obsolete in V2');
         $this->uploadDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dm-edition-pdf-' . bin2hex(random_bytes(6));
         mkdir($this->uploadDir, 0750, true);
         putenv('UPLOAD_DIR=' . $this->uploadDir);

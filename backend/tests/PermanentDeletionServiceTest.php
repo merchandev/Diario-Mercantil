@@ -46,23 +46,9 @@ final class PermanentDeletionServiceTest extends TestCase
     {
         $this->seedPublishedEdition();
 
-        $result = (new PermanentDeletionService($this->pdo))->deleteEdition(10, 99);
-
-        $this->assertTrue($result['deleted']);
-        $this->assertSame(2, $result['requests_requeued']);
-        $this->assertSame(3, $result['files_deleted']);
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM editions')->fetchColumn());
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM edition_orders')->fetchColumn());
-        $this->assertSame(
-            ['En trámite', 'En trámite'],
-            $this->pdo->query('SELECT status FROM legal_requests ORDER BY id')->fetchAll(PDO::FETCH_COLUMN)
-        );
-        $this->assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM files')->fetchColumn());
-        $this->assertFileDoesNotExist($this->uploadDir . '/edition.pdf');
-        $this->assertFileDoesNotExist($this->uploadDir . '/publication-14.pdf');
-        $this->assertFileDoesNotExist($this->uploadDir . '/publication-15.pdf');
-        $this->assertFileExists($this->uploadDir . '/source-14.pdf');
-        $this->assertFileExists($this->uploadDir . '/source-15.pdf');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Una edición publicada conserva su identidad. Utilice Retirar edición.');
+        (new PermanentDeletionService($this->pdo))->deleteEdition(10, 99);
     }
 
     public function testDeletingPublishedRequestInvalidatesEditionAndDeletesAllOwnedData(): void
@@ -71,20 +57,9 @@ final class PermanentDeletionServiceTest extends TestCase
         $this->pdo->exec("INSERT INTO legal_payments(id,legal_request_id) VALUES(1,14)");
         $this->pdo->exec("INSERT INTO payments(id,legal_request_id) VALUES(1,14)");
 
-        $result = (new PermanentDeletionService($this->pdo))->deleteLegalRequest(14, 99);
-
-        $this->assertTrue($result['deleted']);
-        $this->assertSame(1, $result['deleted_editions']);
-        $this->assertSame(1, $result['requests_requeued']);
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM editions')->fetchColumn());
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM legal_requests WHERE id=14')->fetchColumn());
-        $this->assertSame('En trámite', $this->pdo->query('SELECT status FROM legal_requests WHERE id=15')->fetchColumn());
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM legal_payments')->fetchColumn());
-        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM payments')->fetchColumn());
-        $this->assertSame(1, (int) $this->pdo->query('SELECT COUNT(*) FROM legal_files')->fetchColumn());
-        $this->assertSame(['source-15.pdf'], $this->pdo->query('SELECT path FROM files')->fetchAll(PDO::FETCH_COLUMN));
-        $this->assertFileDoesNotExist($this->uploadDir . '/source-14.pdf');
-        $this->assertFileExists($this->uploadDir . '/source-15.pdf');
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Una edición publicada conserva su identidad. Utilice Retirar edición.');
+        (new PermanentDeletionService($this->pdo))->deleteLegalRequest(14, 99);
     }
 
     public function testMissingRecordsReturnNotFound(): void
@@ -103,7 +78,7 @@ final class PermanentDeletionServiceTest extends TestCase
             'CREATE TABLE legal_requests (id INTEGER PRIMARY KEY,status TEXT,publish_date TEXT,edition_code TEXT,edition_no INTEGER,deleted_at TEXT)'
         );
         $this->pdo->exec(
-            'CREATE TABLE editions (id INTEGER PRIMARY KEY,status TEXT,file_id INTEGER,deleted_at TEXT,orders_count INTEGER)'
+            'CREATE TABLE editions (id INTEGER PRIMARY KEY,status TEXT,file_id INTEGER,deleted_at TEXT,published_file_checksum TEXT,orders_count INTEGER)'
         );
         $this->pdo->exec(
             'CREATE TABLE edition_orders (edition_id INTEGER,legal_request_id INTEGER,publication_file_id INTEGER)'

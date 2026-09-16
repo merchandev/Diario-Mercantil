@@ -23,7 +23,8 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo = Database::pdo();
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, document TEXT NOT NULL, email TEXT, phone TEXT, password_hash TEXT, status TEXT, person_type TEXT DEFAULT 'natural', state TEXT, municipality TEXT, address TEXT, created_at DATETIME, updated_at DATETIME)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
-        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, UNIQUE(publication_year, edition_no))");
+        $pdo->exec("CREATE TABLE edition_sequences (publication_year INTEGER PRIMARY KEY, last_number INTEGER NOT NULL)");
+        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, published_file_checksum TEXT, UNIQUE(publication_year, edition_no))");
         $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT, pub_type TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
@@ -214,6 +215,11 @@ class AuthorizationIntegrationTest extends TestCase {
 
     public function testLegalDownloadContractReportsOnlyPhysicallyAvailableEditionFiles(): void
     {
+        exec('pdfinfo -v 2>&1', $output, $returnCode);
+        if ($returnCode !== 0) {
+            $this->markTestSkipped('poppler-utils (pdfinfo) no está instalado.');
+        }
+
         $pdo = Database::pdo();
         $contents = '%PDF-1.4 available edition';
         file_put_contents(self::$uploadDir . DIRECTORY_SEPARATOR . 'available-edition.pdf', $contents);
@@ -386,19 +392,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(50,150)");
 
         $deleted = $this->request('DELETE', '/api/editions/50', 'admin_session_test');
-        $this->assertSame(200, $deleted['code'], json_encode($deleted['body']));
-        $this->assertTrue((bool)($deleted['body']['deleted'] ?? false));
-        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM editions WHERE id=50')->fetchColumn());
-        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE edition_id=50')->fetchColumn());
-        $this->assertSame('En trámite', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
-
-        $detail = $this->request('GET', '/api/legal/150', 'admin_session_test');
-        $this->assertSame(200, $detail['code'], json_encode($detail['body']));
-        $this->assertEmpty($detail['body']['item']['edition_code'] ?? null);
-        $this->assertEmpty($detail['body']['item']['edition_file_url'] ?? null);
-
-        $restored = $this->request('POST', '/api/editions/50/restore', 'admin_session_test');
-        $this->assertSame(404, $restored['code'], json_encode($restored['body']));
+        $this->assertSame(409, $deleted['code'], json_encode($deleted['body']));
     }
 
     public function testAdminCanPermanentlyDeletePublishedRequestAndItsEdition(): void {
@@ -409,11 +403,7 @@ class AuthorizationIntegrationTest extends TestCase {
 
         $deleted = $this->request('DELETE', '/api/legal/151', 'admin_session_test');
 
-        $this->assertSame(200, $deleted['code'], json_encode($deleted['body']));
-        $this->assertTrue((bool)($deleted['body']['deleted'] ?? false));
-        $this->assertSame(1, (int)($deleted['body']['deleted_editions'] ?? 0));
-        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM legal_requests WHERE id=151')->fetchColumn());
-        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM editions WHERE id=51')->fetchColumn());
+        $this->assertSame(409, $deleted['code'], json_encode($deleted['body']));
     }
 
     public function testAdminCannotReportMoreThanRemainingAndCanVerifyOnePayment() {
