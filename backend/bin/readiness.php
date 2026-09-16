@@ -56,6 +56,20 @@ function check(): bool {
             return false;
         }
 
+        // Validar que el bootstrap HTTP (index.php) no está roto (ej. permisos)
+        $_SERVER['REQUEST_METHOD'] = 'OPTIONS';
+        $_SERVER['REQUEST_URI'] = '/api/health/live';
+        $_SERVER['HTTP_ORIGIN'] = 'http://localhost';
+        ob_start();
+        try {
+            require dirname(__DIR__) . '/public/index.php';
+        } catch (Throwable $e) {
+            ob_end_clean();
+            echo "Bootstrap error: " . $e->getMessage() . "\n";
+            return false;
+        }
+        ob_end_clean();
+
         echo "OK\n";
         return true;
     } catch (Throwable $e) {

@@ -29,22 +29,7 @@ ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
 error_reporting(E_ALL);
 
-require_once __DIR__."/../src/AuthController.php";
-require_once __DIR__."/../src/UserController.php";
-require_once __DIR__."/../src/LegalController.php";
-require_once __DIR__."/../src/SystemController.php";
-require_once __DIR__."/../src/PaymentController.php";
 require_once __DIR__."/../src/Response.php";
-require_once __DIR__."/../src/RateController.php";
-require_once __DIR__."/../src/PagesController.php";
-require_once __DIR__."/../src/FileController.php";
-require_once __DIR__."/../src/EditionController.php";
-require_once __DIR__."/../src/HealthController.php";
-require_once __DIR__."/../src/VersionController.php";
-require_once __DIR__."/../src/MetricsController.php";
-require_once __DIR__."/../src/UploadController.php";
-require_once __DIR__."/../src/DirectoryController.php";
-require_once __DIR__."/../src/SeoController.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
 

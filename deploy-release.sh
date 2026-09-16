@@ -19,4 +19,21 @@ docker compose exec -T backend php -r '
   if (($v["git_sha"] ?? "") !== $argv[1]) exit(1);
   echo json_encode($v),PHP_EOL;
 ' "$GIT_SHA"
+
+echo "Running smoke tests..."
+sleep 2
+
+HTTP_VER=$(docker compose exec -T frontend curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/api/version || echo "000")
+if [ "$HTTP_VER" != "200" ]; then echo "Smoke test falló: /api/version devolvió $HTTP_VER"; exit 1; fi
+
+HTTP_ME=$(docker compose exec -T frontend curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1/api/auth/me || echo "000")
+if [ "$HTTP_ME" != "401" ]; then echo "Smoke test falló: /api/auth/me devolvió $HTTP_ME (se esperaba 401 sin sesión)"; exit 1; fi
+
+HTTP_LOGIN=$(docker compose exec -T frontend curl -s -X POST -H "Content-Type: application/json" -d '{"document":"fake","password":"fake"}' -o /dev/null -w "%{http_code}" http://127.0.0.1/api/auth/login || echo "000")
+if [ "$HTTP_LOGIN" != "401" ]; then echo "Smoke test falló: /api/auth/login inválido devolvió $HTTP_LOGIN (se esperaba 401)"; exit 1; fi
+
+HTTP_FORGOT=$(docker compose exec -T frontend curl -s -X POST -H "Content-Type: application/json" -d '{"email":"fake@fake.com"}' -o /dev/null -w "%{http_code}" http://127.0.0.1/api/auth/forgot-password || echo "000")
+if [ "$HTTP_FORGOT" != "200" ]; then echo "Smoke test falló: forgot-password devolvió $HTTP_FORGOT (se esperaba 200 neutro)"; exit 1; fi
+
+echo "Todos los smoke tests HTTP pasaron exitosamente."
 echo "Release ${GIT_SHA} started. Verify the public API and frontend build-info.json."
