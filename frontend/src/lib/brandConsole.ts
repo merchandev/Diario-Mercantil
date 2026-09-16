@@ -1,8 +1,11 @@
-const binarySignature = [
-  '01001101 01000101 01010010 01000011 01001000 01000001 01001110',
-  '00101110 01000100 01000101 01010110 00100000 11000011 10010111',
-  '00100000 01000101 01010000 01010010 01000101 01010011 01010011',
-  '01001001 01010110 01001111',
+const asciiArt = [
+  '  __  __               _                  ____             _ ',
+  ' |  \\/  | ___ _ __ ___| |__   __ _ _ __  |  _ \\  _____   _| |',
+  ' | |\\/| |/ _ \\ \'__/ __| \'_ \\ / _` | \'_ \\ | | | |/ _ \\ \\ / / |',
+  ' | |  | |  __/ | | (__| | | | (_| | | | || |_| |  __/\\ V /|_|',
+  ' |_|  |_|\\___|_|  \\___|_| |_|\\__,_|_| |_||____/ \\___| \\_/ (_)',
+  '                                                             ',
+  '                  < Programmer Full-Stack />                 ',
 ].join('\n')
 
 const ownershipNotice = [
@@ -18,7 +21,7 @@ export function printOwnershipConsoleSignature() {
   if (!browserConsole) return
 
   browserConsole.info(
-    `%c${binarySignature}%c\n  MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.  `,
+    `%c\n${asciiArt}\n%c\n  MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.  `,
     'display:block;background:#070b14;color:#35f2a1;padding:16px 20px 8px;border:1px solid #1c624b;border-bottom:0;border-radius:10px 10px 0 0;font:600 11px/1.65 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.08em;text-shadow:0 0 8px rgba(53,242,161,.55)',
     'display:block;background:linear-gradient(90deg,#070b14,#16102b);color:#ffffff;padding:8px 20px 16px;border:1px solid #1c624b;border-top:0;border-radius:0 0 10px 10px;font:800 15px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.06em',
   )
