@@ -256,7 +256,7 @@ class FileController {
   // Serve raw file content
   public function serve($id) {
     $pdo = Database::pdo();
-    $stmt = $pdo->prepare("SELECT id, name, path, type, created_at, is_public FROM files WHERE id=? AND (deleted_at IS NULL OR deleted_at='')");
+    $stmt = $pdo->prepare("SELECT id, name, path, type, created_at, is_public FROM files WHERE id=? AND deleted_at IS NULL");
     $stmt->execute([$id]);
     $file = $stmt->fetch(PDO::FETCH_ASSOC);
 
