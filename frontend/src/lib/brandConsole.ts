@@ -21,9 +21,12 @@ export function printOwnershipConsoleSignature() {
   if (!browserConsole) return
 
   browserConsole.info(
-    `%c\n${asciiArt}\n%c\n  MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.  `,
-    'display:block;background:#070b14;color:#35f2a1;padding:16px 20px 8px;border:1px solid #1c624b;border-bottom:0;border-radius:10px 10px 0 0;font:600 11px/1.65 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.08em;text-shadow:0 0 8px rgba(53,242,161,.55)',
-    'display:block;background:linear-gradient(90deg,#070b14,#16102b);color:#ffffff;padding:8px 20px 16px;border:1px solid #1c624b;border-top:0;border-radius:0 0 10px 10px;font:800 15px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.06em',
+    `%c${asciiArt}`,
+    'color:#35f2a1;font:800 12px/1.15 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;text-shadow:0 0 8px rgba(53,242,161,.6)'
+  )
+  browserConsole.info(
+    `%c\n  MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.  \n`,
+    'display:block;background:linear-gradient(90deg,#070b14,#16102b);color:#ffffff;padding:8px 20px;border:1px solid #1c624b;border-radius:8px;font:800 15px/1.5 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;letter-spacing:.06em'
   )
   browserConsole.info(
     `%c${ownershipNotice}`,
