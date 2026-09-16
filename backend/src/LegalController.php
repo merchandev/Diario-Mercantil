@@ -13,6 +13,7 @@ require_once __DIR__.'/Services/PdfInspector.php';
 require_once __DIR__.'/Services/DocumentUploadService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
+require_once __DIR__.'/Services/EditorialClock.php';
 
 class LegalController {
   
@@ -126,19 +127,19 @@ class LegalController {
     }
     $reqTo = $_GET['req_to'] ?? '';
     if ($reqTo !== '') {
-        $sql .= " AND l.created_at <= ?";
-        $params[] = $reqTo . ' 23:59:59';
+        $sql .= " AND l.created_at < ?";
+        $params[] = EditorialClock::nextDay($reqTo);
     }
     
     $pubFrom = $_GET['pub_from'] ?? '';
     if ($pubFrom !== '') {
         $sql .= " AND l.publish_date >= ?";
-        $params[] = $pubFrom . ' 00:00:00';
+        $params[] = $pubFrom;
     }
     $pubTo = $_GET['pub_to'] ?? '';
     if ($pubTo !== '') {
-        $sql .= " AND l.publish_date <= ?";
-        $params[] = $pubTo . ' 23:59:59';
+        $sql .= " AND l.publish_date < ?";
+        $params[] = EditorialClock::nextDay($pubTo);
     }
     
     $limit = max(1, min(500, (int)($_GET['limit'] ?? 500)));

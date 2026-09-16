@@ -48,6 +48,33 @@ final class EditionIntegrityServiceTest extends TestCase
         $this->assertTrue($service->fileHasValidChecksum(1));
     }
 
+    public function testRejectsMalformedPdfEvenWhenChecksumMatches(): void
+    {
+        $path=$this->uploadDir.'/malformed.pdf';
+        file_put_contents($path,'%PDF-1.4 not a real PDF');
+        $this->pdo->prepare("INSERT INTO files VALUES(3,'malformed.pdf',?,?,'uploaded',NULL)")->execute([filesize($path),hash_file('sha256',$path)]);
+        $service=new EditionIntegrityService($this->pdo);
+        $this->assertTrue($service->fileHasValidChecksum(3));
+        $this->assertFalse($service->editionFileIsPublishable(['file_id'=>3,'status'=>'Borrador']));
+    }
+
+    public function testRejectsReplacedPublishedFileEvenIfItsNewChecksumMatches(): void
+    {
+        require_once __DIR__.'/../src/fpdf.php';
+        $pdf=new FPDF(); $pdf->AddPage(); $pdf->SetFont('Arial','',12); $pdf->Cell(0,10,'FINAL');
+        $path=$this->uploadDir.'/final.pdf'; $pdf->Output('F',$path);
+        $sha=hash_file('sha256',$path);
+        $this->pdo->prepare("INSERT INTO files VALUES(4,'final.pdf',?,?,'uploaded',NULL)")->execute([filesize($path),$sha]);
+        $service=new EditionIntegrityService($this->pdo);
+        $edition=['file_id'=>4,'status'=>'Publicada','published_file_checksum'=>$sha];
+        $this->assertTrue($service->publishedFileIsValid($edition));
+        $edition['published_file_checksum']=str_repeat('0',64);
+        $this->assertFalse($service->publishedFileIsValid($edition));
+        $edition['published_file_checksum']=$sha;
+        $edition['deleted_at']='2026-09-01';
+        $this->assertFalse($service->publishedFileIsValid($edition));
+    }
+
     public function testRepairReturnsOnlyAffectedEditionToDraftAndPreservesIdentity(): void
     {
         $this->pdo->exec("INSERT INTO files VALUES(2,'missing.pdf',100,'deadbeef','processed',NULL)");

@@ -204,8 +204,8 @@ class EditionController {
         $params[] = $from;
     }
     if ($to !== '') {
-        $sql .= 'AND e.date <= ? ';
-        $params[] = $to;
+        $sql .= 'AND e.date < ? ';
+        $params[] = EditorialClock::nextDay($to);
     }
     
     $sql .= 'ORDER BY e.date DESC, e.id DESC LIMIT 50';
@@ -614,7 +614,7 @@ class EditionController {
     
     try {
         $orderService = new EditionOrderService($pdo);
-        $cnt = $orderService->setOrdersForEdition($id, $ids);
+        $cnt = $orderService->setOrdersForEdition($id, $ids, (int)$u['id']);
         
         $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
             ->execute([$u['id'], 'set_orders_edition', 'edition', $id]);
@@ -655,7 +655,7 @@ class EditionController {
               $mergedIds = array_unique(array_merge($existingIds, $ids));
               
               $orderService = new EditionOrderService($pdo);
-              $cnt = $orderService->setOrdersForEdition($id, $mergedIds);
+              $cnt = $orderService->setOrdersForEdition($id, $mergedIds, (int)$u['id']);
           }
           
           $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")

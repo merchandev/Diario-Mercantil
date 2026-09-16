@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
 import { editorialToday } from '../lib/editorialDate'
 import { createEdition, deleteEdition, permanentDeleteEdition, retireEdition, listEditions, listRetiredEditions, restoreEdition, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
@@ -9,6 +10,7 @@ import FlipbookViewer from '../components/FlipbookViewer'
 import { useDialog } from '../contexts/DialogContext'
 
 export default function Ediciones() {
+  const { user } = useAuth()
   const { confirmAction } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
   const [retiredRows, setRetiredRows] = useState<Edition[]>([])
@@ -480,8 +482,11 @@ export default function Ediciones() {
                                   </div>
                                 )}
                               </div>
+                              {detail.edition.status === 'Borrador' && detail.edition.readiness?.blockers?.map(blocker => (
+                                <p key={blocker.code + blocker.message} className="text-sm text-amber-700">{blocker.message}</p>
+                              ))}
                               {!isPdfCollapsed && !detail.edition.file_id && (
-                                <p className="text-sm text-slate-600">El consolidado se generará al publicar, después de preparar cada PDF individual. También puedes cargar uno manualmente.</p>
+                                <p className="text-sm text-slate-600">Carga el PDF final oficial de la edición antes de publicar. Publicar conserva exactamente ese archivo.</p>
                               )}
                               {!isPdfCollapsed && detail.edition.file_id && detail.edition.file_is_valid && (
                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -734,7 +739,7 @@ export default function Ediciones() {
         <div className="card overflow-hidden border border-amber-200">
           <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
             <h2 className="font-semibold text-amber-900">Ediciones retiradas</h2>
-            <p className="text-xs text-amber-800 mt-1">Puedes restaurarlas o eliminarlas definitivamente junto con sus archivos generados.</p>
+            <p className="text-xs text-amber-800 mt-1">Las ediciones publicadas conservan su CVE y sus archivos. Puedes restaurarlas si su PDF final sigue siendo válido.</p>
           </div>
           <div className="divide-y divide-slate-100">
             {retiredRows.map(edition => (
@@ -744,7 +749,7 @@ export default function Ediciones() {
                   <div className="text-xs text-slate-500">Fecha {edition.date} · retirada {edition.deleted_at || ''}</div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="btn btn-outline" onClick={() => setConfirmDialog({
+                  <button disabled={edition.status !== 'Publicada'} className="btn btn-outline" onClick={() => setConfirmDialog({
                     isOpen: true,
                     title: 'Restaurar edición',
                     message: `¿Volver a publicar la edición ${edition.code}?`,
@@ -758,7 +763,7 @@ export default function Ediciones() {
                       }
                     }
                   })}>Restaurar</button>
-                  <button className="btn btn-danger" onClick={() => setConfirmDialog({
+                  {edition.status === 'Borrador' && user?.role === 'superadmin' && <button className="btn btn-danger" onClick={() => setConfirmDialog({
                     isOpen: true,
                     title: 'Eliminar edición definitivamente',
                     message: `¿Eliminar permanentemente la edición ${edition.code} y todos sus archivos generados?`,
@@ -770,7 +775,7 @@ export default function Ediciones() {
                         setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' })
                       }
                     }
-                  })}>Eliminar</button>
+                  })}>Eliminar</button>}
                 </div>
               </div>
             ))}

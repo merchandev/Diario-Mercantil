@@ -5,9 +5,6 @@ require_once __DIR__ . '/../src/Services/EditionPublicationService.php';
 
 class EditionPublicationServiceTest extends TestCase {
 
-    public function setUp(): void {
-        $this->markTestSkipped('Obsolete in V2');
-    }
 
     public function testPublishFailsIfEditionNotFound() {
         $pdo = $this->createMock(PDO::class);
@@ -41,39 +38,20 @@ class EditionPublicationServiceTest extends TestCase {
         $service->publish(1, 1);
     }
     
-    public function testPublishFailsIfOrderHasNoSourcePdf() {
-        $pdo = $this->createMock(PDO::class);
-        $editionStmt = $this->createMock(PDOStatement::class);
-        $ordersStmt = $this->createMock(PDOStatement::class);
-        $preparedStmt = $this->createMock(PDOStatement::class);
-        $orderStmt = $this->createMock(PDOStatement::class);
-        $sourceStmt = $this->createMock(PDOStatement::class);
-
-        $editionStmt->method('fetch')->willReturn(['status' => 'Borrador']);
-        $ordersStmt->method('fetchAll')->willReturn([1]);
-        $preparedStmt->method('fetch')->willReturn(false);
-        $orderStmt->method('fetch')->willReturn([
-            'status' => 'Borrador',
-            'request_status' => 'En trámite',
-            'publication_file_id' => null,
-            'edition_file_id' => null,
-        ]);
-        $sourceStmt->method('fetch')->willReturn(false);
-        $pdo->method('prepare')->willReturnOnConsecutiveCalls(
-            $editionStmt,
-            $ordersStmt,
-            $preparedStmt,
-            $orderStmt,
-            $sourceStmt
-        );
-        
-        $service = new EditionPublicationService($pdo);
-        
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage("La solicitud 1 no tiene un PDF de documento válido.");
-        $this->expectExceptionCode(422);
-        
-        $service->publish(1, 1);
+    public function testPublishRequiresFinalPdf(): void {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->exec('CREATE TABLE editions(id INTEGER PRIMARY KEY,status TEXT,file_id INTEGER,deleted_at TEXT)');
+        $pdo->exec('CREATE TABLE edition_orders(edition_id INTEGER,legal_request_id INTEGER)');
+        $pdo->exec("INSERT INTO editions VALUES(1,'Borrador',NULL,NULL)");
+        $pdo->exec('INSERT INTO edition_orders VALUES(1,1)');
+        try {
+            (new EditionPublicationService($pdo))->publish(1,1);
+            $this->fail('Debe exigir PDF final.');
+        } catch (RuntimeException $e) {
+            $this->assertSame(422, $e->getCode());
+            $this->assertFalse($pdo->inTransaction());
+            $this->assertSame('Borrador', $pdo->query('SELECT status FROM editions')->fetchColumn());
+        }
     }
 
     public function testPublishFailsIfNoOrders() {

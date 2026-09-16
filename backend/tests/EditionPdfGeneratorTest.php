@@ -9,6 +9,7 @@ require_once __DIR__ . '/../src/Services/EditionPdfGenerator.php';
 require_once __DIR__ . '/../src/Services/PdfInspector.php';
 require_once __DIR__ . '/../src/Services/EditionPublicationService.php';
 require_once __DIR__ . '/../src/Services/EditionOrderService.php';
+require_once __DIR__ . '/../src/Services/EditionOrderPdfService.php';
 
 final class EditionPdfGeneratorTest extends TestCase
 {
@@ -17,7 +18,7 @@ final class EditionPdfGeneratorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->markTestSkipped('Obsolete in V2');
+        $this->previousUploadDir = getenv('UPLOAD_DIR');
         $this->uploadDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dm-edition-pdf-' . bin2hex(random_bytes(6));
         mkdir($this->uploadDir, 0750, true);
         putenv('UPLOAD_DIR=' . $this->uploadDir);
@@ -93,7 +94,7 @@ final class EditionPdfGeneratorTest extends TestCase
         }
     }
 
-    public function testPublicationPreparesAndKeepsTwoIndependentRequestPdfs(): void
+    public function testPreparingIndividualPdfsPreservesUploadedFinal(): void
     {
         $first = $this->createPdf('source-14.pdf', 'SOLICITUD 14');
         $second = $this->createPdf('source-15.pdf', 'SOLICITUD 15');
@@ -133,6 +134,10 @@ final class EditionPdfGeneratorTest extends TestCase
         $pdo->exec("INSERT INTO legal_files(legal_request_id,kind,file_id) VALUES(14,'document_pdf',14),(15,'document_pdf',15)");
         $pdo->exec('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(1,14),(1,15)');
 
+        $finalId = $this->attachFinal($pdo, 1);
+        (new EditionOrderPdfService($pdo))->prepareFromRequest(1, 14, 1);
+        (new EditionOrderPdfService($pdo))->prepareFromRequest(1, 15, 1);
+        $this->assertSame($finalId, (int)$pdo->query('SELECT file_id FROM editions WHERE id=1')->fetchColumn());
         (new EditionPublicationService($pdo))->publish(1, 1);
 
         $rows = $pdo->query(
@@ -152,7 +157,7 @@ final class EditionPdfGeneratorTest extends TestCase
         )->fetchColumn();
         $this->assertIsString($consolidated);
         $this->assertSame(
-            2,
+            1,
             (new PdfInspector())->pageCount(
                 $this->uploadDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $consolidated)
             )
@@ -160,7 +165,7 @@ final class EditionPdfGeneratorTest extends TestCase
     }
 
     /** @dataProvider requestCountProvider */
-    public function testPublicationUsesTheSameDraftCycleForAnyRequestCount(int $requestCount): void
+    public function testPublicationUsesTheSameDraftCycleForAnyRequestCount(int $requestCount, int $userCount): void
     {
         $source = $this->createPdf("source-{$requestCount}.pdf", "FUENTE {$requestCount}");
         $pdo = new PDO('sqlite::memory:');
@@ -189,12 +194,18 @@ final class EditionPdfGeneratorTest extends TestCase
         $insertLegalFile = $pdo->prepare("INSERT INTO legal_files(legal_request_id,kind,file_id) VALUES(?,'document_pdf',100)");
         $insertOrder = $pdo->prepare('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(1,?)');
         for ($id = 1; $id <= $requestCount; $id++) {
-            $insertRequest->execute([$id, 1000 + $id]);
+            $insertRequest->execute([$id, 1000 + (($id - 1) % $userCount)]);
             $insertLegalFile->execute([$id]);
             $insertOrder->execute([$id]);
         }
 
+        $finalId = $this->attachFinal($pdo, 1);
+        $beforeFiles = $pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
         (new EditionPublicationService($pdo))->publish(1, 1);
+        $this->assertSame($beforeFiles, $pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC));
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE publication_file_id IS NOT NULL')->fetchColumn());
+        $this->assertSame($finalId, (int)$pdo->query('SELECT file_id FROM editions WHERE id=1')->fetchColumn());
+
 
         $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=1')->fetchColumn());
         $this->assertSame($requestCount, (int) $pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn());
@@ -204,7 +215,7 @@ final class EditionPdfGeneratorTest extends TestCase
 
     public static function requestCountProvider(): array
     {
-        return ['one request' => [1], 'two requests' => [2], 'three requests' => [3], 'ten requests' => [10]];
+        return ['1x1'=>[1,1], '1x2'=>[2,1], '1x3'=>[3,1], '2x1'=>[2,2], '2+1'=>[3,2], '3x1'=>[3,3], '10 mixed'=>[10,5], '20 one user'=>[20,1], '20 users'=>[20,20], '50 mixed'=>[50,25]];
     }
 
     /** @dataProvider invalidFinalPdfProvider */
@@ -283,6 +294,7 @@ final class EditionPdfGeneratorTest extends TestCase
         $pdo->exec('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(1,14)');
 
         $publication = new EditionPublicationService($pdo);
+        $this->attachFinal($pdo, 1);
         $publication->publish(1, 1);
         $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=1')->fetchColumn());
 
@@ -293,12 +305,23 @@ final class EditionPdfGeneratorTest extends TestCase
 
         $pdo->exec("INSERT INTO editions(id,code,status,date,orders_count) VALUES(2,'MMXXVI-0002','Borrador','2026-08-31',0)");
         (new EditionOrderService($pdo))->setOrdersForEdition(2, [14]);
+        $this->attachFinal($pdo, 2);
         $publication->publish(2, 1);
 
         $this->assertSame('Publicada', $pdo->query('SELECT status FROM editions WHERE id=2')->fetchColumn());
         $this->assertSame('Publicada', $pdo->query('SELECT status FROM legal_requests WHERE id=14')->fetchColumn());
         $this->assertSame(2, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=14')->fetchColumn());
         $this->assertSame(1, (int)$pdo->query('SELECT COUNT(*) FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=14 AND e.deleted_at IS NULL')->fetchColumn());
+    }
+
+    private function attachFinal(PDO $pdo, int $id): int
+    {
+        $path = $this->createPdf("final-{$id}.pdf", "PDF FINAL OFICIAL {$id}");
+        $pdo->prepare("INSERT INTO files(name,path,size,type,checksum,status) VALUES(?,?,?,'pdf',?,'uploaded')")
+            ->execute([basename($path), basename($path), filesize($path), hash_file('sha256', $path)]);
+        $fileId = (int)$pdo->lastInsertId();
+        $pdo->prepare('UPDATE editions SET file_id=?,file_name=? WHERE id=?')->execute([$fileId, basename($path), $id]);
+        return $fileId;
     }
 
     private function createPdf(string $name, string $text): string

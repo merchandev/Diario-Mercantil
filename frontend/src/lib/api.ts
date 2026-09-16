@@ -235,7 +235,7 @@ export type Edition = {
   file_name?: string | null;
   file_url?: string | null;
   file_is_valid?: boolean;
-  readiness?: any;
+  readiness?: { ready: boolean; blockers: { code: string; message: string }[] };
   created_at?: string;
   updated_at?: string;
   published_by_name?: string;

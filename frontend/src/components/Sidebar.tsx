@@ -35,7 +35,7 @@ export default function Sidebar({
   const { user } = useAuth()
   const [sysVersion, setSysVersion] = useState<string>('- - -')
   useEffect(() => {
-    fetch('/api/version').then(r=>r.json()).then(d=>setSysVersion(d.git_sha)).catch(()=>setSysVersion('unknown'))
+    fetch('/api/version').then(r=>r.json()).then(d=>setSysVersion(d.git_sha?.slice(0, 7) || 'unknown')).catch(()=>setSysVersion('unknown'))
   }, [])
   const [collapsed, setCollapsed] = useState(false)
 

@@ -24,7 +24,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, document TEXT NOT NULL, email TEXT, phone TEXT, password_hash TEXT, status TEXT, person_type TEXT DEFAULT 'natural', state TEXT, municipality TEXT, address TEXT, created_at DATETIME, updated_at DATETIME)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
         $pdo->exec("CREATE TABLE edition_sequences (publication_year INTEGER PRIMARY KEY, last_number INTEGER NOT NULL)");
-        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, published_file_checksum TEXT, UNIQUE(publication_year, edition_no))");
+        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, published_file_checksum TEXT, published_at TEXT, published_by INTEGER, file_name TEXT, UNIQUE(publication_year, edition_no))");
         $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT, pub_type TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
@@ -120,7 +120,7 @@ class AuthorizationIntegrationTest extends TestCase {
             $code = (int)$matches[1];
         }
         
-        return ['code' => $code, 'body' => json_decode((string)$response, true)];
+        return ['code' => $code, 'body' => json_decode((string)$response, true), 'raw' => (string)$response];
     }
 
     private function requestMultipart(string $uri, string $sessionId, string $field, string $filename, string $mime, string $contents): array {
@@ -221,7 +221,12 @@ class AuthorizationIntegrationTest extends TestCase {
         }
 
         $pdo = Database::pdo();
-        $contents = '%PDF-1.4 available edition';
+        require_once __DIR__ . '/../src/fpdf.php';
+        $pdf = new FPDF();
+        $pdf->AddPage();
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(0, 10, 'EDICION FINAL OFICIAL');
+        $contents = $pdf->Output('S');
         file_put_contents(self::$uploadDir . DIRECTORY_SEPARATOR . 'available-edition.pdf', $contents);
         $checksum = hash('sha256', $contents);
         $pdo->prepare("INSERT INTO files(id,name,path,size,type,checksum,status,created_at,updated_at) VALUES(201,'available.pdf','available-edition.pdf',?,'pdf',?,'processed','2026-09-01','2026-09-01')")
@@ -229,6 +234,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("INSERT INTO files(id,name,path,size,type,checksum,status,created_at,updated_at) VALUES(202,'missing.pdf','missing-edition.pdf',25,'pdf','deadbeef','processed','2026-09-01','2026-09-01')");
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,created_at) VALUES(164,2,'Publicada',100,'Con PDF','2026-09-01','2026-09-01'),(165,2,'Publicada',100,'Sin PDF','2026-09-01','2026-09-01')");
         $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(61,'MMXXV-0061','Publicada','2025-09-01',61,1,'2025-09-01',2025,201),(62,'MMXXV-0062','Publicada','2025-09-01',62,1,'2025-09-01',2025,202)");
+        $pdo->prepare('UPDATE editions SET published_file_checksum=? WHERE id=61')->execute([$checksum]);
         $pdo->exec('INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(61,164),(62,165)');
 
         $response = $this->request('GET', '/api/legal', 'admin_session_test');
@@ -454,4 +460,77 @@ class AuthorizationIntegrationTest extends TestCase {
         $amount = Database::pdo()->query("SELECT amount_bs FROM legal_payments WHERE id=$paymentId")->fetchColumn();
         $this->assertEquals(100, $amount);
     }
+    public function testFinalPdfWorkflowSameDayRetirementAndSnapshot(): void {
+        require_once __DIR__ . '/../src/fpdf.php';
+        $pdo = Database::pdo();
+        $pdf = new FPDF(); $pdf->AddPage(); $pdf->SetFont('Arial', '', 12); $pdf->Cell(0,10,'FINAL OFICIAL');
+        $contents = $pdf->Output('S');
+        $sha = hash('sha256', $contents);
+        $ids = [];
+        foreach ([601,602] as $requestId) {
+            $pdo->prepare("INSERT INTO legal_requests(id,user_id,status,name,date,total_bs) VALUES(?,2,'En trámite','Solicitud V2','2026-09-01',100)")->execute([$requestId]);
+            $created = $this->request('POST','/api/editions','admin_session_test',['date'=>'2026-09-01','orders'=>[$requestId]]);
+            $this->assertSame(200,$created['code'],json_encode($created['body']));
+            $id = $created['body']['id']; $ids[] = $id;
+            $before = $pdo->query('SELECT * FROM editions WHERE id=' . $id)->fetch(PDO::FETCH_ASSOC);
+            $blocked = $this->request('POST',"/api/editions/{$id}/publish",'admin_session_test');
+            $this->assertSame(409,$blocked['code']);
+            $this->assertSame($before,$pdo->query('SELECT * FROM editions WHERE id=' . $id)->fetch(PDO::FETCH_ASSOC));
+            $uploaded = $this->requestMultipart("/api/editions/{$id}/pdf",'admin_session_test','file','final.pdf','application/pdf',$contents);
+            $this->assertSame(200,$uploaded['code'],json_encode($uploaded['body']));
+            $ready = $this->request('GET',"/api/editions/{$id}/readiness",'admin_session_test');
+            $this->assertTrue($ready['body']['ready']);
+            $filesBefore = $pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+            $published = $this->request('POST',"/api/editions/{$id}/publish",'admin_session_test');
+            $this->assertSame(200,$published['code'],json_encode($published['body']));
+            $this->assertSame($filesBefore,$pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC));
+            $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/publish",'admin_session_test')['code']);
+            $this->assertSame(409,$this->request('DELETE',"/api/editions/{$id}",'admin_session_test')['code']);
+            $detail = $this->request('GET',"/api/legal/{$requestId}",'user_session_test');
+            $url = $detail['body']['item']['edition_file_url'];
+            $this->assertSame('/api/e/code/'.$created['body']['code'].'/download',$url);
+            $download = $this->request('GET',$url);
+            $this->assertSame(200,$download['code']);
+            $this->assertSame($sha,hash('sha256',$download['raw']));
+            $this->assertSame($sha,$pdo->query('SELECT published_file_checksum FROM editions WHERE id='.$id)->fetchColumn());
+        }
+        $first = $ids[0]; $second = $ids[1];
+        $list = $this->request('GET','/api/e?from=2026-09-01&to=2026-09-01');
+        $this->assertSame($second,(int)$list['body']['items'][0]['id']);
+        $this->assertSame(200,$this->request('POST',"/api/editions/{$first}/retire",'admin_session_test')['code']);
+        $this->assertNotEmpty($pdo->query('SELECT deleted_at FROM editions WHERE id='.$first)->fetchColumn());
+        $this->assertSame(200,$this->request('POST',"/api/editions/{$first}/restore",'admin_session_test')['code']);
+        $pdo->prepare('UPDATE editions SET published_file_checksum=? WHERE id=?')->execute([str_repeat('0',64),$second]);
+        $code = $pdo->query('SELECT code FROM editions WHERE id='.$second)->fetchColumn();
+        $this->assertSame(404,$this->request('GET','/api/e/code/'.$code.'/download')['code']);
+        $this->assertNull($this->request('GET','/api/legal/602','user_session_test')['body']['item']['edition_file_url']);
+        $list = $this->request('GET','/api/e?from=2026-09-01&to=2026-09-01');
+        $this->assertNotContains($second,array_map('intval',array_column($list['body']['items'],'id')));
+    }
+
+    public function testDeletedDraftNumberIsNeverReused(): void {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name) VALUES(603,2,'En trámite',100,'Reserva')");
+        $data = ['date'=>'2030-01-01','orders'=>[603]];
+        $first=$this->request('POST','/api/editions','admin_session_test',$data);
+        $this->assertSame(200,$first['code']);
+        $id=$first['body']['id'];
+        $this->assertSame(200,$this->request('DELETE',"/api/editions/{$id}",'admin_session_test')['code']);
+        $second=$this->request('POST','/api/editions','admin_session_test',$data);
+        $this->assertSame(200,$second['code']);
+        $this->assertSame($first['body']['edition_no']+1,$second['body']['edition_no']);
+        $this->assertNotSame($first['body']['code'],$second['body']['code']);
+    }
+
+    public function testDateFilterIncludesDateOnlyAndLastFractionalSecond(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,name,publish_date,created_at) VALUES(610,2,'En trámite','Día','2024-02-29','2024-02-29 00:00:00'),(611,2,'En trámite','Final','2024-02-29 23:59:59.999','2024-02-29 23:59:59.999'),(612,2,'En trámite','Siguiente','2024-03-01','2024-03-01')");
+        foreach (['pub_from=2024-02-29&pub_to=2024-02-29','req_from=2024-02-29&req_to=2024-02-29'] as $filter) {
+            $res=$this->request('GET','/api/legal?'.$filter,'admin_session_test');
+            $this->assertSame(200,$res['code']);
+            $ids=array_map('intval',array_column($res['body']['items'],'id'));
+            $this->assertContains(610,$ids); $this->assertContains(611,$ids); $this->assertNotContains(612,$ids);
+        }
+    }
+
 }
