@@ -37,9 +37,10 @@ COPY php.ini /usr/local/etc/php/conf.d/99-production.ini
 RUN composer dump-autoload --optimize --classmap-authoritative
 
 RUN mkdir -p storage/uploads storage/results \
-    && chown -R www-data:www-data storage \
-    && find storage -type d -exec chmod 0750 {} \; \
-    && find storage -type f -exec chmod 0640 {} \; \
+    && chown -R www-data:www-data /var/www/html \
+    && find /var/www/html -type d -exec chmod 0755 {} \; \
+    && find /var/www/html -type f -exec chmod 0644 {} \; \
+    && chmod -R 0770 storage \
     && sed -i 's/\r$//' /var/www/html/bin/entrypoint.sh \
     && chmod +x /var/www/html/bin/entrypoint.sh
 

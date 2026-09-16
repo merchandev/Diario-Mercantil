@@ -365,6 +365,7 @@ final class AuthController {
             // Always return OK to prevent email enumeration
             Response::json(["ok" => true, "message" => "Si la cuenta existe, recibirás instrucciones."]);
         } catch (Throwable $e) {
+            error_log("[AuthController::forgotPassword] Error: " . $e->getMessage() . " on line " . $e->getLine());
             http_response_code(500);
             echo json_encode(["error" => "server_error", "message" => "Error interno"]);
             exit;
