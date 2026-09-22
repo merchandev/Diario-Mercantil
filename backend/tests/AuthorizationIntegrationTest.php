@@ -34,6 +34,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE settings (`key` TEXT PRIMARY KEY, value TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, bank TEXT, account TEXT, holder TEXT, rif TEXT, phone TEXT, qr_file_id INTEGER, qr_updated_at TEXT, created_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id INTEGER, action TEXT, resource_type TEXT, resource_id INTEGER)");
+        $pdo->exec("CREATE TABLE edition_archives (id INTEGER PRIMARY KEY AUTOINCREMENT, edition_id INTEGER NOT NULL, file_id INTEGER, snapshot_json TEXT NOT NULL, actor_user_id INTEGER, reason TEXT NOT NULL, created_at TEXT NOT NULL)");
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
         
@@ -391,14 +392,23 @@ class AuthorizationIntegrationTest extends TestCase {
         )->fetchColumn());
     }
 
-    public function testDeletingEditionIsPermanentAndRequeuesRequests(): void {
+    public function testTrashingPublishedEditionRequeuesItsRequests(): void {
         $pdo = Database::pdo();
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,order_no,date,edition_code,publish_date) VALUES(150,2,'Publicada',100,'Publicada retirada','ORD-150','2026-08-30','MMXXVI-0050','2026-08-30')");
         $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(50,'MMXXVI-0050','Publicada','2026-08-30',50,1,'2026-08-30',2026,NULL)");
         $pdo->exec("INSERT INTO edition_orders(edition_id,legal_request_id) VALUES(50,150)");
 
         $deleted = $this->request('DELETE', '/api/editions/50', 'admin_session_test');
-        $this->assertSame(409, $deleted['code'], json_encode($deleted['body']));
+        // DELETE now soft-deletes (sends to trash) and requeues requests → 200
+        $this->assertSame(200, $deleted['code'], json_encode($deleted['body']));
+        $this->assertSame(1, $deleted['body']['requests_requeued'] ?? null);
+        // The edition must be soft-deleted
+        $this->assertNotEmpty($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
+        // The request must have been re-queued to Por verificar
+        $this->assertSame('Por verificar', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
+        // Permanent delete via explicit endpoint must reject (no superadmin role here)
+        $perm = $this->request('DELETE', '/api/editions/50/permanent', 'admin_session_test');
+        $this->assertSame(403, $perm['code']);
     }
 
     public function testAdminCanPermanentlyDeletePublishedRequestAndItsEdition(): void {
@@ -515,9 +525,12 @@ class AuthorizationIntegrationTest extends TestCase {
         $first=$this->request('POST','/api/editions','admin_session_test',$data);
         $this->assertSame(200,$first['code']);
         $id=$first['body']['id'];
+        // Soft-delete the edition: request 603 returns to Por verificar
         $this->assertSame(200,$this->request('DELETE',"/api/editions/{$id}",'admin_session_test')['code']);
+        // Re-verify request 603 so it can be selected in a new edition
+        $pdo->exec("UPDATE legal_requests SET status='En trámite' WHERE id=603");
         $second=$this->request('POST','/api/editions','admin_session_test',$data);
-        $this->assertSame(200,$second['code']);
+        $this->assertSame(200,$second['code'],$second['body']['error'] ?? '');
         $this->assertSame($first['body']['edition_no']+1,$second['body']['edition_no']);
         $this->assertNotSame($first['body']['code'],$second['body']['code']);
     }

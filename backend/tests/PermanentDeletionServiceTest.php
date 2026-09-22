@@ -58,7 +58,8 @@ final class PermanentDeletionServiceTest extends TestCase
         $this->pdo->exec("INSERT INTO payments(id,legal_request_id) VALUES(1,14)");
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Una edición publicada conserva su identidad. Utilice Retirar edición.');
+        // The service now validates trash-first before checking the published-edition guard.
+        $this->expectExceptionMessage('Envía la publicación a la papelera antes de eliminarla definitivamente.');
         (new PermanentDeletionService($this->pdo))->deleteLegalRequest(14, 99);
     }
 

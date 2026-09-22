@@ -238,8 +238,10 @@ export type Edition = {
   readiness?: { ready: boolean; blockers: { code: string; message: string }[] };
   created_at?: string;
   updated_at?: string;
+  published_by?: number | null;
   published_by_name?: string;
   published_at?: string;
+  published_file_checksum?: string | null;
   deleted_at?: string | null;
 }
 export type EditionOrder = LegalRequest & {
@@ -302,6 +304,14 @@ export async function uploadEditionPdf(id: number, file: File) {
   fd.append('file', file)
   const res = await fetchAuth(`/api/editions/${id}/pdf`, { method: 'POST', body: fd })
   return res.json() as Promise<{ ok: true; file_id: number; file_name: string; edition?: Edition }>
+}
+export async function getTrashedEdition(id: number) {
+  const res = await fetchAuth('/api/editions/' + id + '/trash-detail')
+  return res.json() as Promise<{ edition: Edition; orders: LegalRequest[] }>
+}
+export async function getTrashedLegal(id: number) {
+  const res = await fetchAuth('/api/legal/trash/' + id)
+  return res.json() as Promise<{ item: LegalRequest; files: { file_id: number; name: string; kind: string }[]; payments: LegalPayment[] }>
 }
 export async function listRetiredEditions() {
   const res = await fetchAuth('/api/editions-retired')
