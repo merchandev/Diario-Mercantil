@@ -15,6 +15,7 @@ require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Services/EditorialClock.php';
 require_once __DIR__.'/Services/EditorialTrashService.php';
+require_once __DIR__.'/Services/EditorialArchiveService.php';
 
 class LegalController {
   
@@ -87,6 +88,19 @@ class LegalController {
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
         $sql .= " AND l.user_id = ?";
         $params[] = $uid;
+    }
+
+    // Used by the edition composer. Keep the general publications list complete,
+    // but let selection requests be enforced server-side as well as in the UI.
+    if (($_GET['available_for_edition'] ?? '') === '1') {
+        $sql .= " AND l.status='En trámite'
+            AND NOT EXISTS (
+                SELECT 1
+                FROM edition_orders available_eo
+                JOIN editions available_e ON available_e.id=available_eo.edition_id
+                WHERE available_eo.legal_request_id=l.id
+                  AND available_e.deleted_at IS NULL
+            )";
     }
 
     $q = $_GET['q'] ?? '';

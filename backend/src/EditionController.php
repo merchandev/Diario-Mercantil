@@ -3,6 +3,7 @@ require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
 require_once __DIR__.'/Services/EditorialTrashService.php';
+require_once __DIR__.'/Services/EditorialArchiveService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Http/StoragePath.php';

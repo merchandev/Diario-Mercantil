@@ -35,7 +35,7 @@ export default function Ediciones() {
 
   const load = async () => {
     try {
-      const [edRes, legRes] = await Promise.all([listEditions(), listLegal()]);
+      const [edRes, legRes] = await Promise.all([listEditions(), listLegal({ available_for_edition: true })]);
       setRows(edRes.items);
       setAllOrders(legRes.items);
     } catch (e) {
@@ -45,7 +45,7 @@ export default function Ediciones() {
   useEffect(() => { load() }, [])
   const openDetail = async (id: number) => {
     setSelId(id)
-    const [det, leg] = await Promise.all([getEdition(id), listLegal()])
+    const [det, leg] = await Promise.all([getEdition(id), listLegal({ available_for_edition: true })])
     setDetail(det); setAllOrders(leg.items)
   }
 

@@ -554,6 +554,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame(200,$second['code'],$second['body']['error'] ?? '');
         $this->assertSame($first['body']['edition_no']+1,$second['body']['edition_no']);
         $this->assertNotSame($first['body']['code'],$second['body']['code']);
+        $available = $this->request('GET','/api/legal?available_for_edition=1','admin_session_test');
+        $availableIds = array_map('intval', array_column($available['body']['items'], 'id'));
+        $this->assertNotContains(603, $availableIds);
         $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/restore",'admin_session_test')['code']);
     }
 
