@@ -385,7 +385,8 @@ testTrashActionsAreAudited
 9. Cargar PDF final de E2.
 10. Publicar E2.
 11. Confirmar que A y B reciben el mismo PDF final.
-12. Restaurar E1 y comprobar que vuelve como Borrador con el mismo CVE.
+12. Intentar restaurar E1: debe rechazar el conflicto porque A ya pertenece a E2.
+13. Probar la restauración con otra edición sin conflictos: vuelve como Borrador con el mismo CVE y exige un nuevo PDF final.
 ```
 
 ## 8. Pruebas frontend
@@ -416,6 +417,14 @@ conflicto de asociación muestra un mensaje entendible
 10. Publicar la versión identificada por SHA.
 
 Nunca ejecutar un `--repair` masivo como parte automática del despliegue.
+
+Para retiros antiguos que dejaron solicitudes como `Publicada`, ejecutar primero la auditoría de solo lectura:
+
+```bash
+docker compose exec -T backend php bin/repair_editorial_trash.php
+```
+
+Después de revisar las ediciones afectadas y guardar el respaldo, aplicar únicamente los identificadores concretos con `--apply --editions=ID,ID --actor=ID_ADMIN`. El proceso conserva las fechas de retiro, archiva la composición y registra cada publicación devuelta a `Por verificar`. Repetir el retiro no vuelve a modificar publicaciones que ya fueron verificadas.
 
 ## 10. Rollback
 

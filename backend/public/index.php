@@ -73,6 +73,7 @@ $router->post('/api/user/avatar', [UserController::class, 'uploadAvatar'], $csrf
 
 // LEGAL
 $router->post('/api/legal/upload-pdf', [LegalController::class, 'uploadPdf'], $csrf);
+$router->get('/api/legal/trash/{id}', [LegalController::class, 'getTrashed'], $auth);
 $router->get('/api/legal/trash', [LegalController::class, 'listTrashed'], $auth);
 $router->delete('/api/legal/trash', [LegalController::class, 'emptyTrash'], $csrf);
 $router->delete('/api/legal/trash/{id}', [LegalController::class, 'permanentDelete'], $csrf);
@@ -119,6 +120,8 @@ $router->post('/api/editions', [EditionController::class, 'create'], $adminCsrf)
 $router->get('/api/editions/{id}', [EditionController::class, 'get'], $admin);
 $router->put('/api/editions/{id}', [EditionController::class, 'update'], $adminCsrf);
 $router->delete('/api/editions/{id}', [EditionController::class, 'delete'], $adminCsrf);
+$router->get('/api/editions/{id}/trash-detail', [EditionController::class, 'getTrashed'], $admin);
+$router->get('/api/editions/{id}/trash-pdf', [EditionController::class, 'downloadTrashed'], $admin);
 $router->post('/api/editions/{id}/retire', [EditionController::class, 'retire'], $adminCsrf);
 $router->delete('/api/editions/{id}/permanent', [EditionController::class, 'permanentDelete'], $adminCsrf);
 $router->get('/api/editions/{id}/readiness', [EditionController::class, 'readiness'], $admin);

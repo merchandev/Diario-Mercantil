@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
+require_once __DIR__.'/Services/EditorialTrashService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Http/StoragePath.php';
@@ -163,14 +164,20 @@ class EditionController {
   }
 
   public function listRetired(){
-    $this->requireAdmin();
+    $u = $this->requireAdmin();
     $pdo = Database::pdo();
     $stmt = $pdo->query(
       'SELECT e.*, u.name AS published_by_name '
       . 'FROM editions e LEFT JOIN users u ON e.published_by=u.id '
       . 'WHERE e.deleted_at IS NOT NULL ORDER BY e.deleted_at DESC, e.id DESC LIMIT 200'
     );
-    Response::json(['items'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($items as &$item) {
+      $item['can_permanently_delete'] = $u['role'] === 'superadmin'
+        && $item['status'] === 'Borrador' && empty($item['published_at']) && empty($item['published_file_checksum'])
+        && !(new EditorialArchiveService($pdo))->references('edition', (int)$item['id']);
+    }
+    Response::json(['items'=>$items]);
   }
 
   public function listPublic(){
@@ -477,94 +484,50 @@ class EditionController {
     }
   }
 
-  public function delete($id){
-      $u = $this->requireAdmin();
-      try {
-          Response::json((new PermanentDeletionService(Database::pdo()))->deleteEdition((int)$id, (int)$u['id']));
-      } catch (Throwable $e) {
-          $code = (int)$e->getCode();
-          Response::json(['error'=>$e->getMessage()], $code >= 400 && $code <= 599 ? $code : 500);
-      }
+  public function delete($id){ return $this->retire($id); }
+
+  private function trashAction(callable $action): void {
+    try { Response::json($action()); }
+    catch (Throwable $e) {
+      $code=(int)$e->getCode();
+      Response::json(['error'=>$e->getMessage()],$code>=400 && $code<=599 ? $code : 500);
+    }
   }
 
   public function retire($id){
-    $u = $this->requireAdmin();
-    $pdo = Database::pdo();
-    try {
-      $pdo->beginTransaction();
-      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
-      $ed = $pdo->prepare('SELECT id, status, code FROM editions WHERE id=? AND deleted_at IS NULL' . $lock);
-      $ed->execute([$id]);
-      $edition = $ed->fetch(PDO::FETCH_ASSOC);
-      if (!$edition) throw new RuntimeException('Edición no encontrada o ya retirada.', 404);
-
-      $pdo->prepare('UPDATE editions SET deleted_at=? WHERE id=?')->execute([EditorialClock::now()->format('Y-m-d H:i:s'), $id]);
-      
-      // Liberar las solicitudes (reencolar) sólo si corresponde (e.g. si status es Borrador)
-      if ($edition['status'] === 'Borrador') {
-        $pdo->prepare("UPDATE legal_requests SET status='En trámite' WHERE id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?)")->execute([$id]);
-      }
-      
-      require_once __DIR__ . '/Services/EditionOrderService.php';
-      $pdo->prepare('INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)')->execute([(int)$u['id'], 'edition_retired', 'edition', (int)$edition['id']]);
-      $pdo->commit();
-      Response::json(['ok'=>true]);
-    } catch (Throwable $e) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
-      $code = (int)$e->getCode();
-      if ($code < 400 || $code > 599) $code = 500;
-      Response::json(['error'=>'retire_failed', 'message'=>$e->getMessage()], $code);
-    }
+    $u=$this->requireAdmin();
+    $this->trashAction(fn() => (new EditorialTrashService(Database::pdo()))->trashEdition((int)$id,(int)$u['id']));
   }
 
   public function restore($id){
-    $u = $this->requireAdmin();
-    $pdo = Database::pdo();
-    try {
-      $pdo->beginTransaction();
-      $lock = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
-      $stmt = $pdo->prepare('SELECT * FROM editions WHERE id=? AND deleted_at IS NOT NULL' . $lock);
-      $stmt->execute([$id]);
-      $edition = $stmt->fetch(PDO::FETCH_ASSOC);
-      if (!$edition) throw new RuntimeException('Edición retirada no encontrada.', 404);
-      if (($edition['status'] ?? '') !== 'Publicada') {
-        throw new RuntimeException('Solo se pueden restaurar ediciones previamente publicadas.', 409);
-      }
+    $u=$this->requireAdmin();
+    $this->trashAction(fn() => (new EditorialTrashService(Database::pdo()))->restoreEdition((int)$id,(int)$u['id']));
+  }
 
-      $candidate = $edition;
-      $candidate['deleted_at'] = null;
-      if (!(new EditionIntegrityService($pdo))->publishedFileIsValid($candidate)) throw new RuntimeException('El PDF final no supera la validación de integridad.', 422);
+  public function getTrashed($id){
+    $this->requireAdmin();
+    $pdo=Database::pdo();
+    $stmt=$pdo->prepare('SELECT * FROM editions WHERE id=? AND deleted_at IS NOT NULL');
+    $stmt->execute([$id]); $edition=$stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$edition) return Response::json(['error'=>'not_found'],404);
+    $orders=$pdo->prepare('SELECT l.id,l.name,l.order_no,l.status,l.deleted_at FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id WHERE eo.edition_id=? ORDER BY l.id');
+    $orders->execute([$id]);
+    $candidate=$edition; $candidate['deleted_at']=null;
+    $edition['file_url']=(new EditionIntegrityService($pdo))->editionFileIsPublishable($candidate) ? '/api/editions/'.(int)$id.'/trash-pdf' : null;
+    Response::json(['edition'=>$edition,'orders'=>$orders->fetchAll(PDO::FETCH_ASSOC)]);
+  }
 
-      $conflict = $pdo->prepare(
-        'SELECT eo.legal_request_id,e.code FROM edition_orders own '
-        . 'JOIN edition_orders eo ON eo.legal_request_id=own.legal_request_id '
-        . 'JOIN editions e ON e.id=eo.edition_id '
-        . 'WHERE own.edition_id=? AND e.id<>? AND e.deleted_at IS NULL LIMIT 1'
-      );
-      $conflict->execute([$id, $id]);
-      if ($row = $conflict->fetch(PDO::FETCH_ASSOC)) {
-        throw new RuntimeException(
-          "La solicitud {$row['legal_request_id']} ya pertenece a la edición activa {$row['code']}.",
-          409
-        );
-      }
-
-      $pdo->prepare('UPDATE editions SET deleted_at=NULL WHERE id=?')->execute([$id]);
-      $pdo->prepare(
-        "UPDATE legal_requests SET status='Publicada',publish_date=? "
-        . 'WHERE deleted_at IS NULL AND id IN (SELECT legal_request_id FROM edition_orders WHERE edition_id=?)'
-      )->execute([(string)$edition['date'], $id]);
-      $pdo->prepare("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(?,?,?,?)")
-        ->execute([$u['id'], 'restore_edition', 'edition', $id]);
-      $pdo->commit();
-      Response::json(['ok'=>true]);
-    } catch (Throwable $e) {
-      if ($pdo->inTransaction()) $pdo->rollBack();
-      error_log('[edition.restore] ' . get_class($e) . ': ' . $e->getMessage());
-      $code = (int)$e->getCode();
-      if ($code < 400 || $code > 599) $code = 500;
-      Response::json(['error'=>$e->getMessage() ?: 'No se pudo restaurar la edición.'], $code);
-    }
+  public function downloadTrashed($id){
+    $this->requireAdmin();
+    $pdo=Database::pdo();
+    $stmt=$pdo->prepare('SELECT * FROM editions WHERE id=? AND deleted_at IS NOT NULL');
+    $stmt->execute([$id]); $edition=$stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$edition) return Response::json(['error'=>'not_found'],404);
+    $edition['deleted_at']=null;
+    if (!(new EditionIntegrityService($pdo))->editionFileIsPublishable($edition)) return Response::json(['error'=>'PDF no disponible o inválido.'],404);
+    $path=$this->locateUploadedFile((int)$edition['file_id']);
+    if (!$path) return Response::json(['error'=>'not_found'],404);
+    $this->streamPdf($path,'edicion-'.$edition['code'].'.pdf',true);
   }
 
   public function update($id){

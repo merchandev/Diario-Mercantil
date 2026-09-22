@@ -411,7 +411,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame(403, $perm['code']);
     }
 
-    public function testAdminCanPermanentlyDeletePublishedRequestAndItsEdition(): void {
+    public function testAdminCannotTrashRequestInPublishedEdition(): void {
         $pdo = Database::pdo();
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,order_no,date,edition_code,publish_date) VALUES(151,2,'Publicada',100,'Publicación a borrar','ORD-151','2026-08-31','MMXXVI-0051','2026-08-31')");
         $pdo->exec("INSERT INTO editions(id,code,status,date,edition_no,orders_count,created_at,publication_year,file_id) VALUES(51,'MMXXVI-0051','Publicada','2026-08-31',51,1,'2026-08-31',2026,NULL)");
@@ -495,7 +495,7 @@ class AuthorizationIntegrationTest extends TestCase {
             $this->assertSame(200,$published['code'],json_encode($published['body']));
             $this->assertSame($filesBefore,$pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC));
             $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/publish",'admin_session_test')['code']);
-            $this->assertSame(409,$this->request('DELETE',"/api/editions/{$id}",'admin_session_test')['code']);
+            $this->assertSame(403,$this->request('DELETE',"/api/editions/{$id}/permanent",'admin_session_test')['code']);
             $detail = $this->request('GET',"/api/legal/{$requestId}",'user_session_test');
             $url = $detail['body']['item']['edition_file_url'];
             $this->assertSame('/api/e/code/'.$created['body']['code'].'/download',$url);
@@ -507,9 +507,23 @@ class AuthorizationIntegrationTest extends TestCase {
         $first = $ids[0]; $second = $ids[1];
         $list = $this->request('GET','/api/e?from=2026-09-01&to=2026-09-01');
         $this->assertSame($second,(int)$list['body']['items'][0]['id']);
-        $this->assertSame(200,$this->request('POST',"/api/editions/{$first}/retire",'admin_session_test')['code']);
+        $this->assertSame(200,$this->request('DELETE',"/api/editions/{$first}",'admin_session_test')['code']);
         $this->assertNotEmpty($pdo->query('SELECT deleted_at FROM editions WHERE id='.$first)->fetchColumn());
+        $this->assertSame('Por verificar', $pdo->query('SELECT status FROM legal_requests WHERE id=601')->fetchColumn());
+        $firstCode = $pdo->query('SELECT code FROM editions WHERE id='.$first)->fetchColumn();
+        $this->assertSame(404,$this->request('GET','/api/e/code/'.$firstCode.'/download')['code']);
+        $trash = $this->request('GET',"/api/editions/{$first}/trash-detail",'admin_session_test');
+        $this->assertSame(200,$trash['code']);
+        $this->assertSame(1,count($trash['body']['orders']));
+        $archivedPdf = $this->request('GET',$trash['body']['edition']['file_url'],'admin_session_test');
+        $this->assertSame(200,$archivedPdf['code']);
+        $this->assertSame($sha,hash('sha256',$archivedPdf['raw']));
         $this->assertSame(200,$this->request('POST',"/api/editions/{$first}/restore",'admin_session_test')['code']);
+        $restored = $this->request('GET',"/api/editions/{$first}",'admin_session_test');
+        $this->assertSame('Borrador',$restored['body']['edition']['status']);
+        $this->assertNull($restored['body']['edition']['file_id']);
+        $this->assertFalse($restored['body']['edition']['readiness']['ready']);
+        $this->assertSame(409,$this->request('POST',"/api/editions/{$first}/publish",'admin_session_test')['code']);
         $pdo->prepare('UPDATE editions SET published_file_checksum=? WHERE id=?')->execute([str_repeat('0',64),$second]);
         $code = $pdo->query('SELECT code FROM editions WHERE id='.$second)->fetchColumn();
         $this->assertSame(404,$this->request('GET','/api/e/code/'.$code.'/download')['code']);
@@ -525,14 +539,40 @@ class AuthorizationIntegrationTest extends TestCase {
         $first=$this->request('POST','/api/editions','admin_session_test',$data);
         $this->assertSame(200,$first['code']);
         $id=$first['body']['id'];
+        $listed = $this->request('GET','/api/legal','admin_session_test');
+        $request = array_values(array_filter($listed['body']['items'], fn($row) => (int)$row['id'] === 603))[0];
+        $this->assertSame((int)$id,(int)$request['active_edition_id']);
         // Soft-delete the edition: request 603 returns to Por verificar
         $this->assertSame(200,$this->request('DELETE',"/api/editions/{$id}",'admin_session_test')['code']);
+        $listed = $this->request('GET','/api/legal','admin_session_test');
+        $request = array_values(array_filter($listed['body']['items'], fn($row) => (int)$row['id'] === 603))[0];
+        $this->assertNull($request['active_edition_id']);
+        $this->assertSame('Por verificar',$request['status']);
         // Re-verify request 603 so it can be selected in a new edition
         $pdo->exec("UPDATE legal_requests SET status='En trámite' WHERE id=603");
         $second=$this->request('POST','/api/editions','admin_session_test',$data);
         $this->assertSame(200,$second['code'],$second['body']['error'] ?? '');
         $this->assertSame($first['body']['edition_no']+1,$second['body']['edition_no']);
         $this->assertNotSame($first['body']['code'],$second['body']['code']);
+        $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/restore",'admin_session_test')['code']);
+    }
+
+    public function testPublicationTrashDetailRestoreAndPermissions(): void {
+        $pdo = Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name) VALUES(620,2,'En trámite',100,'Papelera HTTP')");
+        $pdo->exec("INSERT INTO legal_payments(legal_request_id,amount_bs,status) VALUES(620,100,'Aprobado')");
+        $this->assertSame(403,$this->request('DELETE','/api/legal/620','user_session_test')['code']);
+        $this->assertSame(200,$this->request('DELETE','/api/legal/620','admin_session_test')['code']);
+        $this->assertSame(404,$this->request('GET','/api/legal/620','admin_session_test')['code']);
+        $detail = $this->request('GET','/api/legal/trash/620','admin_session_test');
+        $this->assertSame(200,$detail['code']);
+        $this->assertSame(100,(int)$detail['body']['payments'][0]['amount_bs']);
+        $this->assertSame(403,$this->request('DELETE','/api/legal/trash/620','admin_session_test')['code']);
+        $this->assertSame(403,$this->request('DELETE','/api/legal/trash','admin_session_test')['code']);
+        $this->assertSame(200,$this->request('POST','/api/legal/620/restore','admin_session_test')['code']);
+        $restored = $this->request('GET','/api/legal/620','admin_session_test');
+        $this->assertSame('Por verificar',$restored['body']['item']['status']);
+        $this->assertSame(100,(int)$restored['body']['payments'][0]['amount_bs']);
     }
 
     public function testDateFilterIncludesDateOnlyAndLastFractionalSecond(): void {

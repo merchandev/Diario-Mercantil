@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useAuth } from '../hooks/useAuth'
+import { Link, useSearchParams } from 'react-router-dom'
 import { editorialToday } from '../lib/editorialDate'
-import { createEdition, deleteEdition, permanentDeleteEdition, retireEdition, listEditions, listRetiredEditions, restoreEdition, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
+import { createEdition, deleteEdition, retireEdition, listEditions, type Edition, type EditionOrder, getEdition, updateEdition, listLegal, type LegalRequest, setEditionOrders, publishEdition, uploadEditionPdf, prepareEditionOrderPdf, uploadEditionOrderPdf, notifyEdition } from '../lib/api'
 import { IconPlus, IconEdit, IconTrash, IconSave, IconClose, IconDownload, IconCheck, IconUpload } from '../components/icons'
 import QRCode from 'qrcode.react'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -10,10 +10,9 @@ import FlipbookViewer from '../components/FlipbookViewer'
 import { useDialog } from '../contexts/DialogContext'
 
 export default function Ediciones() {
-  const { user } = useAuth()
+  const [searchParams] = useSearchParams()
   const { confirmAction } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
-  const [retiredRows, setRetiredRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<{ date: string; selectedOrders: number[] }>({ date: editorialToday(), selectedOrders: [] })
   const [selId, setSelId] = useState<number | undefined>(undefined)
@@ -36,9 +35,8 @@ export default function Ediciones() {
 
   const load = async () => {
     try {
-      const [edRes, retiredRes, legRes] = await Promise.all([listEditions(), listRetiredEditions(), listLegal()]);
+      const [edRes, legRes] = await Promise.all([listEditions(), listLegal()]);
       setRows(edRes.items);
-      setRetiredRows(retiredRes.items);
       setAllOrders(legRes.items);
     } catch (e) {
       console.error(e);
@@ -50,6 +48,11 @@ export default function Ediciones() {
     const [det, leg] = await Promise.all([getEdition(id), listLegal()])
     setDetail(det); setAllOrders(leg.items)
   }
+
+  useEffect(() => {
+    const id = Number(searchParams.get('edition'))
+    if (id > 0) void openDetail(id)
+  }, [searchParams])
 
   const handleCreateEdition = async (e: any) => {
     e.preventDefault()
@@ -198,7 +201,7 @@ export default function Ediciones() {
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de la Edición</span>
               <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => {
-                // One edition per date: publication requires a date after the latest active edition.
+                // Multiple editions may share the latest publication date.
                 const lastPublished = rows.filter(r => r.status === 'Publicada').map(r => r.date).sort().reverse()[0]
                 if (lastPublished && e.target.value < lastPublished) {
                   setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: `La fecha debe ser igual o posterior a la última edición publicada (${lastPublished}).`, variant: 'warning' })
@@ -250,7 +253,7 @@ export default function Ediciones() {
                 </div>
                 <div className="p-3 bg-white">
                   <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {allOrders.filter(o => o.status === 'En trámite').map(o => {
+                {allOrders.filter(o => o.status === 'En trámite' && !o.active_edition_id).map(o => {
                       const isSelected = form.selectedOrders.includes(o.id)
                       const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                       return (
@@ -283,7 +286,7 @@ export default function Ediciones() {
                         </label>
                       )
                     })}
-                    {allOrders.filter(o => o.status === 'En trámite').length === 0 && (
+                    {allOrders.filter(o => o.status === 'En trámite' && !o.active_edition_id).length === 0 && (
                       <div className="text-center py-8 text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200">
                         <div className="text-3xl mb-2 opacity-50">📄</div>
                         <p className="text-sm font-medium">No hay publicaciones disponibles</p>
@@ -353,12 +356,12 @@ export default function Ediciones() {
                         </button>
                         <button className="text-rose-700 hover:underline inline-flex items-center gap-1" onClick={() => {
                           if (r.status === 'Publicada') {
-                             setConfirmDialog({ isOpen: true, title: 'Retirar edición', message: 'La edición se retirará del área pública pero se mantendrá su registro y número (CVE). ¿Deseas continuar?', onConfirm: async () => { try { await retireEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo retirar', message: error instanceof Error ? error.message : 'Error al retirar la edición.', variant: 'error' }) } } })
+                             setConfirmDialog({ isOpen: true, title: 'Enviar edición a la papelera', message: 'Se conservarán el CVE y los archivos. Solo sus publicaciones volverán a Por verificar; tras verificarlas podrás seleccionarlas para otra edición. ¿Continuar?', onConfirm: async () => { try { await retireEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo retirar', message: error instanceof Error ? error.message : 'Error al retirar la edición.', variant: 'error' }) } } })
                           } else {
-                             setConfirmDialog({ isOpen: true, title: 'Eliminar edición definitivamente', message: 'Se borrarán la edición, su PDF consolidado y los PDF individuales generados. Las publicaciones incluidas volverán a En trámite. Esta acción no se puede deshacer. ¿Deseas continuar?', onConfirm: async () => { try { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' }) } } })
+                             setConfirmDialog({ isOpen: true, title: 'Enviar edición a la papelera', message: 'Se conservarán la edición y sus archivos. Sus publicaciones volverán a Por verificar y podrán reutilizarse después de verificarlas. ¿Continuar?', onConfirm: async () => { try { await deleteEdition(r.id); if (selId === r.id) { setSelId(undefined); setDetail(null) }; await load() } catch (error) { setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' }) } } })
                           }
                         }}>
-                          <IconTrash className="w-4 h-4" /> <span>{r.status === 'Publicada' ? 'Retirar' : 'Eliminar'}</span>
+                          <IconTrash className="w-4 h-4" /> <span>Papelera</span>
                         </button>
                       </div>
                     </td>
@@ -609,7 +612,7 @@ export default function Ediciones() {
                                   <div className="mt-4 border-t pt-4">
                                     <h4 className="text-sm font-semibold mb-2 text-slate-700">Añadir más publicaciones</h4>
                                     <div className="max-h-56 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                      {allOrders.filter(o => o.status === 'En trámite' && !detail.orders.some(d => d.id === o.id)).map(o => {
+                                      {allOrders.filter(o => o.status === 'En trámite' && !o.active_edition_id && !detail.orders.some(d => d.id === o.id)).map(o => {
                                         const meta = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                                         return (
                                           <div key={o.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:border-brand-300 transition-all">
@@ -630,7 +633,7 @@ export default function Ediciones() {
                                           </div>
                                         )
                                       })}
-                                      {allOrders.filter(o => o.status === 'En trámite' && !detail.orders.some(d => d.id === o.id)).length === 0 && (
+                                      {allOrders.filter(o => o.status === 'En trámite' && !o.active_edition_id && !detail.orders.some(d => d.id === o.id)).length === 0 && (
                                         <p className="text-xs text-slate-500 text-center py-4">No hay más publicaciones disponibles para añadir.</p>
                                       )}
                                     </div>
@@ -735,53 +738,7 @@ export default function Ediciones() {
           </table>
         </div>
       </div>
-      {retiredRows.length > 0 && (
-        <div className="card overflow-hidden border border-amber-200">
-          <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
-            <h2 className="font-semibold text-amber-900">Ediciones retiradas</h2>
-            <p className="text-xs text-amber-800 mt-1">Las ediciones publicadas conservan su CVE y sus archivos. Puedes restaurarlas si su PDF final sigue siendo válido.</p>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {retiredRows.map(edition => (
-              <div key={edition.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <div className="font-mono font-semibold text-slate-800">{edition.code}</div>
-                  <div className="text-xs text-slate-500">Fecha {edition.date} · retirada {edition.deleted_at || ''}</div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button disabled={edition.status !== 'Publicada'} className="btn btn-outline" onClick={() => setConfirmDialog({
-                    isOpen: true,
-                    title: 'Restaurar edición',
-                    message: `¿Volver a publicar la edición ${edition.code}?`,
-                    onConfirm: async () => {
-                      try {
-                        await restoreEdition(edition.id)
-                        await load()
-                        setAlertDialog({ isOpen: true, title: 'Edición restaurada', message: 'La edición y sus solicitudes vuelven a estar publicadas.', variant: 'success' })
-                      } catch (error) {
-                        setAlertDialog({ isOpen: true, title: 'No se pudo restaurar', message: error instanceof Error ? error.message : 'Error al restaurar la edición.', variant: 'error' })
-                      }
-                    }
-                  })}>Restaurar</button>
-                  {edition.status === 'Borrador' && user?.role === 'superadmin' && <button className="btn btn-danger" onClick={() => setConfirmDialog({
-                    isOpen: true,
-                    title: 'Eliminar edición definitivamente',
-                    message: `¿Eliminar permanentemente la edición ${edition.code} y todos sus archivos generados?`,
-                    onConfirm: async () => {
-                      try {
-                        await permanentDeleteEdition(edition.id)
-                        await load()
-                      } catch (error) {
-                        setAlertDialog({ isOpen: true, title: 'No se pudo eliminar', message: error instanceof Error ? error.message : 'Error al eliminar la edición.', variant: 'error' })
-                      }
-                    }
-                  })}>Eliminar</button>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <Link to="/dashboard/papelera?tab=ediciones" className="btn btn-outline inline-flex items-center gap-2"><IconTrash /> Abrir papelera de ediciones</Link>
       <ConfirmDialog isOpen={confirmDialog.isOpen} title={confirmDialog.title} message={confirmDialog.message} variant="warning" onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       <AlertDialog {...alertDialog} onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })} />
       

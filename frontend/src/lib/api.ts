@@ -225,6 +225,7 @@ export async function getPublicationPublic(slug: string) {
 
 // Editions
 export type Edition = {
+  can_permanently_delete?: boolean;
   id: number;
   code: string;
   status: string;
@@ -385,6 +386,8 @@ export async function listPaymentMethods() {
 
 // Legal requests
 export type LegalRequest = {
+  can_permanently_delete?: boolean;
+  active_edition_id?: number | null;
   id: number;
   status: string;
   name: string;

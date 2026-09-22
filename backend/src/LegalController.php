@@ -14,6 +14,7 @@ require_once __DIR__.'/Services/DocumentUploadService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
 require_once __DIR__.'/Services/EditionIntegrityService.php';
 require_once __DIR__.'/Services/EditorialClock.php';
+require_once __DIR__.'/Services/EditorialTrashService.php';
 
 class LegalController {
   
@@ -69,7 +70,8 @@ class LegalController {
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
     
-    $sql = "SELECT l.*, 
+    $sql = "SELECT l.*,
+                   (SELECT active_eo.edition_id FROM edition_orders active_eo JOIN editions active_e ON active_e.id=active_eo.edition_id WHERE active_eo.legal_request_id=l.id AND active_e.deleted_at IS NULL ORDER BY active_e.id LIMIT 1) AS active_edition_id,
                    e.id AS edition_id, 
                    e.code AS edition_code, 
                    e.file_id AS edition_file_id, 
@@ -384,66 +386,51 @@ class LegalController {
          $stmt = $pdo->prepare("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL AND user_id=? ORDER BY deleted_at DESC");
          $stmt->execute([$uid]);
      }
-     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
+     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+     $refs = $pdo->prepare('SELECT 1 FROM edition_orders WHERE legal_request_id=? LIMIT 1');
+     foreach ($items as &$item) {
+       $refs->execute([$item['id']]);
+       $item['can_permanently_delete'] = $role === 'superadmin' && !$refs->fetchColumn()
+         && !(new EditorialArchiveService($pdo))->references('request', (int)$item['id']);
+     }
+     Response::json(['items'=>$items]);
+  }
+
+  private function trashAction(callable $action): void {
+    try { Response::json($action()); }
+    catch (Throwable $e) {
+      $code=(int)$e->getCode();
+      Response::json(['error'=>$e->getMessage()],$code>=400 && $code<=599 ? $code : 500);
+    }
   }
 
   public function softDelete($id){
-     $u = AuthController::requireAuth();
-     $this->checkAccess($id, $u);
-     $pdo = Database::pdo();
-
-     // Administrators requested a real deletion from the Publications screen.
-     // This also invalidates any edition that contains the publication, removes
-     // dependent rows and cleans orphaned PDFs.
-     if (RolePolicy::canManageLegalRequests($u)) {
-         try {
-             $result = (new PermanentDeletionService($pdo))->deleteLegalRequest((int)$id, (int)$u['id']);
-             return Response::json($result);
-         } catch (Throwable $e) {
-             error_log('[legal.force-delete] ' . get_class($e) . ': ' . $e->getMessage());
-             $code = (int)$e->getCode();
-             if ($code < 400 || $code > 599) $code = 500;
-             return Response::json([
-                 'error'=>'force_delete_failed',
-                 'message'=>$e->getMessage() ?: 'No se pudo eliminar definitivamente la publicación.',
-             ], $code);
-         }
-     }
-
-     $this->ensureMutable($id);
-     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
-     $currStatus = $s->fetchColumn();
-     
-     if ($currStatus !== 'Borrador') {
-         return Response::json(['error'=>'Solo puedes eliminar solicitudes en Borrador'], 403);
-     }
-     
-     $now = gmdate("c");
-     $pdo->prepare("UPDATE legal_requests SET deleted_at=? WHERE id=?")->execute([$now, $id]);
-     Response::json(["ok"=>true]);
+    $u=AuthController::requireAuth(); $this->checkAccess($id,$u);
+    $this->trashAction(fn() => (new EditorialTrashService(Database::pdo()))->trashPublication((int)$id,(int)$u['id'],RolePolicy::canManageLegalRequests($u)));
   }
 
   public function restore($id){
-     $u = AuthController::requireAuth();
-     $this->checkAccess($id, $u);
-     $this->ensureMutable($id);
-     
-     $pdo = Database::pdo();
-     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
-     $currStatus = $s->fetchColumn();
-     
-     $isAdmin = RolePolicy::canManageLegalRequests($u);
-     if (!$isAdmin && $currStatus !== 'Borrador') {
-         return Response::json(['error'=>'Solo puedes restaurar solicitudes en Borrador'], 403);
-     }
-     
-     $pdo->prepare("UPDATE legal_requests SET deleted_at=NULL WHERE id=?")->execute([$id]);
-     Response::json(["ok"=>true]);
+    $u=AuthController::requireAuth(); $this->checkAccess($id,$u);
+    $this->trashAction(fn() => (new EditorialTrashService(Database::pdo()))->restorePublication((int)$id,(int)$u['id'],RolePolicy::canManageLegalRequests($u)));
   }
-  
+
+  public function getTrashed($id){
+    $u=AuthController::requireAuth(); $this->checkAccess($id,$u);
+    $pdo=Database::pdo();
+    $stmt=$pdo->prepare('SELECT * FROM legal_requests WHERE id=? AND deleted_at IS NOT NULL');
+    $stmt->execute([$id]); $item=$stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$item) return Response::json(['error'=>'not_found'],404);
+    $files=$pdo->prepare('SELECT lf.file_id,lf.kind,f.name FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?');
+    $files->execute([$id]);
+    $payments=$pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY id');
+    $payments->execute([$id]);
+    Response::json(['item'=>$item,'files'=>$files->fetchAll(PDO::FETCH_ASSOC),'payments'=>$payments->fetchAll(PDO::FETCH_ASSOC)]);
+  }
+
   public function permanentDelete($id){
     $u = AuthController::requireAuth();
     $this->requireAdmin($u);
+    if ($u['role'] !== 'superadmin') return Response::json(['error'=>'Solo SuperAdmin puede eliminar definitivamente.'],403);
     try {
       $result = (new PermanentDeletionService(Database::pdo()))
         ->deleteLegalRequest((int)$id, (int)$u['id']);
@@ -459,6 +446,7 @@ class LegalController {
   public function emptyTrash(){
      $u = AuthController::requireAuth();
      $this->requireAdmin($u);
+     if ($u['role'] !== 'superadmin') return Response::json(['error'=>'Solo SuperAdmin puede vaciar la papelera.'],403);
      $pdo = Database::pdo();
      $ids = $pdo->query("SELECT id FROM legal_requests WHERE deleted_at IS NOT NULL")
        ->fetchAll(PDO::FETCH_COLUMN);

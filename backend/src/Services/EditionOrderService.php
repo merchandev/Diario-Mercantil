@@ -36,7 +36,7 @@ final class EditionOrderService {
                 $stmt = $this->pdo->prepare("
                     SELECT id, status, deleted_at 
                     FROM legal_requests 
-                    WHERE id IN ($inQuery) $lockClause
+                    WHERE id IN ($inQuery) ORDER BY id $lockClause
                 ");
                 $stmt->execute($orderIds);
                 $requests = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -59,7 +59,7 @@ final class EditionOrderService {
                     SELECT eo.legal_request_id, e.code 
                     FROM edition_orders eo
                     JOIN editions e ON e.id = eo.edition_id
-                    WHERE eo.legal_request_id IN ($inQuery) AND e.id != ? AND e.deleted_at IS NULL
+                    WHERE eo.legal_request_id IN ($inQuery) AND e.id != ? AND e.deleted_at IS NULL $lockClause
                 ");
                 $params = $orderIds;
                 $params[] = $editionId;

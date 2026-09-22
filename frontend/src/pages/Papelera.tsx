@@ -1,289 +1,123 @@
-import { useState, useEffect } from 'react'
-import { listTrashedLegal, restoreLegal, permanentDeleteLegal, emptyTrash, type LegalRequest } from '../lib/api'
-import { IconTrash, IconArrowLeft } from '../components/icons'
-import ConfirmDialog from '../components/ConfirmDialog'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { listTrashedLegal, listRetiredEditions, restoreLegal, restoreEdition, permanentDeleteLegal, permanentDeleteEdition, getTrashedLegal, getTrashedEdition, type LegalRequest, type Edition } from '../lib/api'
+import { useAuth } from '../hooks/useAuth'
 import { useDialog } from '../contexts/DialogContext'
+import { IconTrash } from '../components/icons'
+
+type Preview = { title: string; description: string; links: { title: string; url: string }[]; rows: string[] }
 
 export default function Papelera() {
-  const { showAlert } = useDialog()
-  const [items, setItems] = useState<LegalRequest[]>([])
+  const [params, setParams] = useSearchParams()
+  const tab = params.get('tab') === 'ediciones' ? 'ediciones' : 'publicaciones'
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const { showAlert, confirmAction } = useDialog()
+  const [publications, setPublications] = useState<LegalRequest[]>([])
+  const [editions, setEditions] = useState<Edition[]>([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; message: string; variant: 'danger' | 'warning' | 'info'; onConfirm: () => void }>({ isOpen: false, title: '', message: '', variant: 'info', onConfirm: () => { } })
+  const [busy, setBusy] = useState(false)
+  const [preview, setPreview] = useState<Preview | null>(null)
 
-  const loadTrash = async () => {
+  async function load() {
     setLoading(true)
     try {
-      const r = await listTrashedLegal()
-      setItems(r.items)
-    } catch (e: any) {
-      void showAlert('Error al cargar papelera: ' + (e.message || 'Error desconocido'), { title: 'Error' })
-    } finally {
-      setLoading(false)
-    }
+      const [pubs, eds] = await Promise.all([listTrashedLegal(), listRetiredEditions()])
+      setPublications(pubs.items); setEditions(eds.items)
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'No se pudo cargar la papelera.', { title: 'Error' })
+    } finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [])
+
+  async function restore(id: number, edition: boolean) {
+    const message = edition
+      ? 'La edición volverá a Borrador con el mismo CVE. Verifica sus publicaciones y carga nuevamente el PDF final antes de publicar. Si una publicación ya pertenece a otra edición activa, se informará el conflicto.'
+      : 'La publicación volverá a Por verificar y conservará sus pagos y documentos. Se abrirá su ficha para corregirla y verificarla nuevamente.'
+    if (!await confirmAction(message, { title: 'Restaurar para editar', confirmText: 'Restaurar y editar' })) return
+    setBusy(true)
+    try {
+      if (edition) await restoreEdition(id)
+      else await restoreLegal(id)
+      navigate(edition ? '/dashboard/ediciones?edition=' + id : '/dashboard/publicaciones/' + id)
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'No se pudo restaurar.', { title: 'No se pudo restaurar' })
+    } finally { setBusy(false) }
   }
 
-  useEffect(() => {
-    loadTrash()
-  }, [])
+  async function remove(id: number, edition: boolean) {
+    if (!await confirmAction('Esta eliminación es definitiva y no se puede deshacer. Los registros vinculados a un historial editorial protegido se conservarán. ¿Continuar?', { title: 'Eliminar definitivamente', confirmText: 'Eliminar definitivamente' })) return
+    setBusy(true)
+    try {
+      if (edition) await permanentDeleteEdition(id)
+      else await permanentDeleteLegal(id)
+      setPreview(null); await load()
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'No se pudo eliminar.', { title: 'No se pudo eliminar' })
+    } finally { setBusy(false) }
+  }
 
-  const handleRestore = async (id: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Restaurar publicación',
-      message: '¿Restaurar esta publicación?',
-      variant: 'info',
-      onConfirm: async () => {
-        try {
-          await restoreLegal(id)
-          loadTrash()
-          setSelected(new Set())
-        } catch (e: any) {
-          void showAlert('Error: ' + (e.message || 'No se pudo restaurar'), { title: 'Error' })
-        }
+  async function inspect(id: number, edition: boolean) {
+    setBusy(true)
+    try {
+      if (edition) {
+        const data = await getTrashedEdition(id)
+        setPreview({ title: data.edition.code, description: 'Composición conservada de la edición en papelera.',
+          links: data.edition.file_url ? [{ title: 'Consultar PDF conservado', url: data.edition.file_url }] : [],
+          rows: data.orders.map(o => (o.order_no || '#' + o.id) + ' — ' + o.name + ' · ' + o.status + (o.deleted_at ? ' · En papelera' : '')) })
+      } else {
+        const data = await getTrashedLegal(id)
+        setPreview({ title: data.item.name, description: 'Documentos y pagos conservados. Restaura la publicación para editarla.',
+          links: data.files.map(f => ({ title: f.name, url: '/api/uploads/' + f.file_id })),
+          rows: data.payments.map(p => 'Pago ' + (p.ref || '#' + p.id) + ' · Bs. ' + p.amount_bs + ' · ' + p.status) })
       }
-    })
+    } catch (error) {
+      await showAlert(error instanceof Error ? error.message : 'No se pudo cargar el detalle.', { title: 'Error' })
+    } finally { setBusy(false) }
   }
 
-  const handlePermanentDelete = async (id: number) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar permanentemente',
-      message: '⚠️ ADVERTENCIA: Esta acción eliminará permanentemente la publicación y NO se puede deshacer.\n\n¿Estás seguro de que deseas continuar?',
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          await permanentDeleteLegal(id)
-          loadTrash()
-          setSelected(new Set())
-        } catch (e: any) {
-          void showAlert('Error: ' + (e.message || 'No se pudo eliminar'), { title: 'Error' })
-        }
-      }
-    })
-  }
-
-  const handleEmptyTrash = async () => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Vaciar papelera',
-      message: `⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${items.length} publicación(es) de la papelera y NO se puede deshacer.\n\n¿Estás completamente seguro?`,
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          const r = await emptyTrash()
-          await showAlert(r.message || `Se eliminaron ${r.count} publicaciones`, { title: 'Papelera vaciada' })
-          loadTrash()
-          setSelected(new Set())
-        } catch (e: any) {
-          void showAlert('Error: ' + (e.message || 'No se pudo vaciar la papelera'), { title: 'Error' })
-        }
-      }
-    })
-  }
-
-  const handleDeleteSelected = async () => {
-    if (selected.size === 0) { void showAlert('No hay publicaciones seleccionadas.', { title: 'Seleccione publicaciones' }); return }
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Eliminar seleccionadas',
-      message: `⚠️ ADVERTENCIA: Esta acción eliminará permanentemente ${selected.size} publicación(es) y NO se puede deshacer.\n\n¿Estás seguro?`,
-      variant: 'danger',
-      onConfirm: async () => {
-        try {
-          for (const id of Array.from(selected)) {
-            await permanentDeleteLegal(id)
-          }
-          loadTrash()
-          setSelected(new Set())
-        } catch (e: any) {
-          void showAlert('Error: ' + (e.message || 'No se pudieron eliminar todas las publicaciones'), { title: 'Error' })
-          loadTrash()
-        }
-      }
-    })
-  }
-
-  const toggleSelect = (id: number) => {
-    const newSelected = new Set(selected)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelected(newSelected)
-  }
-
-  const toggleSelectAll = () => {
-    if (selected.size === items.length) {
-      setSelected(new Set())
-    } else {
-      setSelected(new Set(items.map(i => i.id)))
-    }
-  }
-
-  const prettyDate = (s?: string) => s ? s.split('-').reverse().join('/') : '-'
-  const prettyStatus = (s?: string) => {
-    if (!s) return '-'
-    if (s === 'Borrador' || s === 'Pendiente') return 'Pendiente'
-    if (s === 'Publicada' || s === 'Publicado') return 'Publicado'
-    return s
-  }
-
-  const daysSinceDeleted = (deletedAt: string) => {
-    const deleted = new Date(deletedAt)
-    const now = new Date()
-    const diff = now.getTime() - deleted.getTime()
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    return days
-  }
-
-  const daysUntilAutoDelete = (deletedAt: string) => {
-    return 30 - daysSinceDeleted(deletedAt)
-  }
-
-  return (
-    <section className="space-y-4">
-      <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold flex items-center gap-2">
-            <IconTrash className="w-6 h-6" />
-            Papelera de reciclaje
-          </h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Las publicaciones se eliminan después de 30 días
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {selected.size > 0 && (
-            <button
-              className="btn bg-red-600 text-white hover:bg-red-700 w-full sm:w-auto mt-2 sm:mt-0"
-              onClick={handleDeleteSelected}
-            >
-              Eliminar seleccionadas ({selected.size})
-            </button>
-          )}
-          {items.length > 0 && (
-            <button
-              className="btn bg-red-700 text-white hover:bg-red-800 w-full sm:w-auto mt-2 sm:mt-0"
-              onClick={handleEmptyTrash}
-            >
-              🗑️ Vaciar papelera ({items.length})
-            </button>
-          )}
-        </div>
-      </div>
-
-      {loading && (
-        <div className="card p-8 text-center">
-          <div className="animate-spin inline-block w-8 h-8 border-4 border-brand-200 border-t-brand-600 rounded-full mb-2"></div>
-          <p className="text-slate-600">Cargando papelera...</p>
-        </div>
-      )}
-
-      {!loading && items.length === 0 && (
-        <div className="card p-8 text-center">
-          <IconTrash className="w-16 h-16 mx-auto text-slate-300 mb-3" />
-          <h3 className="text-lg font-semibold text-slate-700 mb-2">La papelera está vacía</h3>
-          <p className="text-slate-600">No hay publicaciones eliminadas</p>
-        </div>
-      )}
-
-      {!loading && items.length > 0 && (
-        <div className="card overflow-x-auto pb-2 pt-1">
-          <table className="min-w-[800px] w-full text-left text-sm">
-            <thead>
-              <tr className="bg-brand-800 text-white">
-                <th className="px-4 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selected.size === items.length}
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4"
-                  />
-                </th>
-                <th className="text-left px-4 py-2">N° orden</th>
-                <th className="text-left px-4 py-2">Razón social</th>
-                <th className="text-left px-4 py-2">Tipo</th>
-                <th className="text-left px-4 py-2">Estado</th>
-                <th className="text-left px-4 py-2">Fecha solicitud</th>
-                <th className="text-left px-4 py-2">Eliminado hace</th>
-                <th className="text-left px-4 py-2">Auto-eliminación</th>
-                <th className="text-right px-4 py-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(item => {
-                const daysDeleted = daysSinceDeleted(item.deleted_at!)
-                const daysLeft = daysUntilAutoDelete(item.deleted_at!)
-                const isUrgent = daysLeft <= 7
-
-                return (
-                  <tr key={item.id} className={`border-t ${isUrgent ? 'bg-red-50' : ''}`}>
-                    <td className="px-4 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(item.id)}
-                        onChange={() => toggleSelect(item.id)}
-                        className="w-4 h-4"
-                      />
-                    </td>
-                    <td className="px-4 py-2 font-mono">{item.order_no || item.id}</td>
-                    <td className="px-4 py-2">{item.name}</td>
-                    <td className="px-4 py-2">{item.pub_type || 'Documento'}</td>
-                    <td className="px-4 py-2">{prettyStatus(item.status)}</td>
-                    <td className="px-4 py-2">{prettyDate(item.date)}</td>
-                    <td className="px-4 py-2">
-                      {daysDeleted === 0 ? 'Hoy' : daysDeleted === 1 ? '1 día' : `${daysDeleted} días`}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`font-semibold ${isUrgent ? 'text-red-700' : 'text-slate-600'}`}>
-                        {daysLeft <= 0 ? 'Hoy' : daysLeft === 1 ? '1 día' : `${daysLeft} días`}
-                        {isUrgent && ' ⚠️'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          className="text-emerald-700 hover:underline inline-flex items-center gap-1 text-xs"
-                          onClick={() => handleRestore(item.id)}
-                          title="Restaurar publicación"
-                        >
-                          <IconArrowLeft />
-                          <span>Restaurar</span>
-                        </button>
-                        <button
-                          className="text-red-700 hover:underline inline-flex items-center gap-1 text-xs"
-                          onClick={() => handlePermanentDelete(item.id)}
-                          title="Eliminar permanentemente"
-                        >
-                          <IconTrash />
-                          <span>Eliminar</span>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {!loading && items.length > 0 && (
-        <div className="card p-4 bg-amber-50 border-amber-200">
-          <h3 className="font-semibold text-amber-900 mb-2">ℹ️ Información importante</h3>
-          <ul className="text-sm text-amber-800 space-y-1">
-            <li>• Las publicaciones eliminadas se conservan durante <strong>30 días</strong></li>
-            <li>• Después de 30 días, se eliminarán automáticamente de forma permanente</li>
-            <li>• Puedes restaurar publicaciones individuales haciendo clic en "Restaurar"</li>
-            <li>• Puedes seleccionar varias publicaciones y eliminarlas manualmente</li>
-            <li>• El botón "Vaciar papelera" elimina TODAS las publicaciones permanentemente</li>
-            <li>• Las publicaciones marcadas con ⚠️ se eliminarán en menos de 7 días</li>
-          </ul>
-        </div>
-      )}
-    </section>
-  )
+  return <section className="space-y-5">
+    <header>
+      <h1 className="text-2xl font-semibold flex items-center gap-2"><IconTrash /> Papelera</h1>
+      <p className="text-sm text-slate-600 mt-2">Los elementos se conservan hasta que decidas restaurarlos o eliminarlos definitivamente. No se borran automáticamente.</p>
+    </header>
+    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipo de papelera">
+      <button role="tab" aria-selected={tab === 'publicaciones'} className={'btn ' + (tab === 'publicaciones' ? 'btn-primary' : 'btn-outline')} onClick={() => { setParams({ tab: 'publicaciones' }); setPreview(null) }}>Publicaciones ({publications.length})</button>
+      <button role="tab" aria-selected={tab === 'ediciones'} className={'btn ' + (tab === 'ediciones' ? 'btn-primary' : 'btn-outline')} onClick={() => { setParams({ tab: 'ediciones' }); setPreview(null) }}>Ediciones ({editions.length})</button>
+    </div>
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      Al enviar una edición a la papelera, sus publicaciones vuelven a <strong>Por verificar</strong>. Tras verificarlas, podrás seleccionarlas nuevamente. Restaurar una edición conserva su CVE y exige un nuevo PDF final.
+    </div>
+    {loading ? <p role="status">Cargando papelera…</p> : <div className="card overflow-x-auto">
+      <table className="w-full text-sm text-left">
+        <thead><tr className="border-b bg-slate-50"><th className="p-4">{tab === 'ediciones' ? 'Edición / CVE' : 'Publicación'}</th><th className="p-4">Estado anterior</th><th className="p-4">En papelera desde</th><th className="p-4">Acciones</th></tr></thead>
+        <tbody>
+          {tab === 'ediciones' ? editions.map(e => <tr key={e.id} className="border-b">
+            <td className="p-4"><strong>{e.code}</strong><div>{e.orders_count} publicaciones · {e.date}</div></td>
+            <td className="p-4">{e.status}</td><td className="p-4">{e.deleted_at}</td>
+            <td className="p-4"><div className="flex flex-wrap gap-2">
+              <button className="btn btn-outline" disabled={busy} onClick={() => inspect(e.id, true)}>Ver detalle</button>
+              <button className="btn btn-primary" disabled={busy} onClick={() => restore(e.id, true)}>Restaurar y editar</button>
+              {e.can_permanently_delete && user?.role === 'superadmin' && <button className="btn btn-danger" disabled={busy} onClick={() => remove(e.id, true)}>Eliminar definitivamente</button>}
+            </div></td>
+          </tr>) : publications.map(p => <tr key={p.id} className="border-b">
+            <td className="p-4"><strong>{p.name}</strong><div>{p.order_no || '#' + p.id} · {p.pub_type || 'Documento'}</div></td>
+            <td className="p-4">{p.status}</td><td className="p-4">{p.deleted_at}</td>
+            <td className="p-4"><div className="flex flex-wrap gap-2">
+              <button className="btn btn-outline" disabled={busy} onClick={() => inspect(p.id, false)}>Ver detalle</button>
+              <button className="btn btn-primary" disabled={busy} onClick={() => restore(p.id, false)}>Restaurar y editar</button>
+              {p.can_permanently_delete && user?.role === 'superadmin' && <button className="btn btn-danger" disabled={busy} onClick={() => remove(p.id, false)}>Eliminar definitivamente</button>}
+            </div></td>
+          </tr>)}
+          {(tab === 'ediciones' ? editions : publications).length === 0 && <tr><td colSpan={4} className="p-8 text-center text-slate-500">No hay {tab} en la papelera.</td></tr>}
+        </tbody>
+      </table>
+    </div>}
+    {preview && <aside className="card p-5 space-y-3" aria-label="Detalle en papelera">
+      <div className="flex justify-between gap-3"><h2 className="font-semibold">{preview.title}</h2><button className="btn btn-outline" onClick={() => setPreview(null)}>Cerrar detalle</button></div>
+      <p>{preview.description}</p>
+      <ul className="space-y-2">{preview.rows.map((row, i) => <li key={i}>{row}</li>)}</ul>
+      <div className="flex flex-wrap gap-3">{preview.links.map(link => <a key={link.url} className="text-brand-700 underline" href={link.url} target="_blank" rel="noreferrer">{link.title}</a>)}</div>
+    </aside>}
+  </section>
 }

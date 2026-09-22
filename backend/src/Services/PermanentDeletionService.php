@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../Http/StoragePath.php';
+require_once __DIR__ . '/EditorialArchiveService.php';
 
 /**
  * Performs the destructive admin-only removal of legal requests and editions.
@@ -31,28 +32,21 @@ final class PermanentDeletionService
         $this->pdo->beginTransaction();
         try {
             $request = $this->selectOneForUpdate(
-                'SELECT id,status FROM legal_requests WHERE id=?',
+                'SELECT * FROM legal_requests WHERE id=?',
                 [$requestId]
             );
             if (!$request) {
                 throw new RuntimeException('Publicación no encontrada.', 404);
             }
 
-            $editionIds = $this->columnValues(
-                'SELECT edition_id FROM edition_orders WHERE legal_request_id=?',
-                [$requestId]
-            );
-
-            $deletedEditions = 0;
-            $requeuedRequests = 0;
-            foreach ($editionIds as $editionId) {
-                $editionResult = $this->deleteEditionRecord((int) $editionId, $requestId);
-                if ($editionResult === null) continue;
-                $deletedEditions++;
-                $requeuedRequests += $editionResult['requests_requeued'];
-                $physicalPaths = array_merge($physicalPaths, $editionResult['physical_paths']);
-                $this->insertAudit($actorUserId, 'force_delete_edition', 'edition', (int) $editionId);
+            if (empty($request['deleted_at'])) throw new RuntimeException('Envía la publicación a la papelera antes de eliminarla definitivamente.',409);
+            $refs=$this->pdo->prepare('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=?');
+            $refs->execute([$requestId]);
+            if ((int)$refs->fetchColumn()>0 || (new EditorialArchiveService($this->pdo))->references('request', $requestId)) {
+                throw new RuntimeException('La publicación forma parte del historial de una edición. Se conserva en la papelera y puede restaurarse.',409);
             }
+            $deletedEditions=0;
+            $requeuedRequests=0;
 
             $fileIds = array_merge(
                 $this->columnValues(
@@ -139,6 +133,11 @@ final class PermanentDeletionService
             throw new RuntimeException('Una edición publicada conserva su identidad. Utilice Retirar edición.', 409);
         }
 
+        if (empty($edition['deleted_at'])) throw new RuntimeException('Envía la edición a la papelera antes de eliminarla definitivamente.',409);
+        if ((new EditorialArchiveService($this->pdo))->references('edition', $editionId)) {
+            throw new RuntimeException('La edición conserva un historial editorial. Puede restaurarse desde la papelera.', 409);
+        }
+
         $requestIds = $this->columnValues(
             'SELECT legal_request_id FROM edition_orders WHERE edition_id=?',
             [$editionId]
@@ -168,18 +167,18 @@ final class PermanentDeletionService
         $requestIds = array_values(array_unique(array_map('intval', $requestIds)));
         if (!$requestIds) return 0;
 
-        $assignments = ["status='En trámite'"];
+        $assignments = ["status='Por verificar'"];
         foreach (['publish_date', 'edition_code', 'edition_no'] as $column) {
             if ($this->columnExists('legal_requests', $column)) $assignments[] = "{$column}=NULL";
         }
 
         $placeholders = implode(',', array_fill(0, count($requestIds), '?'));
         $sql = 'UPDATE legal_requests SET ' . implode(',', $assignments)
-            . " WHERE id IN ({$placeholders}) AND status='Publicada'"
+            . " WHERE id IN ({$placeholders}) AND deleted_at IS NULL"
             . ' AND NOT EXISTS (SELECT 1 FROM edition_orders active_eo '
             . 'JOIN editions active_e ON active_e.id=active_eo.edition_id '
             . 'WHERE active_eo.legal_request_id=legal_requests.id '
-            . "AND active_e.deleted_at IS NULL AND active_e.status='Publicada')";
+            . 'AND active_e.deleted_at IS NULL)';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($requestIds);
         return $stmt->rowCount();
@@ -212,8 +211,10 @@ final class PermanentDeletionService
         return $paths;
     }
 
-    private function fileIsReferenced(int $fileId): bool
+    public function fileIsReferenced(int $fileId): bool
     {
+        if ((new EditorialArchiveService($this->pdo))->references('file', $fileId)) return true;
+
         $references = [
             ['legal_files', 'file_id'],
             ['edition_orders', 'publication_file_id'],

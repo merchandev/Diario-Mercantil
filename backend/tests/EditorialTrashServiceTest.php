@@ -438,6 +438,105 @@ final class EditorialTrashServiceTest extends TestCase
         );
     }
 
+    public function testLegacyRetirementIsReconciledOnceWithoutChangingDate(): void
+    {
+        $this->insertEdition(19, 'CVE-0019', 'Publicada', '2026-09-18 22:05:24');
+        $this->insertRequest(190, 'Publicada', null, 'CVE-0019', '2026-09-10');
+        $this->linkOrder(19, 190);
+        $this->assertSame(1, $this->service->trashEdition(19, 1, true)['requests_requeued']);
+        $this->assertSame('Por verificar', $this->requestStatus(190));
+        $this->assertSame('2026-09-18 22:05:24', $this->editionDeletedAt(19));
+        $this->pdo->exec("UPDATE legal_requests SET status='En trámite' WHERE id=190");
+        $this->assertSame(0, $this->service->trashEdition(19, 1)['requests_requeued']);
+        $this->assertSame('En trámite', $this->requestStatus(190));
+        $this->assertSame(1, $this->archiveCount(19));
+    }
+
+    public function testArchiveProtectsRemovedRequestAndIndividualPdf(): void
+    {
+        $this->insertEdition(20, 'CVE-0020', 'Borrador', null, 200);
+        $this->insertRequest(200);
+        $this->linkOrder(20, 200);
+        $this->pdo->exec('UPDATE edition_orders SET publication_file_id=201 WHERE edition_id=20');
+        $this->service->trashPublication(200, 1, true);
+        $this->assertSame(0, (int)$this->pdo->query('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=200')->fetchColumn());
+
+        $deletion = new PermanentDeletionService($this->pdo);
+        $this->assertTrue($deletion->fileIsReferenced(200));
+        $this->assertTrue($deletion->fileIsReferenced(201));
+        $this->expectExceptionCode(409);
+        $deletion->deleteLegalRequest(200, 1);
+    }
+
+    public function testLegacyRepairSkipsReverifiedRequestsAndRejectsActiveEdition(): void
+    {
+        $this->insertEdition(23, 'CVE-0023', 'Publicada', '2026-09-18 22:05:24');
+        $this->insertRequest(240, 'En trámite');
+        $this->linkOrder(23, 240);
+        $this->assertSame(0, $this->service->trashEdition(23, 1, true)['requests_requeued']);
+        $this->assertSame('En trámite', $this->requestStatus(240));
+        $this->insertEdition(24, 'CVE-0024');
+        $this->expectExceptionCode(409);
+        $this->service->trashEdition(24, 1, true);
+    }
+
+    public function testPermanentDeletionPreservesArchivedDraftIdentity(): void
+    {
+        $this->insertEdition(21, 'CVE-0021');
+        $this->service->trashEdition(21, 1);
+        $this->expectExceptionCode(409);
+        (new PermanentDeletionService($this->pdo))->deleteEdition(21, 1);
+    }
+
+    public function testRequestWithoutEditorialHistoryCanBePermanentlyDeleted(): void
+    {
+        $this->insertRequest(210, 'Borrador');
+        $this->pdo->exec("INSERT INTO legal_payments(legal_request_id,amount_bs,status) VALUES(210,100,'Aprobado')");
+        $this->service->trashPublication(210, 1, true);
+        $this->assertSame(1, (int)$this->pdo->query('SELECT COUNT(*) FROM legal_payments WHERE legal_request_id=210')->fetchColumn());
+        $result = (new PermanentDeletionService($this->pdo))->deleteLegalRequest(210, 1);
+        $this->assertTrue($result['deleted']);
+        $this->assertSame(0, (int)$this->pdo->query('SELECT COUNT(*) FROM legal_requests WHERE id=210')->fetchColumn());
+        $this->assertSame(0, (int)$this->pdo->query('SELECT COUNT(*) FROM legal_payments WHERE legal_request_id=210')->fetchColumn());
+    }
+
+    public function testFailureAfterArchivingRollsBackEntireOperation(): void
+    {
+        $this->insertEdition(22, 'CVE-0022');
+        $this->insertRequest(220);
+        $this->linkOrder(22, 220);
+        $this->pdo->exec("CREATE TRIGGER fail_requeue BEFORE UPDATE ON legal_requests BEGIN SELECT RAISE(ABORT, 'simulated failure'); END");
+        try {
+            $this->service->trashEdition(22, 1);
+            $this->fail('Expected the update to fail');
+        } catch (PDOException $e) {
+            $this->assertStringContainsString('simulated failure', $e->getMessage());
+        }
+        $this->assertNull($this->editionDeletedAt(22));
+        $this->assertSame('En trámite', $this->requestStatus(220));
+        $this->assertSame(0, $this->archiveCount(22));
+        $this->assertSame(0, $this->auditCount('trash_edition'));
+    }
+
+    public function testOwnerCannotTrashOrRestoreAnotherUsersPublication(): void
+    {
+        $this->insertRequest(230, 'Borrador');
+        try {
+            $this->service->trashPublication(230, 2, false);
+            $this->fail('Expected forbidden');
+        } catch (RuntimeException $e) {
+            $this->assertSame(403, $e->getCode());
+        }
+        $this->service->trashPublication(230, 1, false);
+        try {
+            $this->service->restorePublication(230, 2, false);
+            $this->fail('Expected forbidden');
+        } catch (RuntimeException $e) {
+            $this->assertSame(403, $e->getCode());
+        }
+        $this->assertSame('Borrador', $this->service->restorePublication(230, 1, false)['status']);
+    }
+
     public function testTrashActionsAreAudited(): void
     {
         $this->insertEdition(13, 'CVE-0013', 'Borrador');

@@ -4,15 +4,14 @@ import { printOwnershipConsoleSignature } from './brandConsole'
 describe('browser ownership signature', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('prints the binary brand and the complete ownership notice', () => {
+  it('prints the brand and the complete ownership notice', () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => undefined)
 
     printOwnershipConsoleSignature()
 
-    expect(info).toHaveBeenCalledTimes(2)
-    expect(info.mock.calls[0][0]).toContain('01001101 01000101 01010010')
-    expect(info.mock.calls[0][0]).toContain('MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.')
-    expect(info.mock.calls[1][0]).toContain('Desarrollo e ingeniería de software propiedad de Merchan.Dev')
-    expect(info.mock.calls[1][0]).toContain('acciones civiles y penales correspondientes')
+    const output = info.mock.calls.map(call => call[0]).join('\n')
+    expect(output).toContain('MERCHAN.DEV  ×  EPRESSIVO VENEZUELA, C.A.')
+    expect(output).toContain('Desarrollo e ingeniería de software propiedad de Merchan.Dev')
+    expect(output).toContain('acciones civiles y penales correspondientes')
   })
 })

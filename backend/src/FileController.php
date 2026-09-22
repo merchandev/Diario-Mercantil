@@ -4,6 +4,7 @@ require_once __DIR__.'/Database.php';
 require_once __DIR__.'/UploadController.php';
 require_once __DIR__."/Http/StoragePath.php";
 require_once __DIR__."/Http/SettingSchema.php";
+require_once __DIR__.'/Services/PermanentDeletionService.php';
 
 class FileController {
   private function requireAdmin() {
@@ -90,6 +91,9 @@ class FileController {
   public function softDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    if ((new PermanentDeletionService($pdo))->fileIsReferenced((int)$id)) {
+      return Response::json(['error'=>'file_in_use', 'message'=>'El archivo pertenece a una publicación o a su historial editorial.'], 409);
+    }
     $references = $this->publicSettingReferences($pdo, (int)$id);
     if ($references) {
       Response::json([
@@ -126,6 +130,9 @@ class FileController {
   public function permanentDelete($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
+    if ((new PermanentDeletionService($pdo))->fileIsReferenced((int)$id)) {
+      return Response::json(['error'=>'file_in_use', 'message'=>'El archivo pertenece a una publicación o a su historial editorial.'], 409);
+    }
     $references = $this->publicSettingReferences($pdo, (int)$id);
     if ($references) {
       Response::json([
@@ -175,7 +182,7 @@ class FileController {
     $count = 0;
     $failed = [];
     foreach ($files as $f) {
-        if ($this->publicSettingReferences($pdo, (int)$f['id'])) {
+        if ($this->publicSettingReferences($pdo, (int)$f['id']) || (new PermanentDeletionService($pdo))->fileIsReferenced((int)$f['id'])) {
             $failed[] = (int)$f['id'];
             continue;
         }

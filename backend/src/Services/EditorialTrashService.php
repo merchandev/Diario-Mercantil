@@ -66,24 +66,34 @@ final class EditorialTrashService
 
     private function activeAssociation(int $requestId, ?int $exceptEdition = null): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT e.id,e.code,e.status FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=? AND e.deleted_at IS NULL AND e.id<>? ORDER BY e.id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT e.id,e.code,e.status FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=? AND e.deleted_at IS NULL AND e.id<>? ORDER BY e.id LIMIT 1' . $this->lock());
         $stmt->execute([$requestId, $exceptEdition ?? 0]);
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    public function trashEdition(int $id, int $actor): array
+    public function trashEdition(int $id, int $actor, bool $legacyOnly = false): array
     {
-        return $this->transaction(function () use ($id, $actor): array {
+        return $this->transaction(function () use ($id, $actor, $legacyOnly): array {
             $edition = $this->edition($id);
-            if ($edition['deleted_at'] !== null) return ['ok'=>true, 'requests_requeued'=>0];
+            if ($legacyOnly && $edition['deleted_at'] === null) {
+                throw new RuntimeException('La edición ya está activa; no se puede reparar como retiro antiguo.', 409);
+            }
+            if ($edition['deleted_at'] !== null) {
+                $archived = $this->pdo->prepare("SELECT 1 FROM edition_archives WHERE edition_id=? AND reason='trash_edition' LIMIT 1");
+                $archived->execute([$id]);
+                if ($archived->fetchColumn()) return ['ok'=>true, 'requests_requeued'=>0];
+                // Legacy retirements did not release requests. Archive and reconcile
+                // them once, while preserving the original retirement timestamp.
+            }
             $orders = $this->orders($id);
             $this->archive($edition, $orders, $actor, 'trash_edition');
-            $this->pdo->prepare('UPDATE editions SET deleted_at=? WHERE id=?')
+            $this->pdo->prepare('UPDATE editions SET deleted_at=COALESCE(deleted_at,?) WHERE id=?')
                 ->execute([EditorialClock::now()->format('Y-m-d H:i:s'), $id]);
             $count = 0;
             foreach ($orders as $order) {
                 $requestId = (int)$order['legal_request_id'];
                 $request = $this->request($requestId);
+                if ($legacyOnly && $request['status'] !== 'Publicada') continue;
                 // A legacy archived association must not alter a different active edition.
                 if ($request['deleted_at'] !== null || $this->activeAssociation($requestId, $id)) continue;
                 $this->pdo->prepare("UPDATE legal_requests SET status='Por verificar',publish_date=NULL,edition_code=NULL WHERE id=?")
@@ -135,6 +145,14 @@ final class EditorialTrashService
                 $editions[] = $edition;
             }
             $request = $this->request($id);
+            // Recheck with a current locking read after obtaining the request lock.
+            // A concurrent editor may have attached it while we locked editions.
+            $current = $this->pdo->prepare('SELECT e.id FROM editions e JOIN edition_orders eo ON eo.edition_id=e.id WHERE eo.legal_request_id=? AND e.deleted_at IS NULL ORDER BY e.id' . $this->lock());
+            $current->execute([$id]);
+            $currentIds = array_map('intval', $current->fetchAll(PDO::FETCH_COLUMN));
+            if ($currentIds !== array_map(static fn(array $edition): int => (int)$edition['id'], $editions)) {
+                throw new RuntimeException('La composición cambió durante la operación. Actualiza la página e intenta nuevamente.', 409);
+            }
             if (!$isAdmin && ($request['status'] !== 'Borrador' || (int)$request['user_id'] !== $actor)) {
                 throw new RuntimeException('Solo puedes enviar a la papelera tus solicitudes en Borrador.', 403);
             }
