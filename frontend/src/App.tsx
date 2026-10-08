@@ -210,9 +210,9 @@ export default function App() {
                   mobileMenuOpen={mobileMenuOpen}
                   setMobileMenuOpen={setMobileMenuOpen}
                 />
-                <div className={`grid grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+                <div className={`grid grid-cols-1 grid-rows-[auto,1fr] transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                   <Topbar onMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)} />
-                  <main className="p-4 md:p-6 w-full overflow-x-hidden md:overflow-visible relative">
+                  <main className="min-w-0 p-4 md:p-6 w-full overflow-x-hidden md:overflow-visible relative">
                     <div className="mx-auto w-full max-w-6xl space-y-4 md:space-y-6">
                       <Routes>
                         <Route index element={<LazyRoute><PanelHome /></LazyRoute>} />

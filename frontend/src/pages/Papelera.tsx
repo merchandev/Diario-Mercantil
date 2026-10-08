@@ -89,22 +89,22 @@ export default function Papelera() {
     <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
       Al enviar una edición a la papelera, sus publicaciones vuelven a <strong>Por verificar</strong>. Tras verificarlas, podrás seleccionarlas nuevamente. Restaurar una edición conserva su CVE y exige un nuevo PDF final.
     </div>
-    {loading ? <p role="status">Cargando papelera…</p> : <div className="card overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead><tr className="border-b bg-slate-50"><th className="p-4">{tab === 'ediciones' ? 'Edición / CVE' : 'Publicación'}</th><th className="p-4">Estado anterior</th><th className="p-4">En papelera desde</th><th className="p-4">Acciones</th></tr></thead>
+    {loading ? <p role="status">Cargando papelera…</p> : <div className="card overflow-x-auto" role="region" aria-label="Elementos en papelera" tabIndex={0}>
+      <table className="w-full min-w-[70rem] text-sm text-left">
+        <thead><tr className="border-b bg-slate-50"><th className="min-w-[15rem] px-5 py-4">{tab === 'ediciones' ? 'Edición / CVE' : 'Publicación'}</th><th className="w-40 px-5 py-4 whitespace-nowrap">Estado anterior</th><th className="w-52 px-5 py-4 whitespace-nowrap">En papelera desde</th><th className="w-[32rem] px-5 py-4">Acciones</th></tr></thead>
         <tbody>
           {tab === 'ediciones' ? editions.map(e => <tr key={e.id} className="border-b">
-            <td className="p-4"><strong>{e.code}</strong><div className="font-mono text-xs">{e.cve}</div><div>{e.orders_count} publicaciones · {e.date}</div></td>
-            <td className="p-4">{e.status}</td><td className="p-4">{e.deleted_at}</td>
-            <td className="p-4"><div className="flex flex-wrap gap-2">
+            <td className="px-5 py-5"><strong>{e.code}</strong><div className="font-mono text-xs">{e.cve}</div><div>{e.orders_count} publicaciones · {e.date}</div></td>
+            <td className="px-5 py-5 whitespace-nowrap">{e.status}</td><td className="px-5 py-5 whitespace-nowrap">{e.deleted_at}</td>
+            <td className="px-5 py-5"><div className="flex items-center gap-3 whitespace-nowrap [&>button]:shrink-0">
               <button className="btn btn-outline" disabled={busy} onClick={() => inspect(e.id, true)}>Ver detalle</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => restore(e.id, true)}>Restaurar y editar</button>
               {e.can_permanently_delete && canDelete && <button className="btn btn-danger" disabled={busy} onClick={() => remove(e.id, true)}>Eliminar definitivamente</button>}
             </div></td>
           </tr>) : publications.map(p => <tr key={p.id} className="border-b">
-            <td className="p-4"><strong>{p.name}</strong><div>{p.order_no || '#' + p.id} · {p.pub_type || 'Documento'}</div></td>
-            <td className="p-4">{p.status}</td><td className="p-4">{p.deleted_at}</td>
-            <td className="p-4"><div className="flex flex-wrap gap-2">
+            <td className="px-5 py-5"><div className="max-w-sm break-words"><strong>{p.name}</strong><div>{p.order_no || '#' + p.id} · {p.pub_type || 'Documento'}</div></div></td>
+            <td className="px-5 py-5 whitespace-nowrap">{p.status}</td><td className="px-5 py-5 whitespace-nowrap">{p.deleted_at}</td>
+            <td className="px-5 py-5"><div className="flex items-center gap-3 whitespace-nowrap [&>button]:shrink-0">
               <button className="btn btn-outline" disabled={busy} onClick={() => inspect(p.id, false)}>Ver detalle</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => restore(p.id, false)}>Restaurar y editar</button>
               {p.can_permanently_delete && canDelete && <button className="btn btn-danger" disabled={busy} onClick={() => remove(p.id, false)}>Eliminar definitivamente</button>}
