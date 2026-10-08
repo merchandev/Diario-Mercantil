@@ -409,9 +409,15 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertNotEmpty($pdo->query('SELECT deleted_at FROM editions WHERE id=50')->fetchColumn());
         // The request must have been re-queued to Por verificar
         $this->assertSame('Por verificar', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
-        // Permanent delete via explicit endpoint must reject (no superadmin role here)
+        $retired = $this->request('GET', '/api/editions-retired', 'admin_session_test');
+        $this->assertSame(200, $retired['code']);
+        $item = array_values(array_filter($retired['body']['items'], fn($item) => (int)$item['id'] === 50))[0];
+        $this->assertTrue($item['can_permanently_delete']);
+        // Administrators can explicitly delete trashed editions, preserving requeued requests.
         $perm = $this->request('DELETE', '/api/editions/50/permanent', 'admin_session_test');
-        $this->assertSame(403, $perm['code']);
+        $this->assertSame(200, $perm['code'], json_encode($perm['body']));
+        $this->assertSame(0, (int)$pdo->query('SELECT COUNT(*) FROM editions WHERE id=50')->fetchColumn());
+        $this->assertSame('Por verificar', $pdo->query('SELECT status FROM legal_requests WHERE id=150')->fetchColumn());
     }
 
     public function testAdminCannotTrashRequestInPublishedEdition(): void {
@@ -498,7 +504,7 @@ class AuthorizationIntegrationTest extends TestCase {
             $this->assertSame(200,$published['code'],json_encode($published['body']));
             $this->assertSame($filesBefore,$pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC));
             $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/publish",'admin_session_test')['code']);
-            $this->assertSame(403,$this->request('DELETE',"/api/editions/{$id}/permanent",'admin_session_test')['code']);
+            $this->assertSame(409,$this->request('DELETE',"/api/editions/{$id}/permanent",'admin_session_test')['code']);
             $detail = $this->request('GET',"/api/legal/{$requestId}",'user_session_test');
             $url = $detail['body']['item']['edition_file_url'];
             $this->assertSame('/api/e/code/'.$created['body']['cve'].'/download',$url);
@@ -574,7 +580,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $detail = $this->request('GET','/api/legal/trash/620','admin_session_test');
         $this->assertSame(200,$detail['code']);
         $this->assertSame(100,(int)$detail['body']['payments'][0]['amount_bs']);
-        $this->assertSame(403,$this->request('DELETE','/api/legal/trash/620','admin_session_test')['code']);
+        $this->assertSame(403,$this->request('DELETE','/api/legal/trash/620','user_session_test')['code']);
         $this->assertSame(403,$this->request('DELETE','/api/legal/trash','admin_session_test')['code']);
         $this->assertSame(200,$this->request('POST','/api/legal/620/restore','admin_session_test')['code']);
         $restored = $this->request('GET','/api/legal/620','admin_session_test');
@@ -590,6 +596,38 @@ class AuthorizationIntegrationTest extends TestCase {
             $this->assertSame(200,$res['code']);
             $ids=array_map('intval',array_column($res['body']['items'],'id'));
             $this->assertContains(610,$ids); $this->assertContains(611,$ids); $this->assertNotContains(612,$ids);
+        }
+    }
+
+    public function testIndividualTrashDeletionAllowsOnlyAdminAndSuperadmin(): void {
+        $pdo = Database::pdo();
+        $insertUser = $pdo->prepare("INSERT INTO users(id,role,name,document,status) VALUES(?,?,?,?,'active')");
+        $insertSession = $pdo->prepare("INSERT INTO sessions(id,user_id,token_hash,expires_at) VALUES(?,?,?,?)");
+        foreach (['staff', 'manager', 'solicitante', 'admin', 'superadmin'] as $index => $role) {
+            $id = 830 + $index;
+            $session = 'trash_permission_' . $role;
+            $insertUser->execute([$id, $role, $role, 'V' . $id]);
+            $insertSession->execute([$session, $id, hash('sha256', $session), date('Y-m-d H:i:s', time() + 3600)]);
+            $pdo->prepare("INSERT INTO editions(id,code,status,edition_no,publication_year,deleted_at) VALUES(?,?,'Publicada',?,2026,CURRENT_TIMESTAMP)")->execute([$id, 'MMXXVI-' . $id, $id]);
+            $pdo->prepare("INSERT INTO legal_requests(id,user_id,status,name,deleted_at) VALUES(?,?,'Por verificar',?,CURRENT_TIMESTAMP)")->execute([$id, $id, 'Papelera ' . $role]);
+
+            $allowed = in_array($role, ['admin', 'superadmin'], true);
+            $publications = $this->request('GET', '/api/legal/trash', $session);
+            $this->assertSame(200, $publications['code']);
+            $item = array_values(array_filter($publications['body']['items'], fn($item) => (int)$item['id'] === $id))[0];
+            $this->assertSame($allowed, $item['can_permanently_delete'], $role);
+            if ($allowed) {
+                $editions = $this->request('GET', '/api/editions-retired', $session);
+                $this->assertSame(200, $editions['code']);
+                $item = array_values(array_filter($editions['body']['items'], fn($item) => (int)$item['id'] === $id))[0];
+                $this->assertTrue($item['can_permanently_delete']);
+            }
+            foreach (["/api/editions/{$id}/permanent", "/api/legal/trash/{$id}"] as $endpoint) {
+                $deleted = $this->request('DELETE', $endpoint, $session);
+                $this->assertSame($allowed ? 200 : 403, $deleted['code'], $role . ': ' . json_encode($deleted['body']));
+            }
+            $this->assertSame($allowed ? 0 : 1, (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE id={$id}")->fetchColumn());
+            $this->assertSame($allowed ? 0 : 1, (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE id={$id}")->fetchColumn());
         }
     }
 

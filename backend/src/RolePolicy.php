@@ -97,6 +97,11 @@ final class RolePolicy {
         return in_array($role, [Role::SUPERADMIN, Role::ADMIN], true);
     }
 
+    /** Can the actor permanently delete individual editorial items from trash? */
+    public static function canPermanentlyDeleteEditorialItems(array $actor): bool {
+        return in_array($actor['role'] ?? '', [self::ADMIN, self::SUPERADMIN], true);
+    }
+
     /**
      * Can the actor manage global settings?
      */

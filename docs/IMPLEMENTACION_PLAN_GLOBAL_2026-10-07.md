@@ -24,7 +24,7 @@ El PDF previo mencionado en C02 no está entre los archivos disponibles. No se i
 | C10 | Listado público ordena por published_at e ID, mostrando las publicaciones más recientes; búsqueda incluye CVE. |
 | C11 | La siguiente reserva empieza por el menor número libre desde 1; la secuencia antigua de pruebas no obliga a empezar en 16. Se preservan las ediciones existentes 10, 13 y 15; no se renumeran ni eliminan registros públicos. |
 | C12 | Se reutiliza el menor número libre sin exigir vaciar papelera. Unicidad transaccional de números activos y rechazo 409 al restaurar un número ya ocupado. |
-| C13 | SuperAdmin puede eliminar definitivamente registros de papelera, incluso con historial propio. La operación elimina sus archivos huérfanos y conserva archivos usados por otros registros. Publicaciones vinculadas a ediciones activas exigen retirar primero esas ediciones. |
+| C13 | Administrador y SuperAdmin pueden eliminar definitivamente registros individuales de papelera, incluso con historial propio. La operación elimina sus archivos huérfanos y conserva archivos usados por otros registros. Publicaciones vinculadas a ediciones activas exigen retirar primero esas ediciones. |
 | C14 | PromptDialog limpia contraseña al abrir/cerrar/cambiar usuario, usa input password, espera la API y mantiene visibles los errores. ConfirmDialog también espera la operación. |
 | C15 | Identificación numérica con prefijo separado en registro y login, con validación backend. Se conserva un acceso administrativo explícito por usuario para cuentas históricas como soporte, restringido a administradores. |
 | C16 | Solicitante y número de orden real se muestran en selección y composición de ediciones; backend devuelve applicant_name. |
@@ -53,7 +53,11 @@ Ejemplo: se crean 1 y 2; se retira 2; la siguiente recibe número 2 y CVE difere
 
 ### Papelera y eliminación
 
-Retirar sigue siendo reversible: guarda composición y devuelve las publicaciones sin otra asociación activa a Por verificar. Restaurar vuelve a Borrador y exige nuevo PDF final. Eliminar definitivamente es una acción separada exclusiva de SuperAdmin: requiere papelera, elimina el historial propio y conserva cualquier archivo compartido.
+Retirar sigue siendo reversible: guarda composición y devuelve las publicaciones sin otra asociación activa a Por verificar. Restaurar vuelve a Borrador y exige nuevo PDF final. Eliminar definitivamente es una acción separada disponible para Administrador y SuperAdmin: requiere papelera, elimina el historial propio y conserva cualquier archivo compartido.
+
+### Corrección posterior: botón de eliminación en papelera
+
+El botón no aparecía con una sesión de Administrador porque la interfaz y el campo `can_permanently_delete` lo restringían a SuperAdmin. Por indicación expresa del usuario se habilitó el borrado definitivo individual de ediciones y publicaciones para ambos perfiles. La API aplica la misma política al listar y al eliminar; staff, manager y solicitante siguen sin ese permiso. El botón exige confirmación y respeta la capacidad enviada por el backend. Vaciar la papelera completa mantiene su permiso exclusivo de SuperAdmin. Esta corrección no ejecuta borrados sobre los datos de producción.
 
 ### Precio final y persistencia
 
@@ -63,8 +67,8 @@ El volumen `diario_mercantil_storage_data` se monta en `/var/www/html/storage`. 
 
 ## Pruebas
 
-- PHPUnit: 90 pruebas y 446 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas e integridad.
-- Frontend: TypeScript, 26 pruebas Vitest y compilación Vite.
+- PHPUnit: 91 pruebas y 484 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas, integridad y permisos del borrado definitivo individual.
+- Frontend: TypeScript, 31 pruebas Vitest y compilación Vite, incluyendo la visibilidad del botón para Administrador/SuperAdmin y la cancelación de la confirmación.
 - Regresiones añadidas: CVE independiente, enlace antiguo después de reciclar número, inicio desde 1 pese a secuencia de pruebas, contraseña limpia con errores asíncronos, IVA incluido.
 - PHP: comprobación de sintaxis de servicios, controladores, CLI y migraciones.
 

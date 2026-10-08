@@ -12,6 +12,7 @@ export default function Papelera() {
   const tab = params.get('tab') === 'ediciones' ? 'ediciones' : 'publicaciones'
   const navigate = useNavigate()
   const { user } = useAuth()
+  const canDelete = user?.role === 'admin' || user?.role === 'superadmin'
   const { showAlert, confirmAction } = useDialog()
   const [publications, setPublications] = useState<LegalRequest[]>([])
   const [editions, setEditions] = useState<Edition[]>([])
@@ -98,7 +99,7 @@ export default function Papelera() {
             <td className="p-4"><div className="flex flex-wrap gap-2">
               <button className="btn btn-outline" disabled={busy} onClick={() => inspect(e.id, true)}>Ver detalle</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => restore(e.id, true)}>Restaurar y editar</button>
-              {e.can_permanently_delete && user?.role === 'superadmin' && <button className="btn btn-danger" disabled={busy} onClick={() => remove(e.id, true)}>Eliminar definitivamente</button>}
+              {e.can_permanently_delete && canDelete && <button className="btn btn-danger" disabled={busy} onClick={() => remove(e.id, true)}>Eliminar definitivamente</button>}
             </div></td>
           </tr>) : publications.map(p => <tr key={p.id} className="border-b">
             <td className="p-4"><strong>{p.name}</strong><div>{p.order_no || '#' + p.id} · {p.pub_type || 'Documento'}</div></td>
@@ -106,7 +107,7 @@ export default function Papelera() {
             <td className="p-4"><div className="flex flex-wrap gap-2">
               <button className="btn btn-outline" disabled={busy} onClick={() => inspect(p.id, false)}>Ver detalle</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => restore(p.id, false)}>Restaurar y editar</button>
-              {p.can_permanently_delete && user?.role === 'superadmin' && <button className="btn btn-danger" disabled={busy} onClick={() => remove(p.id, false)}>Eliminar definitivamente</button>}
+              {p.can_permanently_delete && canDelete && <button className="btn btn-danger" disabled={busy} onClick={() => remove(p.id, false)}>Eliminar definitivamente</button>}
             </div></td>
           </tr>)}
           {(tab === 'ediciones' ? editions : publications).length === 0 && <tr><td colSpan={4} className="p-8 text-center text-slate-500">No hay {tab} en la papelera.</td></tr>}

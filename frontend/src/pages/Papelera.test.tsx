@@ -37,7 +37,7 @@ describe('Papelera editorial', () => {
     open()
     await screen.findByText('Solicitud conservada')
     expect(screen.getByRole('tab', { name: 'Ediciones (1)' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Eliminar definitivamente' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Restaurar y editar' }))
     await screen.findByText('Ficha restaurada')
     expect(mocks.restoreLegal).toHaveBeenCalledWith(11)
@@ -64,8 +64,8 @@ describe('Papelera editorial', () => {
     expect(screen.getByText('MMXXVI-0022')).toBeTruthy()
   })
 
-  it('only offers permanent deletion to superadmin for eligible records', async () => {
-    mocks.role = 'superadmin'
+  it.each(['admin', 'superadmin'])('offers confirmed permanent deletion to %s for both kinds of records', async (role) => {
+    mocks.role = role
     open()
     await screen.findByText('Solicitud conservada')
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }))
@@ -74,5 +74,27 @@ describe('Papelera editorial', () => {
     await screen.findByText('MMXXVI-0022')
     fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }))
     await waitFor(() => expect(mocks.permanentDeleteEdition).toHaveBeenCalledWith(22))
+    expect(mocks.confirmAction).toHaveBeenCalledTimes(2)
+  })
+
+  it.each(['staff', 'manager', 'solicitante'])('does not offer permanent deletion to %s', async (role) => {
+    mocks.role = role
+    open('ediciones')
+    await screen.findByText('MMXXVI-0022')
+    expect(screen.queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Publicaciones (1)' }))
+    expect(screen.queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull()
+  })
+
+  it('respects backend eligibility and cancellation', async () => {
+    mocks.listRetiredEditions.mockResolvedValue({ items: [{ id: 22, code: 'MMXXVI-0022', can_permanently_delete: false }] })
+    mocks.confirmAction.mockResolvedValue(false)
+    open('ediciones')
+    await screen.findByText('MMXXVI-0022')
+    expect(screen.queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Publicaciones (1)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }))
+    await waitFor(() => expect(mocks.confirmAction).toHaveBeenCalledTimes(1))
+    expect(mocks.permanentDeleteLegal).not.toHaveBeenCalled()
   })
 })

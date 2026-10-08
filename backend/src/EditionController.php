@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
+require_once __DIR__.'/RolePolicy.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
 require_once __DIR__.'/Services/EditionIdentityService.php';
 require_once __DIR__.'/Services/EditorialTrashService.php';
@@ -164,7 +165,7 @@ class EditionController {
     );
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$item) {
-      $item['can_permanently_delete'] = $u['role'] === 'superadmin';
+      $item['can_permanently_delete'] = RolePolicy::canPermanentlyDeleteEditorialItems($u);
     }
     Response::json(['items'=>$items]);
   }
@@ -448,7 +449,7 @@ class EditionController {
 
   public function permanentDelete($id){
     $u = $this->requireAdmin();
-    if ($u['role'] !== 'superadmin') return Response::json(['error'=>'Solo SuperAdmin puede eliminar definitivamente.'],403);
+    if (!RolePolicy::canPermanentlyDeleteEditorialItems($u)) return Response::json(['error'=>'Solo Administrador y SuperAdmin pueden eliminar definitivamente.'],403);
     try {
       $result = (new PermanentDeletionService(Database::pdo()))
         ->deleteEdition((int)$id, (int)$u['id']);

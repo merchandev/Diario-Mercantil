@@ -416,7 +416,6 @@ class LegalController {
      $u = AuthController::requireAuth();
      $pdo = Database::pdo();
      $uid = (int)$u['id'];
-     $role = strtolower($u['role'] ?? '');
 
      if (RolePolicy::canManageLegalRequests($u)) {
          $stmt = $pdo->query("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
@@ -426,7 +425,7 @@ class LegalController {
      }
      $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
      foreach ($items as &$item) {
-       $item['can_permanently_delete'] = $role === 'superadmin';
+       $item['can_permanently_delete'] = RolePolicy::canPermanentlyDeleteEditorialItems($u);
      }
      Response::json(['items'=>$items]);
   }
@@ -465,7 +464,7 @@ class LegalController {
   public function permanentDelete($id){
     $u = AuthController::requireAuth();
     $this->requireAdmin($u);
-    if ($u['role'] !== 'superadmin') return Response::json(['error'=>'Solo SuperAdmin puede eliminar definitivamente.'],403);
+    if (!RolePolicy::canPermanentlyDeleteEditorialItems($u)) return Response::json(['error'=>'Solo Administrador y SuperAdmin pueden eliminar definitivamente.'],403);
     try {
       $result = (new PermanentDeletionService(Database::pdo()))
         ->deleteLegalRequest((int)$id, (int)$u['id']);
