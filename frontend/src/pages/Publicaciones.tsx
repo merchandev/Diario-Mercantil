@@ -1,3 +1,4 @@
+import PublicationStatus from '../components/PublicationStatus'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { IconSearch, IconTrash, IconDownload, IconClose, IconPlus, IconSave, IconQrCode } from '../components/icons'
@@ -84,6 +85,13 @@ export default function Publicaciones() {
       ? (() => { try { return JSON.parse(r.meta) } catch { return {} } })()
       : (r.meta || {})
     return meta.razon_denominacion_social || meta.razon_social || meta.razon_social_convocatoria || r.name || '-'
+  }
+  const handleReject = async (id: number) => {
+    const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
+    if (reason === null) return
+    if (!reason.trim()) { await showAlert('Indique un motivo para rechazar la solicitud.', { title: 'Motivo requerido' }); return }
+    try { await rejectLegal(id, reason.trim()); await reload(); setSel(null); await showAlert('Solicitud rechazada. El motivo quedó registrado.', { title: 'Solicitud actualizada' }) }
+    catch (err: any) { await showAlert(err?.message || 'No se pudo rechazar la solicitud', { title: 'Error' }) }
   }
   const prettyStatus = (s?: string) => {
     if (!s) return '-'
@@ -219,7 +227,7 @@ export default function Publicaciones() {
                   <td className="px-4 py-2">{formatCaracasDateTime((r as any).created_at || r.date)}</td>
                   <td className="px-4 py-2">{r.pub_type || 'Documento'}</td>
                   <td className="px-4 py-2">{razonSocial(r)}</td>
-                  <td className="px-4 py-2">{prettyStatus(r.status)}</td>
+                  <td className="px-4 py-2"><PublicationStatus status={r.status} /></td>
                   <td className="px-4 py-2 font-mono text-slate-600">{(r as any).edition_code || '-'}</td>
                   <td className="px-4 py-2">{prettyDate(r.verification_date)}</td>
                   <td className="px-4 py-2">{prettyDate(r.publish_date)}</td>
@@ -228,9 +236,9 @@ export default function Publicaciones() {
                       {/* QR Button removed - QR is now edition-based */}
                       <button className="text-brand-700 hover:underline inline-flex items-center gap-1" onClick={() => navigate(`/dashboard/publicaciones/${r.id}`)}><IconSave /> <span>Detalles</span></button>
                       {['Por verificar', 'En trámite'].includes(r.status) && (
-                        <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={async () => { const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true }); if (reason === null) return; await rejectLegal(r.id, reason); reload() }}><IconClose /> <span>Rechazar</span></button>
+                        <button className="text-amber-700 hover:underline inline-flex items-center gap-1" onClick={() => handleReject(r.id)}><IconClose /> <span>Rechazar</span></button>
                       )}
-                      <button className="text-emerald-700 hover:underline inline-flex items-center gap-1" onClick={() => download(r.id)}><IconDownload /> <span>Descargar</span></button>
+
                       <button className="text-red-700 hover:underline inline-flex items-center gap-1" onClick={() => handleDelete(r.id)}><IconTrash /> <span>Papelera</span></button>
                     </div>
                   </td>
@@ -365,12 +373,7 @@ export default function Publicaciones() {
                     <button
                       className="btn bg-red-600 text-white hover:bg-red-700 flex-1"
                       onClick={async () => {
-                        const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
-                        if (reason === null) return
-                        await rejectLegal(sel.id, reason)
-                        await showAlert('Solicitud rechazada', { title: 'Solicitud actualizada' })
-                        reload()
-                        setSel(null)
+                        await handleReject(sel.id)
                       }}
                     >
                       ✗ Rechazar

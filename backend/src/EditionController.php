@@ -2,6 +2,7 @@
 require_once __DIR__.'/Response.php';
 require_once __DIR__.'/Database.php';
 require_once __DIR__.'/Services/EditionOrderService.php';
+require_once __DIR__.'/Services/EditionIdentityService.php';
 require_once __DIR__.'/Services/EditorialTrashService.php';
 require_once __DIR__.'/Services/EditorialArchiveService.php';
 require_once __DIR__.'/Services/PermanentDeletionService.php';
@@ -59,20 +60,12 @@ class EditionController {
     $u = AuthController::userFromToken();
     $isAdmin = $u && ($u['role'] === 'admin' || $u['role'] === 'superadmin');
 
-    if ($isAdmin) {
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
-        $ed->execute([$code, '%'.$code]);
-    } else {
-        $today = EditorialClock::today();
-        $ed = $pdo->prepare("SELECT * FROM editions WHERE (code=? OR code LIKE ?) AND status='Publicada' AND date <= ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1");
-        $ed->execute([$code, '%'.$code, $today]);
-    }
-
-    $edition = $ed->fetch(PDO::FETCH_ASSOC);
+    $edition = (new EditionIdentityService($pdo))->resolve((string)$code);
+    if ($edition && ($edition['deleted_at'] !== null || (!$isAdmin && $edition['status'] !== 'Publicada'))) $edition = null;
     if (!$edition) return Response::json(['error'=>'not_found'],404);
     $edition['file_is_valid'] = (new EditionIntegrityService($pdo))->editionFileIsPublishable($edition);
     if (!$isAdmin && !$edition['file_is_valid']) return Response::json(['error'=>'not_found'],404);
-    $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    $edition['file_url'] = $edition['file_is_valid'] ? ($isAdmin ? '/api/editions/'.$edition['id'].'/download' : '/api/e/code/'.urlencode((string)($edition['cve'] ?? $edition['code'])).'/download') : null;
 
     $edition['seo'] = [
         'title' => 'Edición N° ' . $edition['edition_no'] . ' | Diario Mercantil Venezuela',
@@ -97,12 +90,11 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) { http_response_code(404); echo 'Not found'; return; }
 
-    $today = EditorialClock::today();
-    if ($edition['status'] !== 'Publicada' || $edition['date'] > $today) {
+    if ($edition['status'] !== 'Publicada') {
         require_once __DIR__.'/AuthController.php';
         $u = AuthController::userFromToken();
         if (!$u || ($u['role'] !== 'admin' && $u['role'] !== 'superadmin')) {
-            http_response_code(403); echo 'Acceso denegado (edición futura o no publicada)'; return;
+            http_response_code(403); echo 'Acceso denegado (edición no publicada)'; return;
         }
     }
 
@@ -137,11 +129,9 @@ class EditionController {
 
   public function downloadByCode($code){
     $pdo = Database::pdo();
-    $today = EditorialClock::today();
-    $ed = $pdo->prepare("SELECT id FROM editions WHERE code=? AND status='Publicada' AND date <= ? AND deleted_at IS NULL");
-    $ed->execute([$code, $today]);
-    $id = (int)($ed->fetchColumn() ?: 0);
-    if (!$id) { http_response_code(404); echo 'Not found'; return; }
+    $edition = (new EditionIdentityService($pdo))->resolve((string)$code);
+    if (!$edition || $edition['deleted_at'] !== null || $edition['status'] !== 'Publicada') { http_response_code(404); echo 'Not found'; return; }
+    $id = (int)$edition['id'];
     return $this->downloadById($id);
   }
 
@@ -159,7 +149,7 @@ class EditionController {
     $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
       $row['file_is_valid'] = $editionIntegrity->editionFileIsPublishable($row);
-      $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_url'] = $row['file_is_valid'] ? '/api/editions/'.$row['id'].'/download' : null;
     }
     Response::json(['items'=>$items]);
   }
@@ -174,16 +164,13 @@ class EditionController {
     );
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($items as &$item) {
-      $item['can_permanently_delete'] = $u['role'] === 'superadmin'
-        && $item['status'] === 'Borrador' && empty($item['published_at']) && empty($item['published_file_checksum'])
-        && !(new EditorialArchiveService($pdo))->references('edition', (int)$item['id']);
+      $item['can_permanently_delete'] = $u['role'] === 'superadmin';
     }
     Response::json(['items'=>$items]);
   }
 
   public function listPublic(){
     $pdo = Database::pdo();
-    $today = EditorialClock::today();
     $q = $_GET['q'] ?? '';
     $from = $_GET['from'] ?? '';
     $to = $_GET['to'] ?? '';
@@ -194,16 +181,16 @@ class EditionController {
         $sql .= 'LEFT JOIN edition_orders eo ON eo.edition_id = e.id ';
         $sql .= 'LEFT JOIN legal_requests l ON l.id = eo.legal_request_id ';
     }
-    $sql .= 'WHERE e.status = "Publicada" AND e.date <= ? AND e.deleted_at IS NULL ';
-    $params = [$today];
+    $sql .= 'WHERE e.status = "Publicada" AND e.deleted_at IS NULL ';
+    $params = [];
 
     if ($q !== '') {
         if ($isSqlite) {
-            $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS TEXT) LIKE ? OR l.name LIKE ? OR l.meta LIKE ?) ';
-            for ($i=0; $i<4; $i++) $params[] = "%$q%";
-        } else {
-            $sql .= 'AND (e.code LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
+            $sql .= 'AND (e.code LIKE ? OR e.cve LIKE ? OR CAST(e.edition_no AS TEXT) LIKE ? OR l.name LIKE ? OR l.meta LIKE ?) ';
             for ($i=0; $i<5; $i++) $params[] = "%$q%";
+        } else {
+            $sql .= 'AND (e.code LIKE ? OR e.cve LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
+            for ($i=0; $i<6; $i++) $params[] = "%$q%";
         }
     }
 
@@ -216,7 +203,7 @@ class EditionController {
         $params[] = EditorialClock::nextDay($to);
     }
     
-    $sql .= 'ORDER BY e.date DESC, e.id DESC LIMIT 50';
+    $sql .= 'ORDER BY e.published_at DESC, e.id DESC LIMIT 50';
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -237,7 +224,7 @@ class EditionController {
     $editionIntegrity = new EditionIntegrityService($pdo);
     foreach ($items as &$row) {
       $row['file_is_valid'] = $editionIntegrity->editionFileIsPublishable($row);
-      $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)$row['code']).'/download' : null;
+      $row['file_url'] = $row['file_is_valid'] ? '/api/e/code/'.urlencode((string)($row['cve'] ?? $row['code'])).'/download' : null;
       $row['company_name'] = implode(' · ', array_keys($companyNames[(int)$row['id']] ?? []));
     }
     $items = array_values(array_filter($items, static fn(array $item): bool => $item['file_is_valid']));
@@ -298,12 +285,12 @@ class EditionController {
     } else {
         $edition['file_is_valid'] = $integrityService->editionFileIsPublishable($edition);
     }
-    $edition['file_url'] = $edition['file_is_valid'] ? '/api/e/code/'.urlencode((string)$edition['code']).'/download' : null;
+    $edition['file_url'] = $edition['file_is_valid'] ? '/api/editions/'.$edition['id'].'/download' : null;
     $ord = $pdo->prepare(
-        'SELECT l.id,l.name,l.document,l.status,l.date,l.meta,'
+        'SELECT l.id,l.order_no,u.name AS applicant_name,l.name,l.document,l.status,l.date,l.meta,'
         . 'eo.publication_file_id,eo.publication_file_name,eo.publication_checksum,'
         . 'eo.publication_source,eo.publication_prepared_at '
-        . 'FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id '
+        . 'FROM edition_orders eo JOIN legal_requests l ON l.id=eo.legal_request_id LEFT JOIN users u ON u.id=l.user_id '
         . 'WHERE eo.edition_id=? ORDER BY l.id'
     );
     $ord->execute([$id]);
@@ -363,6 +350,7 @@ class EditionController {
     }
 
     $year = (int)$dateObj->format('Y');
+    if ($year > (int)substr(EditorialClock::today(),0,4)) return Response::json(['error'=>'El año no puede ser posterior al actual.'],422);
     $now = gmdate('Y-m-d H:i:s');
     $isSqlite = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite';
     $lockName = 'diario_edition_counter_' . $year;
@@ -387,24 +375,15 @@ class EditionController {
             $pdo->beginTransaction();
         }
 
-        $q = $pdo->prepare('SELECT MAX(edition_no) FROM editions WHERE publication_year = ?');
-        $q->execute([$year]);
-        $maxExisting = (int)$q->fetchColumn();
-        $seed = $isSqlite
-            ? 'INSERT OR IGNORE INTO edition_sequences(publication_year,last_number) VALUES(?,?)'
-            : 'INSERT IGNORE INTO edition_sequences(publication_year,last_number) VALUES(?,?)';
-        $pdo->prepare($seed)->execute([$year, $maxExisting]);
-        $sequence = $pdo->prepare('SELECT last_number FROM edition_sequences WHERE publication_year=?' . ($isSqlite ? '' : ' FOR UPDATE'));
-        $sequence->execute([$year]);
-        $editionNo = max((int)$sequence->fetchColumn(), $maxExisting) + 1;
-        $pdo->prepare('UPDATE edition_sequences SET last_number=? WHERE publication_year=?')->execute([$editionNo, $year]);
-        $code = $this->generateCode($date, $editionNo);
+        $editionNo = (new EditionIdentityService($pdo))->nextNumber($year);
+        $code = EditionIdentityService::code($year, $editionNo);
+        $cve = EditionIdentityService::cve();
 
         $stmt = $pdo->prepare(
-            'INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year) '
-            . 'VALUES(?,?,?,?,?,?,?)'
+            'INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year,cve) '
+            . 'VALUES(?,?,?,?,?,?,?,?)'
         );
-        $stmt->execute([$code, $status, $date, $editionNo, 0, $now, $year]);
+        $stmt->execute([$code, $status, $date, $editionNo, 0, $now, $year, $cve]);
         $editionId = (int)$pdo->lastInsertId();
 
         $orderService = new EditionOrderService($pdo);
@@ -415,7 +394,7 @@ class EditionController {
         )->execute([$u['id'], 'create_edition', 'edition', $editionId]);
 
         if ($pdo->inTransaction()) $pdo->commit();
-        $responseBody = ['ok'=>true, 'id'=>$editionId, 'code'=>$code, 'edition_no'=>$editionNo];
+        $responseBody = ['ok'=>true, 'id'=>$editionId, 'code'=>$code, 'edition_no'=>$editionNo, 'cve'=>$cve];
     } catch (PDOException $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         if ((string)$e->getCode() === '23000') {
@@ -542,7 +521,12 @@ class EditionController {
     }
     
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
-    $fields = ['date','edition_no'];
+    $fields = ['date'];
+    if (isset($in['date'])) {
+      $date = DateTimeImmutable::createFromFormat('!Y-m-d',(string)$in['date']);
+      $yearStmt=$pdo->prepare('SELECT publication_year FROM editions WHERE id=?'); $yearStmt->execute([$id]);
+      if (!$date || $date->format('Y-m-d') !== $in['date'] || (int)$date->format('Y') > (int)substr(EditorialClock::today(),0,4) || (int)$date->format('Y') !== (int)$yearStmt->fetchColumn()) return Response::json(['error'=>'Fecha inválida; conserva el año de la edición.'],422);
+    }
     $set=[]; $vals=[];
     foreach ($fields as $f) if (isset($in[$f])) { $set[]="$f=?"; $vals[]=$in[$f]; }
     

@@ -5,3 +5,6 @@ export function editorialToday(now = new Date()): string {
   const value = (type: string) => parts.find(p => p.type === type)!.value
   return [value('year'), value('month'), value('day')].join('-')
 }
+
+export const editorialYear = () => Number(editorialToday().slice(0, 4))
+export const editorialYearEnd = () => `${editorialYear()}-12-31`

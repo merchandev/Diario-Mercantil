@@ -1,3 +1,4 @@
+import { includedVat } from '../../lib/pricing'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, submitLegal } from '../../lib/api'
@@ -78,11 +79,9 @@ export default function Convocatoria() {
   const totals = useMemo(() => {
     const usd = Number(settings.convocatoria_usd || 0)
     const unitBs = usd * (bcv || Number(settings.bcv_rate || 0))
-    const sub = +unitBs.toFixed(2)
-    const iva = +(sub * ((Number(settings.iva_percent || 16)) / 100)).toFixed(2)
-    const total = +(sub + iva).toFixed(2)
+    const { sub, iva, total } = includedVat(Number(req?.total_bs) || unitBs, Number(req?.porcentaje_iva ?? settings.iva_percent ?? 16))
     return { unitBs, sub, iva, total }
-  }, [settings, bcv])
+  }, [req, settings, bcv])
 
   const submit = async () => {
     if (!req) return
@@ -218,7 +217,7 @@ export default function Convocatoria() {
               <span className="text-slate-600">Precio USD:</span>
               <span className="font-medium">${Number(settings.convocatoria_usd || 0).toFixed(2)}</span>
             </div>
-            {/* Subtotal e IVA ocultos a petición del cliente */}
+            <div>Subtotal sin IVA: Bs. {totals.sub.toFixed(2)}</div><div>IVA ({settings.iva_percent ?? 16}%): Bs. {totals.iva.toFixed(2)}</div>
             <div className="flex justify-between items-center border-t-2 border-brand-600 pt-2 mt-2">
               <span className="text-base font-bold text-brand-900">TOTAL A PAGAR:</span>
               <div className="text-right">

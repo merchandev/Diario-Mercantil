@@ -10,6 +10,7 @@ export default function Login() {
   const navigate = useNavigate()
   const { refreshUser } = useAuth()
   const [docPrefix, setDocPrefix] = useState<'V' | 'E' | 'J' | 'G' | 'P'>('V')
+  const [administrative, setAdministrative] = useState(false)
   const [docNumber, setDocNumber] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
@@ -22,8 +23,9 @@ export default function Login() {
     setError(''); setLoading(true)
     try {
       const raw = (docNumber || '').trim()
-      const document = /[^0-9]/.test(raw) ? raw : `${docPrefix}${raw}`
-      const { user } = await apiLogin({ document, password })
+      if (!administrative && !/^[0-9]{1,12}$/.test(raw)) throw new Error('Ingrese solo números en el documento')
+      const document = administrative ? raw : `${docPrefix}${raw}`
+      const { user } = await apiLogin({ document, password, administrative })
 
       if (remember) {
         localStorage.setItem('user_name', user.name || '')
@@ -77,22 +79,24 @@ export default function Login() {
                 <label className="block text-sm mb-1 text-slate-600">N° de documento</label>
                 <div className="flex items-center rounded-2xl ring-1 ring-slate-200 bg-white focus-within:ring-2 focus-within:ring-brand-600 transition px-2 h-12 shadow-sm">
                   <span className="text-slate-500 w-8 grid place-items-center"><IconIdCard /></span>
-                  <select aria-label="Prefijo" value={docPrefix} onChange={e => setDocPrefix(e.target.value as any)} className="h-8 rounded-md bg-transparent px-1 text-slate-700 focus:outline-none">
+                  {!administrative && <select aria-label="Prefijo" value={docPrefix} onChange={e => setDocPrefix(e.target.value as any)} className="h-8 rounded-md bg-transparent px-1 text-slate-700 focus:outline-none">
                     <option value="V">V</option>
                     <option value="E">E</option>
                     <option value="J">J</option>
                     <option value="G">G</option>
                     <option value="P">P</option>
-                  </select>
+                  </select>}
                   <input
                     value={docNumber}
-                    onChange={e => setDocNumber(e.target.value)}
+                    onChange={e => setDocNumber(administrative ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 12))}
+                    inputMode={administrative ? 'text' : 'numeric'}
                     className="ml-2 flex-1 bg-transparent outline-none text-slate-800 placeholder-slate-400 h-10"
-                    placeholder="Documento o usuario"
+                    placeholder={administrative ? 'Usuario administrativo' : 'Número de documento'}
                     autoComplete="username"
                   />
                 </div>
               </div>
+              <button type="button" className="text-sm text-brand-700 underline" onClick={() => { setAdministrative(!administrative); setDocNumber(''); setError('') }}>{administrative ? 'Acceso con documento' : 'Acceso administrativo con usuario'}</button>
               <div className="group">
                 <label className="block text-sm mb-1 text-slate-600">Contraseña</label>
                 <div className="flex items-center rounded-2xl ring-1 ring-slate-200 bg-white focus-within:ring-2 focus-within:ring-brand-600 transition px-2 h-12 shadow-sm">

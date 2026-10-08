@@ -35,7 +35,7 @@ export default function EdicionesPublic() {
   }, [filtered, showList, q, from, to])
 
   const latestPdfUrl = latestEdition?.file_url
-    || (latestEdition?.code ? `/api/e/code/${encodeURIComponent(latestEdition.code)}/download` : '')
+    || (latestEdition?.code ? `/api/e/code/${encodeURIComponent(latestEdition.cve || latestEdition.code)}/download` : '')
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -74,7 +74,7 @@ export default function EdicionesPublic() {
                     </p>
                     {latestEdition.code && (
                       <p className="text-xs text-slate-500 font-mono mt-1">
-                        CVE: {latestEdition.code}
+                        CVE: {latestEdition.cve || latestEdition.code}
                       </p>
                     )}
                   </div>
@@ -82,7 +82,7 @@ export default function EdicionesPublic() {
                     {latestEdition.code && (
                       <Link
                         className="btn btn-outline text-sm"
-                        to={`/edicion/${encodeURIComponent(latestEdition.code)}`}
+                        to={`/edicion/${encodeURIComponent(latestEdition.cve || latestEdition.code)}`}
                       >
                         Ver en línea
                       </Link>
@@ -164,7 +164,7 @@ export default function EdicionesPublic() {
                           <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
                           <td className="p-3">{ed.edition_no ? `N° ${ed.edition_no}` : '-'}</td>
                           <td className="p-3">{ed.company_name || ed.name || '-'}</td>
-                          <td className="p-3 font-mono text-xs">{ed.code || '-'}</td>
+                          <td className="p-3 font-mono text-xs">{ed.cve || ed.code || '-'}</td>
                           <td className="p-3">
                             <span className={`pill text-xs ${ed.status === 'Publicada' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                               {ed.status || '-'}
@@ -172,7 +172,7 @@ export default function EdicionesPublic() {
                           </td>
                           <td className="p-3">
                             <div className="flex items-center justify-end gap-2">
-                              {ed.code && <Link className="btn btn-outline h-9 text-xs" to={`/edicion/${encodeURIComponent(ed.code)}`}>Ver en línea</Link>}
+                              {ed.code && <Link className="btn btn-outline h-9 text-xs" to={`/edicion/${encodeURIComponent(ed.cve || ed.code)}`}>Ver en línea</Link>}
                               {hasPdf ? (
                                 <a className="btn btn-primary h-9 text-xs" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">Descargar</a>
                               ) : (

@@ -379,14 +379,8 @@ final class EditorialTrashServiceTest extends TestCase
         $this->linkOrder(11, 130);
 
         $service = new PermanentDeletionService($this->pdo);
-        $this->expectException(RuntimeException::class);
-        try {
-            $service->deleteLegalRequest(130, 1);
-        } catch (RuntimeException $e) {
-            // 409 – referenced in edition history
-            $this->assertGreaterThanOrEqual(400, $e->getCode());
-            throw $e;
-        }
+        $this->assertTrue($service->deleteLegalRequest(130, 1)['deleted']);
+        $this->assertSame(0,(int)$this->pdo->query('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=130')->fetchColumn());
     }
 
     public function testSameRequestCanBeSelectedAfterVerificationAgain(): void
@@ -457,6 +451,7 @@ final class EditorialTrashServiceTest extends TestCase
         $this->insertEdition(20, 'CVE-0020', 'Borrador', null, 200);
         $this->insertRequest(200);
         $this->linkOrder(20, 200);
+        $this->pdo->exec("INSERT INTO files(id,name,path,checksum) VALUES(200,'shared','missing-shared.pdf','hash'),(201,'individual','missing-individual.pdf','hash')");
         $this->pdo->exec('UPDATE edition_orders SET publication_file_id=201 WHERE edition_id=20');
         $this->service->trashPublication(200, 1, true);
         $this->assertSame(0, (int)$this->pdo->query('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=200')->fetchColumn());
@@ -464,8 +459,11 @@ final class EditorialTrashServiceTest extends TestCase
         $deletion = new PermanentDeletionService($this->pdo);
         $this->assertTrue($deletion->fileIsReferenced(200));
         $this->assertTrue($deletion->fileIsReferenced(201));
-        $this->expectExceptionCode(409);
-        $deletion->deleteLegalRequest(200, 1);
+        $this->assertTrue($deletion->deleteLegalRequest(200, 1)['deleted']);
+        $this->assertTrue($deletion->fileIsReferenced(200));
+        $this->assertFalse($deletion->fileIsReferenced(201));
+        $this->assertSame(0,(int)$this->pdo->query('SELECT COUNT(*) FROM files WHERE id=201')->fetchColumn());
+        $this->assertSame(1,(int)$this->pdo->query('SELECT COUNT(*) FROM files WHERE id=200')->fetchColumn());
     }
 
     public function testLegacyRepairSkipsReverifiedRequestsAndRejectsActiveEdition(): void
@@ -484,8 +482,8 @@ final class EditorialTrashServiceTest extends TestCase
     {
         $this->insertEdition(21, 'CVE-0021');
         $this->service->trashEdition(21, 1);
-        $this->expectExceptionCode(409);
-        (new PermanentDeletionService($this->pdo))->deleteEdition(21, 1);
+        $this->assertTrue((new PermanentDeletionService($this->pdo))->deleteEdition(21, 1)['deleted']);
+        $this->assertSame(0,$this->archiveCount(21));
     }
 
     public function testRequestWithoutEditorialHistoryCanBePermanentlyDeleted(): void

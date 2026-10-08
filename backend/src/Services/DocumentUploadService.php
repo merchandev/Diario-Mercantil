@@ -241,7 +241,7 @@ final class DocumentUploadService
 
     private function createDraftRequest(array $user, int $folios, array $pricing, string $now): int
     {
-        $ivaUsd = round((float) $pricing['price_usd'] * ((float) $pricing['iva_percent'] / 100), 4);
+        $ivaUsd = (float)$pricing['iva_usd'];
         $stmt = $this->pdo->prepare(
             'INSERT INTO legal_requests('
             . 'status,name,document,date,folios,pub_type,user_id,'
@@ -257,7 +257,7 @@ final class DocumentUploadService
             'Documento',
             (int) $user['id'],
             (float) $pricing['price_per_folio_usd'],
-            (float) $pricing['price_usd'],
+            (float) $pricing['subtotal_usd'],
             (float) $pricing['iva_percent'],
             $ivaUsd,
             (float) $pricing['bcv_rate'],
@@ -271,7 +271,7 @@ final class DocumentUploadService
 
     private function updateRequestPricing(int $requestId, int $folios, array $pricing, string $now): void
     {
-        $ivaUsd = round((float) $pricing['price_usd'] * ((float) $pricing['iva_percent'] / 100), 4);
+        $ivaUsd = (float)$pricing['iva_usd'];
         $stmt = $this->pdo->prepare(
             'UPDATE legal_requests SET folios=?, precio_unitario_usd=?, subtotal_usd=?, porcentaje_iva=?, '
             . 'iva_usd=?, tasa_bcv=?, fecha_tasa=?, total_bs=?, updated_at=? WHERE id=?'
@@ -279,7 +279,7 @@ final class DocumentUploadService
         $stmt->execute([
             $folios,
             (float) $pricing['price_per_folio_usd'],
-            (float) $pricing['price_usd'],
+            (float) $pricing['subtotal_usd'],
             (float) $pricing['iva_percent'],
             $ivaUsd,
             (float) $pricing['bcv_rate'],

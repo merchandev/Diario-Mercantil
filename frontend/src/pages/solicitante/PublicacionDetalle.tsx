@@ -1,3 +1,4 @@
+import PublicationStatus from '../../components/PublicationStatus'
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getLegal, type LegalRequest, type LegalPayment, downloadLegal, listLegalFiles, type LegalFile } from '../../lib/api'
@@ -88,7 +89,7 @@ export default function PublicacionDetalleSolicitante() {
 
   const isPublicada = req.status === 'Publicada'
   // Public QR/URL must belong exclusively to the edition. Never fall back to request/order IDs.
-  const publicUrl = req.edition_code ? `${window.location.origin}/edicion/${encodeURIComponent(req.edition_code)}` : ''
+  const publicUrl = req.edition_code ? `${window.location.origin}/edicion/${encodeURIComponent(req.edition_cve || req.edition_code)}` : ''
   const publicationDownloadUrl = editionDownloadUrl(req)
   const hasAvailableEdition = isPublicada && Boolean(publicationDownloadUrl)
 
@@ -213,7 +214,7 @@ export default function PublicacionDetalleSolicitante() {
             <dl className="space-y-3 text-sm">
               <div>
                 <dt className="text-slate-600">Estado Actual:</dt>
-                <dd className="font-semibold text-brand-700">{req.status}</dd>
+                <dd><PublicationStatus status={req.status} />{req.status === 'Rechazado' && <p className="text-rose-700 mt-2">Motivo: {req.reject_reason || 'Consulte con administración'}</p>}</dd>
               </div>
               <div>
                 <dt className="text-slate-600">Folios:</dt>
@@ -242,7 +243,7 @@ export default function PublicacionDetalleSolicitante() {
                 <QRCode value={publicUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
               </div>
               <div className="text-xs text-center mt-3 text-slate-500 font-mono break-all">
-                {req.edition_code}
+                {req.edition_cve || req.edition_code}
               </div>
               <button
                 onClick={handleDownloadQR}
@@ -259,7 +260,7 @@ export default function PublicacionDetalleSolicitante() {
               <h3 className="font-semibold mb-3 text-brand-800">Enlace Público</h3>
               <p className="text-xs text-slate-600 mb-3">Comparte este enlace para que otros vean tu publicación</p>
               <div className="bg-slate-50 p-3 rounded border border-slate-200 mb-3">
-                <p className="text-xs font-mono break-all text-slate-700">{publicUrl}</p>
+                <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-mono break-all text-brand-700 underline">{publicUrl}</a>
               </div>
               <button
                 onClick={() => {

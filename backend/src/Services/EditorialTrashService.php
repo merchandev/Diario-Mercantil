@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/EditorialClock.php';
+require_once __DIR__ . '/EditionIdentityService.php';
 
 /** Reversible editorial deletion. Archived associations never reserve a live request. */
 final class EditorialTrashService
@@ -22,6 +23,7 @@ final class EditorialTrashService
             return $result;
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            if ($e instanceof PDOException && (string)$e->getCode() === '23000' && (str_contains($e->getMessage(),'uq_active_') || str_contains($e->getMessage(),'UNIQUE constraint failed: editions.'))) throw new RuntimeException('El número de edición ya está ocupado. Actualiza la lista antes de restaurar.',409,$e);
             throw $e;
         }
     }
@@ -111,6 +113,10 @@ final class EditorialTrashService
         return $this->transaction(function () use ($id, $actor): array {
             $edition = $this->edition($id);
             if ($edition['deleted_at'] === null) throw new RuntimeException('La edición no está en la papelera.', 409);
+            $year=(int)$edition['publication_year'];
+            $numberCheck=$this->pdo->prepare('SELECT id FROM editions WHERE publication_year=? AND edition_no=? AND deleted_at IS NULL AND id<>?');
+            $numberCheck->execute([$year,(int)$edition['edition_no'],$id]);
+            if ($numberCheck->fetchColumn()) throw new RuntimeException('El número de edición ya fue reutilizado. Retira la edición que lo ocupa antes de restaurar esta.',409);
             $orders = $this->orders($id);
             foreach ($orders as $order) {
                 $requestId = (int)$order['legal_request_id'];

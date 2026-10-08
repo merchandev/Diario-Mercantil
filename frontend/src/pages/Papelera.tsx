@@ -32,7 +32,7 @@ export default function Papelera() {
 
   async function restore(id: number, edition: boolean) {
     const message = edition
-      ? 'La edición volverá a Borrador con el mismo CVE. Verifica sus publicaciones y carga nuevamente el PDF final antes de publicar. Si una publicación ya pertenece a otra edición activa, se informará el conflicto.'
+      ? 'La edición volverá a Borrador con el mismo CVE. Verifica sus publicaciones y carga nuevamente el PDF final antes de publicar. Si su número fue reutilizado o una publicación pertenece a otra edición activa, se informará el conflicto.'
       : 'La publicación volverá a Por verificar y conservará sus pagos y documentos. Se abrirá su ficha para corregirla y verificarla nuevamente.'
     if (!await confirmAction(message, { title: 'Restaurar para editar', confirmText: 'Restaurar y editar' })) return
     setBusy(true)
@@ -46,7 +46,7 @@ export default function Papelera() {
   }
 
   async function remove(id: number, edition: boolean) {
-    if (!await confirmAction('Esta eliminación es definitiva y no se puede deshacer. Los registros vinculados a un historial editorial protegido se conservarán. ¿Continuar?', { title: 'Eliminar definitivamente', confirmText: 'Eliminar definitivamente' })) return
+    if (!await confirmAction('Esta eliminación es definitiva y no se puede deshacer. Se eliminará su historial propio. Los archivos usados por otros registros se conservarán. ¿Continuar?', { title: 'Eliminar definitivamente', confirmText: 'Eliminar definitivamente' })) return
     setBusy(true)
     try {
       if (edition) await permanentDeleteEdition(id)
@@ -93,7 +93,7 @@ export default function Papelera() {
         <thead><tr className="border-b bg-slate-50"><th className="p-4">{tab === 'ediciones' ? 'Edición / CVE' : 'Publicación'}</th><th className="p-4">Estado anterior</th><th className="p-4">En papelera desde</th><th className="p-4">Acciones</th></tr></thead>
         <tbody>
           {tab === 'ediciones' ? editions.map(e => <tr key={e.id} className="border-b">
-            <td className="p-4"><strong>{e.code}</strong><div>{e.orders_count} publicaciones · {e.date}</div></td>
+            <td className="p-4"><strong>{e.code}</strong><div className="font-mono text-xs">{e.cve}</div><div>{e.orders_count} publicaciones · {e.date}</div></td>
             <td className="p-4">{e.status}</td><td className="p-4">{e.deleted_at}</td>
             <td className="p-4"><div className="flex flex-wrap gap-2">
               <button className="btn btn-outline" disabled={busy} onClick={() => inspect(e.id, true)}>Ver detalle</button>

@@ -32,7 +32,7 @@ export default function Settings(){
     <form onSubmit={onSave} className="card p-6 space-y-4">
       <h2 className="text-xl font-semibold">Configuración</h2>
       <div className="grid md:grid-cols-3 gap-3">
-        <label className="block"><span className="text-sm">Precio por folio (USD)</span><input className="input w-full" type="number" step="0.01" value={s.price_per_folio_usd||''} onChange={e=>setS({...s, price_per_folio_usd:e.target.value})} /></label>
+        <label className="block"><span className="text-sm">Precio final por folio (USD, IVA incluido)</span><input className="input w-full" type="number" step="0.01" value={s.price_per_folio_usd||''} onChange={e=>setS({...s, price_per_folio_usd:e.target.value})} /></label>
         <label className="block"><span className="text-sm">Convocatoria (USD)</span><input className="input w-full" type="number" step="0.01" value={s.convocatoria_usd||''} onChange={e=>setS({...s, convocatoria_usd:e.target.value})} /></label>
         <label className="block"><span className="text-sm">IVA (%)</span><input className="input w-full" type="number" step="0.01" value={s.iva_percent||''} onChange={e=>setS({...s, iva_percent:e.target.value})} /></label>
       </div>

@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { IconClose, IconAlertTriangle } from './icons'
 
 interface PromptDialogProps {
   isOpen: boolean
   title: string
   message: string
+  inputType?: 'text' | 'password'
   placeholder?: string
   defaultValue?: string
   confirmText?: string
   cancelText?: string
   variant?: 'danger' | 'warning' | 'info'
-  onConfirm: (value: string) => void
+  onConfirm: (value: string) => void | Promise<void>
   onCancel: () => void
 }
 
@@ -18,6 +19,7 @@ export default function PromptDialog({
   isOpen,
   title,
   message,
+  inputType = 'text',
   placeholder = '',
   defaultValue = '',
   confirmText = 'Aceptar',
@@ -28,6 +30,10 @@ export default function PromptDialog({
 }: PromptDialogProps) {
   const [value, setValue] = useState(defaultValue)
 
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { setValue(isOpen ? defaultValue : ''); setError('') }, [isOpen, title, message, defaultValue])
+  const cancel = () => { if (!busy) { setValue(''); onCancel() } }
   if (!isOpen) return null
 
   const variantStyles = {
@@ -42,10 +48,13 @@ export default function PromptDialog({
     info: 'bg-blue-600 hover:bg-blue-700 text-white'
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onConfirm(value)
-    onCancel()
+    if (busy) return
+    setBusy(true); setError('')
+    try { await onConfirm(value); setValue(''); onCancel() }
+    catch (err: any) { setError(err?.message || 'No se pudo completar la operación') }
+    finally { setBusy(false) }
   }
 
   return (
@@ -60,7 +69,7 @@ export default function PromptDialog({
             </div>
             <button
               type="button"
-              onClick={onCancel}
+              onClick={cancel} disabled={busy}
               className="p-1 hover:bg-white/30 rounded-lg transition-colors"
               aria-label="Cerrar"
             >
@@ -72,7 +81,9 @@ export default function PromptDialog({
           <div className="px-6 py-5 space-y-4">
             <p className="text-slate-700 leading-relaxed whitespace-pre-line">{message}</p>
             <input
-              type="text"
+              type={inputType}
+              disabled={busy}
+              autoComplete={inputType === 'password' ? 'new-password' : 'off'}
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={placeholder}
@@ -81,20 +92,21 @@ export default function PromptDialog({
             />
           </div>
 
+          {error && <p role="alert" className="px-6 text-sm text-rose-700">{error}</p>}
           {/* Actions */}
           <div className="px-6 py-4 bg-slate-50 rounded-b-xl flex gap-3 justify-end">
             <button
               type="button"
-              onClick={onCancel}
+              onClick={cancel} disabled={busy}
               className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors"
             >
               {cancelText}
             </button>
             <button
-              type="submit"
+              type="submit" disabled={busy}
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${buttonStyles[variant]}`}
             >
-              {confirmText}
+              {busy ? 'Guardando...' : confirmText}
             </button>
           </div>
         </form>

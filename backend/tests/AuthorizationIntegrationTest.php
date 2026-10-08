@@ -24,7 +24,10 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, role TEXT NOT NULL, name TEXT NOT NULL, document TEXT NOT NULL, email TEXT, phone TEXT, password_hash TEXT, status TEXT, person_type TEXT DEFAULT 'natural', state TEXT, municipality TEXT, address TEXT, created_at DATETIME, updated_at DATETIME)");
         $pdo->exec("CREATE TABLE IF NOT EXISTS sessions (id VARCHAR(255) PRIMARY KEY, user_id INTEGER, payload TEXT, last_activity INTEGER, token_hash VARCHAR(255), revoked_at DATETIME, expires_at DATETIME)");
         $pdo->exec("CREATE TABLE edition_sequences (publication_year INTEGER PRIMARY KEY, last_number INTEGER NOT NULL)");
-        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, published_file_checksum TEXT, published_at TEXT, published_by INTEGER, file_name TEXT, UNIQUE(publication_year, edition_no))");
+        $pdo->exec("CREATE TABLE editions (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL, cve TEXT UNIQUE, status TEXT NOT NULL, date TEXT, edition_no INTEGER NOT NULL, orders_count INTEGER DEFAULT 0, created_at TEXT, publication_year INTEGER NOT NULL, file_id INTEGER, deleted_at TEXT, published_file_checksum TEXT, published_at TEXT, published_by INTEGER, file_name TEXT)");
+        $pdo->exec("CREATE UNIQUE INDEX edition_active_number ON editions(publication_year,edition_no) WHERE deleted_at IS NULL");
+        $pdo->exec("CREATE UNIQUE INDEX edition_active_code ON editions(code) WHERE deleted_at IS NULL");
+        $pdo->exec("CREATE TABLE edition_link_aliases(alias TEXT PRIMARY KEY,edition_id INTEGER NOT NULL)");
         $pdo->exec("CREATE TABLE legal_requests (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL, total_bs NUMERIC, deleted_at TEXT, name TEXT, order_no TEXT, document TEXT, date TEXT, meta TEXT, edition_code TEXT, publish_date TEXT, pub_type TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_payments (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, ref TEXT, date TEXT, bank TEXT, type TEXT, amount_bs NUMERIC, status TEXT, mobile_phone TEXT, comment TEXT, created_at TEXT)");
         $pdo->exec("CREATE TABLE legal_files (id INTEGER PRIMARY KEY AUTOINCREMENT, legal_request_id INTEGER NOT NULL, file_id INTEGER NOT NULL, kind TEXT, created_at TEXT)");
@@ -498,7 +501,7 @@ class AuthorizationIntegrationTest extends TestCase {
             $this->assertSame(403,$this->request('DELETE',"/api/editions/{$id}/permanent",'admin_session_test')['code']);
             $detail = $this->request('GET',"/api/legal/{$requestId}",'user_session_test');
             $url = $detail['body']['item']['edition_file_url'];
-            $this->assertSame('/api/e/code/'.$created['body']['code'].'/download',$url);
+            $this->assertSame('/api/e/code/'.$created['body']['cve'].'/download',$url);
             $download = $this->request('GET',$url);
             $this->assertSame(200,$download['code']);
             $this->assertSame($sha,hash('sha256',$download['raw']));
@@ -532,10 +535,10 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertNotContains($second,array_map('intval',array_column($list['body']['items'],'id')));
     }
 
-    public function testDeletedDraftNumberIsNeverReused(): void {
+    public function testDeletedDraftNumberIsReusedWithDistinctCve(): void {
         $pdo = Database::pdo();
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name) VALUES(603,2,'En trámite',100,'Reserva')");
-        $data = ['date'=>'2030-01-01','orders'=>[603]];
+        $data = ['date'=>'2026-10-10','orders'=>[603]];
         $first=$this->request('POST','/api/editions','admin_session_test',$data);
         $this->assertSame(200,$first['code']);
         $id=$first['body']['id'];
@@ -552,8 +555,9 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("UPDATE legal_requests SET status='En trámite' WHERE id=603");
         $second=$this->request('POST','/api/editions','admin_session_test',$data);
         $this->assertSame(200,$second['code'],$second['body']['error'] ?? '');
-        $this->assertSame($first['body']['edition_no']+1,$second['body']['edition_no']);
-        $this->assertNotSame($first['body']['code'],$second['body']['code']);
+        $this->assertSame($first['body']['edition_no'],$second['body']['edition_no']);
+        $this->assertSame($first['body']['code'],$second['body']['code']);
+        $this->assertNotSame($first['body']['cve'],$second['body']['cve']);
         $available = $this->request('GET','/api/legal?available_for_edition=1','admin_session_test');
         $availableIds = array_map('intval', array_column($available['body']['items'], 'id'));
         $this->assertNotContains(603, $availableIds);
@@ -589,4 +593,35 @@ class AuthorizationIntegrationTest extends TestCase {
         }
     }
 
+    public function testRegistrationIsEnforcedByApiAndNumericIdentityIsValidated(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT OR REPLACE INTO settings VALUES('registration_enabled','0','now','now')");
+        $before=(int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        $blocked=$this->request('POST','/api/auth/register',null,['document'=>'V789','name'=>'Blocked','password'=>'password123456']);
+        $this->assertSame(403,$blocked['code']);
+        $this->assertSame($before,(int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
+        $pdo->exec("UPDATE settings SET value='1' WHERE `key`='registration_enabled'");
+        $invalid=$this->request('POST','/api/auth/register',null,['document'=>'Vabc','name'=>'Invalid','password'=>'password123456']);
+        $this->assertSame(422,$invalid['code']);
+        $this->assertSame(422,$this->request('POST','/api/auth/login',null,['document'=>'soporte','password'=>'anything'])['code']);
+        $pdo->exec("UPDATE settings SET value='0' WHERE `key`='registration_enabled'");
+    }
+    public function testFutureYearsAreRejectedButPublishedSameYearFuturePdfIsPublic(): void {
+        $year=(int)date('Y');
+        $invalid=$this->request('POST','/api/editions','admin_session_test',['date'=>($year+1).'-01-01','orders'=>[100]]);
+        $this->assertSame(422,$invalid['code']);
+        $pdo=Database::pdo();
+        $e=$pdo->query("SELECT * FROM editions WHERE status='Publicada' AND deleted_at IS NULL AND published_file_checksum IS NOT NULL LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+        $pdo->prepare('UPDATE editions SET date=? WHERE id=?')->execute([$year.'-12-31',$e['id']]);
+        try {
+            $url='/api/dm/e-'.($e['cve'] ?? $e['code']);
+            $public=$this->request('GET',$url);
+            $this->assertSame(200,$public['code']);
+            $pdf=$this->request('GET',$public['body']['edition']['file_url']);
+            $this->assertSame(200,$pdf['code']);
+            $this->assertSame($e['published_file_checksum'],hash('sha256',$pdf['raw']));
+            $list=$this->request('GET','/api/e?q='.$e['cve']);
+            $this->assertContains((int)$e['id'],array_map('intval',array_column($list['body']['items'],'id')));
+        } finally { $pdo->prepare('UPDATE editions SET date=? WHERE id=?')->execute([$e['date'],$e['id']]); }
+    }
 }

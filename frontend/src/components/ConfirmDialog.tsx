@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { IconClose, IconAlertTriangle } from './icons'
 
 interface ConfirmDialogProps {
@@ -7,7 +8,7 @@ interface ConfirmDialogProps {
   confirmText?: string
   cancelText?: string
   variant?: 'danger' | 'warning' | 'info'
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   onCancel: () => void
 }
 
@@ -21,6 +22,16 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel
 }: ConfirmDialogProps) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => { setError('') }, [isOpen, message])
+  const submit = async () => {
+    if (busy) return
+    setBusy(true); setError('')
+    try { await onConfirm(); onCancel() }
+    catch (e: any) { setError(e?.message || 'No se pudo completar la operación') }
+    finally { setBusy(false) }
+  }
   if (!isOpen) return null
 
   const variantStyles = {
@@ -45,7 +56,7 @@ export default function ConfirmDialog({
             <h3 className="font-semibold text-lg">{title}</h3>
           </div>
           <button
-            onClick={onCancel}
+            onClick={onCancel} disabled={busy}
             className="p-1 hover:bg-white/30 rounded-lg transition-colors"
             aria-label="Cerrar"
           >
@@ -58,19 +69,17 @@ export default function ConfirmDialog({
           <p className="text-slate-700 leading-relaxed whitespace-pre-line">{message}</p>
         </div>
 
+        {error && <p role="alert" className="px-6 text-rose-700">{error}</p>}
         {/* Actions */}
         <div className="px-6 py-4 bg-slate-50 rounded-b-xl flex gap-3 justify-end">
           <button
-            onClick={onCancel}
+            onClick={onCancel} disabled={busy}
             className="px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition-colors"
           >
             {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm()
-              onCancel()
-            }}
+            onClick={submit} disabled={busy}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${buttonStyles[variant]}`}
           >
             {confirmText}

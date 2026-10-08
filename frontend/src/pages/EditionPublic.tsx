@@ -32,7 +32,7 @@ export default function EditionPublic() {
   useEffect(() => {
     // Cargar ediciones recientes para los widgets de abajo
     listPublicEditions().then(res => {
-      setRecentEditions(res.items.filter(e => e.code !== activeCode && e.status === 'Publicada').slice(0, 4))
+      setRecentEditions(res.items.filter(e => e.code !== activeCode && e.cve !== activeCode && e.status === 'Publicada').slice(0, 4))
     }).catch(console.error)
   }, [activeCode])
 
@@ -140,6 +140,7 @@ export default function EditionPublic() {
           </div>
         </div>
 
+        <p className="text-sm font-mono text-slate-600">CVE: {edition.cve || edition.code}</p>
         {/* 2. Revista PDF Central */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
           {pdfUrl ? (
@@ -165,7 +166,7 @@ export default function EditionPublic() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {recentEditions.map(ed => (
-                <Link key={ed.id} to={`/edicion/${ed.code}`} className="group card flex flex-col hover:border-brand-300 transition-all hover:shadow-md bg-white p-4 border border-slate-200 rounded-xl">
+                <Link key={ed.id} to={`/edicion/${ed.cve || ed.code}`} className="group card flex flex-col hover:border-brand-300 transition-all hover:shadow-md bg-white p-4 border border-slate-200 rounded-xl">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-mono text-slate-400">{ed.code}</span>
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full">{ed.date}</span>

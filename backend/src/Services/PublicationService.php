@@ -20,8 +20,9 @@ class PublicationService {
         return (float)$priceRaw;
     }
     
-    public function calculatePricing(int $folios): array {
-        $pricePerFolioUsd = $this->getPricePerFolio();
+    public function calculatePricing(int $folios, ?float $finalUnitPrice = null): array {
+        $pricePerFolioUsd = $finalUnitPrice ?? $this->getPricePerFolio();
+        if ($folios < 1 || $pricePerFolioUsd <= 0) throw new InvalidArgumentException('Folios y precio deben ser positivos.');
         $bcv = $this->bcvService->getRate();
         
         $stmt = $this->pdo->prepare('SELECT value FROM settings WHERE `key`=?');
@@ -33,13 +34,16 @@ class PublicationService {
         $ivaPercent = (float)$ivaRaw;
         
         $priceUsd = $folios * $pricePerFolioUsd;
-        $subtotalBs = round($priceUsd * $bcv, 2);
-        $ivaBs = round($subtotalBs * ($ivaPercent / 100), 2);
-        $totalBs = round($subtotalBs + $ivaBs, 2);
+        $totalBs = round($priceUsd * $bcv, 2);
+        $subtotalBs = round($totalBs / (1 + $ivaPercent / 100), 2);
+        $ivaBs = round($totalBs - $subtotalBs, 2);
+        $subtotalUsd = round($priceUsd / (1 + $ivaPercent / 100), 4);
         
         return [
             'price_per_folio_usd' => $pricePerFolioUsd,
             'price_usd' => $priceUsd,
+            'subtotal_usd' => $subtotalUsd,
+            'iva_usd' => round($priceUsd - $subtotalUsd,4),
             'bcv_rate' => $bcv,
             'subtotal_bs' => $subtotalBs,
             'iva_percent' => $ivaPercent,
@@ -59,7 +63,7 @@ class PublicationService {
                 $price = $this->calculatePricing($folios);
                 
                 $sql = "UPDATE legal_requests SET folios=?, precio_unitario_usd=?, subtotal_usd=?, porcentaje_iva=?, iva_usd=?, tasa_bcv=?, fecha_tasa=?, total_bs=?, updated_at=? WHERE id=? AND status='Borrador'";
-                $params = [$folios, $price['price_per_folio_usd'], $price['price_usd'], $price['iva_percent'], $price['iva_bs'] / $price['bcv_rate'], $price['bcv_rate'], $now, $price['total_bs'], $now, $existingRequestId];
+                $params = [$folios, $price['price_per_folio_usd'], $price['subtotal_usd'], $price['iva_percent'], $price['iva_usd'], $price['bcv_rate'], $now, $price['total_bs'], $now, $existingRequestId];
                 
                 if (!$isAdmin) {
                     $sql .= " AND user_id=?";
@@ -85,7 +89,7 @@ class PublicationService {
         
         $price = $this->calculatePricing($folios);
         $stmt = $this->pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,precio_unitario_usd,subtotal_usd,porcentaje_iva,iva_usd,tasa_bcv,fecha_tasa,total_bs,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute(['Borrador', $userData['name'], $userData['document'], gmdate('Y-m-d'), $folios, 'Documento', $userData['id'], $price['price_per_folio_usd'], $price['price_usd'], $price['iva_percent'], $price['iva_bs'] / $price['bcv_rate'], $price['bcv_rate'], $now, $price['total_bs'], $now]);
+        $stmt->execute(['Borrador', $userData['name'], $userData['document'], gmdate('Y-m-d'), $folios, 'Documento', $userData['id'], $price['price_per_folio_usd'], $price['subtotal_usd'], $price['iva_percent'], $price['iva_usd'], $price['bcv_rate'], $now, $price['total_bs'], $now]);
         return (int)$this->pdo->lastInsertId();
     }
     

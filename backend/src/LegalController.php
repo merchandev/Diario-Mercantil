@@ -18,7 +18,7 @@ require_once __DIR__.'/Services/EditorialTrashService.php';
 require_once __DIR__.'/Services/EditorialArchiveService.php';
 
 class LegalController {
-  
+
   private function checkAccess($reqId, $u) {
       if (RolePolicy::canManageLegalRequests($u)) return true;
       $pdo = Database::pdo();
@@ -53,10 +53,10 @@ class LegalController {
     $u = AuthController::requireAuth();
     $pdo = Database::pdo();
     $service = new DocumentUploadService($pdo);
-    
+
     $reqId = isset($_POST['legal_request_id']) ? (int)$_POST['legal_request_id'] : 0;
     $file = $_FILES['file'] ?? [];
-    
+
     try {
         $result = $service->upload($u, $file, $reqId);
         return Response::json($result);
@@ -70,21 +70,21 @@ class LegalController {
     $pdo = Database::pdo();
     $uid = (int)$u['id'];
     $role = strtolower($u['role'] ?? '');
-    
-    $sql = "SELECT l.*,
+
+    $sql = "SELECT l.*, u.name AS applicant_name,
                    (SELECT active_eo.edition_id FROM edition_orders active_eo JOIN editions active_e ON active_e.id=active_eo.edition_id WHERE active_eo.legal_request_id=l.id AND active_e.deleted_at IS NULL ORDER BY active_e.id LIMIT 1) AS active_edition_id,
-                   e.id AS edition_id, 
-                   e.code AS edition_code, 
-                   e.file_id AS edition_file_id, 
+                   e.id AS edition_id,
+                   e.code AS edition_code, e.cve AS edition_cve,
+                   e.file_id AS edition_file_id,
                    e.status AS edition_status,
                    e.published_file_checksum,
-                   eo.publication_file_id 
-            FROM legal_requests l 
-            LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') 
-            LEFT JOIN editions e ON e.id=eo.edition_id 
+                   eo.publication_file_id
+            FROM legal_requests l LEFT JOIN users u ON u.id=l.user_id
+            LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada')
+            LEFT JOIN editions e ON e.id=eo.edition_id
             WHERE l.deleted_at IS NULL";
     $params = [];
-    
+
     if ($uid && !RolePolicy::canManageLegalRequests($u)) {
         $sql .= " AND l.user_id = ?";
         $params[] = $uid;
@@ -123,19 +123,19 @@ class LegalController {
         $sql .= " AND l.pub_type = ?";
         $params[] = $pubType;
     }
-    
+
     $editionCode = $_GET['edition_code'] ?? '';
     if ($editionCode !== '') {
         $sql .= " AND e.code LIKE ?";
         $params[] = "%$editionCode%";
     }
-    
+
     $userIdFilter = $_GET['user_id'] ?? '';
     if ($userIdFilter !== '' && RolePolicy::canManageLegalRequests($u)) {
         $sql .= " AND l.user_id = ?";
         $params[] = $userIdFilter;
     }
-    
+
     $reqFrom = $_GET['req_from'] ?? '';
     if ($reqFrom !== '') {
         $sql .= " AND l.created_at >= ?";
@@ -146,7 +146,7 @@ class LegalController {
         $sql .= " AND l.created_at < ?";
         $params[] = EditorialClock::nextDay($reqTo);
     }
-    
+
     $pubFrom = $_GET['pub_from'] ?? '';
     if ($pubFrom !== '') {
         $sql .= " AND l.publish_date >= ?";
@@ -157,7 +157,7 @@ class LegalController {
         $sql .= " AND l.publish_date < ?";
         $params[] = EditorialClock::nextDay($pubTo);
     }
-    
+
     $limit = max(1, min(500, (int)($_GET['limit'] ?? 500)));
     $sql .= " ORDER BY l.id DESC LIMIT " . $limit;
     $stmt = $pdo->prepare($sql);
@@ -169,12 +169,12 @@ class LegalController {
             ? '/api/editions/' . $item['edition_id'] . '/orders/' . $item['id'] . '/pdf'
             : null;
         $item['edition_has_file'] = $editionIntegrity->publishedFileIsValid([
-            'file_id' => $item['edition_file_id'], 
-            'status' => $item['edition_status'], 
+            'file_id' => $item['edition_file_id'],
+            'status' => $item['edition_status'],
             'published_file_checksum' => $item['published_file_checksum']
         ]);
         $item['edition_file_url'] = $item['edition_has_file'] && !empty($item['edition_code'])
-            ? '/api/e/code/' . urlencode($item['edition_code']) . '/download'
+            ? '/api/e/code/' . urlencode($item['edition_cve'] ?? $item['edition_code']) . '/download'
             : null;
     }
     Response::json(["items"=>$items]);
@@ -185,31 +185,41 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $pdo = Database::pdo();
-    $s = $pdo->prepare("SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.file_id AS edition_file_id, e.status AS edition_status, e.published_file_checksum, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL"); $s->execute([$id]);
+    $s = $pdo->prepare("SELECT l.*, e.id AS edition_id, e.code AS edition_code, e.cve AS edition_cve, e.file_id AS edition_file_id, e.status AS edition_status, e.published_file_checksum, eo.publication_file_id FROM legal_requests l LEFT JOIN edition_orders eo ON eo.legal_request_id=l.id AND EXISTS (SELECT 1 FROM editions active_e WHERE active_e.id=eo.edition_id AND active_e.deleted_at IS NULL AND active_e.status='Publicada') LEFT JOIN editions e ON e.id=eo.edition_id WHERE l.id=? AND l.deleted_at IS NULL"); $s->execute([$id]);
     $r = $s->fetch(PDO::FETCH_ASSOC);
     if (!$r) return Response::json(['error'=>'not_found'],404);
-    
+
     $r['edition_has_file'] = (new EditionIntegrityService($pdo))->publishedFileIsValid([
         'file_id' => $r['edition_file_id'],
         'status' => $r['edition_status'],
         'published_file_checksum' => $r['published_file_checksum']
     ]);
     if ($r['edition_has_file'] && !empty($r['edition_code'])) {
-        $r['edition_file_url'] = '/api/e/code/' . urlencode((string)$r['edition_code']) . '/download';
+        $r['edition_file_url'] = '/api/e/code/' . urlencode((string)($r['edition_cve'] ?? $r['edition_code'])) . '/download';
     } else {
         $r['edition_file_url'] = null;
     }
     $r['publication_file_url'] = !empty($r['publication_file_id']) && !empty($r['edition_id'])
         ? '/api/editions/' . $r['edition_id'] . '/orders/' . $r['id'] . '/pdf'
         : null;
-    
+
     $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY date DESC'); $p->execute([$id]);
     $pay = $p->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $f = $pdo->prepare('SELECT lf.id, lf.kind, lf.file_id, f.name FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?'); $f->execute([$id]);
     $files = $f->fetchAll(PDO::FETCH_ASSOC);
-    
+
     Response::json(['item'=>$r,'payments'=>$pay,'files'=>$files]);
+  }
+
+  private function validateEditorialDates(array $in): void {
+    $year=(int)substr(EditorialClock::today(),0,4);
+    foreach (array_merge($in, is_array($in['meta'] ?? null) ? $in['meta'] : []) as $key=>$value) {
+      if (!is_scalar($value)) continue;
+      if ((preg_match('/(?:year|anio|ano|año)/ui',(string)$key) && is_numeric($value) && (int)$value>$year) ||
+          (preg_match('/(?:date|fecha)/i',(string)$key) && preg_match('/^(\d{4})-\d{2}-\d{2}$/',(string)$value,$m) && (int)$m[1]>$year))
+        Response::json(['error'=>'La fecha no puede pertenecer a un año posterior al actual.'],422);
+    }
   }
 
   public function create(){
@@ -217,20 +227,21 @@ class LegalController {
       $u = AuthController::requireAuth();
       $pdo = Database::pdo();
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
+      $this->validateEditorialDates($in);
       $status = 'Borrador';
       $uid = (int)$u['id'];
       $now = gmdate('c');
-      
+
       $stmt = $pdo->prepare('INSERT INTO legal_requests(status,name,document,date,folios,comment,user_id,pub_type,created_at) VALUES(?,?,?,?,?,?,?,?,?)');
       $stmt->execute([
          $status,
-         $in['name']??'', 
-         $in['document']??'', 
-         $in['date']??gmdate('Y-m-d'), 
-         (int)($in['folios']??1), 
-         $in['comment']??null, 
-         $uid, 
-         $in['pub_type']??'Documento', 
+         $in['name']??'',
+         $in['document']??'',
+         $in['date']??gmdate('Y-m-d'),
+         (int)($in['folios']??1),
+         $in['comment']??null,
+         $uid,
+         $in['pub_type']??'Documento',
          $now
       ]);
       Response::json(['ok'=>true,'id'=>$pdo->lastInsertId()]);
@@ -243,19 +254,24 @@ class LegalController {
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $this->ensureMutable($id);
-    
+
     $pdo = Database::pdo();
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
-    
+
+    $this->validateEditorialDates($in);
     $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
     $currStatus = $s->fetchColumn();
     $isAdmin = RolePolicy::canManageLegalRequests($u);
     if (!$isAdmin && $currStatus !== 'Borrador') {
         return Response::json(['error'=>'No se puede editar una solicitud formalizada. Debe estar en Borrador.'], 403);
     }
-    
+
     if (isset($in['meta']) && is_array($in['meta'])) {
         $m = $in['meta'];
+        $currentYear=(int)substr(EditorialClock::today(),0,4);
+        foreach ($m as $key=>$value) {
+          if (preg_match('/(?:year|anio|ano|año)/ui',(string)$key) && is_numeric($value) && (int)$value > $currentYear) return Response::json(['error'=>'El año del documento no puede ser posterior al actual.'],422);
+        }
         if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
         if (isset($m['fecha'])) { $m['fecha_registro'] = $m['fecha']; unset($m['fecha']); }
         if (isset($m['razon_denominacion_social'])) { $m['razon_social'] = $m['razon_denominacion_social']; unset($m['razon_denominacion_social']); }
@@ -276,7 +292,7 @@ class LegalController {
         }
         if (!empty($m['anio'])) {
             $year = (string)$m['anio'];
-            if (!preg_match('/^\d{4}$/', $year) || (int)$year > (int)gmdate('Y')) {
+            if (!preg_match('/^\d{4}$/', $year) || (int)$year > (int)substr(EditorialClock::today(),0,4)) {
                 return Response::json(['error'=>'El año registral debe ser válido y no puede ser superior al año actual'], 400);
             }
         }
@@ -296,7 +312,15 @@ class LegalController {
         }
         $in['meta'] = $m;
     }
-    
+
+    // A convocatoria has a final fixed price; capture it before payment/submit.
+    $pricingStmt=$pdo->prepare('SELECT pub_type,total_bs FROM legal_requests WHERE id=?'); $pricingStmt->execute([$id]);
+    $pricingRequest=$pricingStmt->fetch(PDO::FETCH_ASSOC);
+    if (($pricingRequest['pub_type'] ?? '') === 'Convocatoria' && $currStatus === 'Borrador' && (float)($pricingRequest['total_bs'] ?? 0)<=0) {
+      $priceStmt=$pdo->prepare("SELECT value FROM settings WHERE `key`='convocatoria_usd'"); $priceStmt->execute();
+      $pricing=(new PublicationService($pdo,new BcvService($pdo)))->calculatePricing(1,(float)$priceStmt->fetchColumn());
+      $pdo->prepare('UPDATE legal_requests SET precio_unitario_usd=?,subtotal_usd=?,porcentaje_iva=?,iva_usd=?,tasa_bcv=?,fecha_tasa=?,total_bs=? WHERE id=?')->execute([$pricing['price_per_folio_usd'],$pricing['subtotal_usd'],$pricing['iva_percent'],$pricing['iva_usd'],$pricing['bcv_rate'],EditorialClock::now()->format('Y-m-d H:i:s'),$pricing['total_bs'],$id]);
+    }
     $fields = ['name','document','date','phone','email','address','folios','comment','pub_type','meta'];
     $set=[]; $vals=[];
     foreach ($fields as $f) {
@@ -318,7 +342,7 @@ class LegalController {
      $this->checkAccess($id, $u);
      $this->ensureMutable($id);
      $pdo = Database::pdo();
-     
+
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $orderNo = $machine->submit($id);
@@ -333,7 +357,7 @@ class LegalController {
      $this->requireAdmin($u);
      $this->ensureMutable($id);
      $pdo = Database::pdo();
-     
+
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $machine->verify($id);
@@ -348,7 +372,7 @@ class LegalController {
        $this->requireAdmin($u);
        $this->ensureMutable($id);
        $pdo = Database::pdo();
-       
+
        $machine = new LegalRequestStateMachine($pdo);
        try {
            $machine->returnToDraft($id);
@@ -362,7 +386,7 @@ class LegalController {
        $u = AuthController::requireAuth();
        $this->requireAdmin($u);
        $pdo = Database::pdo();
-       
+
        $machine = new LegalRequestStateMachine($pdo);
        try {
            $machine->unpublish($id);
@@ -378,7 +402,7 @@ class LegalController {
      $this->ensureMutable($id);
      $pdo = Database::pdo();
      $in = json_decode(file_get_contents('php://input'), true) ?: [];
-     
+
      $machine = new LegalRequestStateMachine($pdo);
      try {
          $machine->reject($id, $in['reason']??'');
@@ -393,7 +417,7 @@ class LegalController {
      $pdo = Database::pdo();
      $uid = (int)$u['id'];
      $role = strtolower($u['role'] ?? '');
-     
+
      if (RolePolicy::canManageLegalRequests($u)) {
          $stmt = $pdo->query("SELECT * FROM legal_requests WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC");
      } else {
@@ -401,11 +425,8 @@ class LegalController {
          $stmt->execute([$uid]);
      }
      $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-     $refs = $pdo->prepare('SELECT 1 FROM edition_orders WHERE legal_request_id=? LIMIT 1');
      foreach ($items as &$item) {
-       $refs->execute([$item['id']]);
-       $item['can_permanently_delete'] = $role === 'superadmin' && !$refs->fetchColumn()
-         && !(new EditorialArchiveService($pdo))->references('request', (int)$item['id']);
+       $item['can_permanently_delete'] = $role === 'superadmin';
      }
      Response::json(['items'=>$items]);
   }
@@ -482,11 +503,11 @@ class LegalController {
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
       $this->ensureMutable($id);
-      
+
       $in = json_decode(file_get_contents('php://input'),true);
       $idemKey = $_SERVER['HTTP_IDEMPOTENCY_KEY'] ?? null;
       $pdo = Database::pdo();
-      
+
       if ($idemKey) {
           $hash = hash('sha256', json_encode($in));
           $cached = IdempotencyService::check($pdo, $u['id'], $idemKey, '/api/legal/'.$id.'/payments', $hash);
@@ -561,7 +582,7 @@ class LegalController {
           if ($paymentAmount > $remaining + 0.005) {
               throw new Exception('payment_exceeds_remaining', 422);
           }
-          
+
           $stmt = $pdo->prepare("
             INSERT INTO legal_payments (legal_request_id, ref, date, bank, type, amount_bs, status, mobile_phone, comment, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'Por verificar', ?, ?, ?)
@@ -571,13 +592,13 @@ class LegalController {
               trim((string)($in['comment'] ?? '')) ?: null,
               gmdate('Y-m-d H:i:s')
           ]);
-          
+
           $paymentId = $pdo->lastInsertId();
 
           // Audit
           $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
               ->execute([$u['id'], 'add_payment', 'legal_request', $id]);
-          
+
           if ($ownsTransaction) {
               $pdo->commit();
           }
@@ -659,25 +680,25 @@ class LegalController {
       $payment['status'] = 'Rechazado';
       Response::json(['ok'=>true, 'payment'=>$payment]);
   }
-  
+
   public function deletePayment($id,$pid){
       $u = AuthController::requireAuth();
       $this->checkAccess($id, $u);
       $this->ensureMutable($id);
-      
+
       $pdo = Database::pdo();
       $s = $pdo->prepare('SELECT status FROM legal_requests WHERE id=?'); $s->execute([$id]);
       $reqStatus = $s->fetchColumn();
-      
+
       if (!in_array($reqStatus, ['Borrador', 'Por verificar'])) {
           return Response::json(['error'=>'No se pueden eliminar pagos de una solicitud que ya está en trámite'], 403);
       }
-      
+
       $pdo->prepare('DELETE FROM legal_payments WHERE id=? AND legal_request_id=?')->execute([$pid, $id]);
-      
+
       $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
           ->execute([$u['id'], 'delete_payment', 'legal_request', $id]);
-          
+
       Response::json(['ok'=>true]);
   }
 
@@ -698,7 +719,7 @@ class LegalController {
           $r['edition_code'] = $edition['code'];
           $r['edition_id'] = $edition['id'];
       }
-      
+
       $role = strtolower($u['role'] ?? '');
       if (!RolePolicy::canManageLegalRequests($u)) {
           if ((int)$r['user_id'] !== (int)$u['id']) {
@@ -706,16 +727,16 @@ class LegalController {
               die('No tienes acceso a esta orden');
           }
       }
-      
+
       $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=?'); $p->execute([$id]);
       $pay = $p->fetchAll(PDO::FETCH_ASSOC);
-      
+
       $bcvService = new BcvService($pdo);
       $publicationService = new PublicationService($pdo, $bcvService);
       $pdfGenerationService = new PdfGenerationService($pdo, $bcvService, $publicationService);
-      
+
       $output = $pdfGenerationService->generateOrderPdf($r, $pay);
-      
+
       header('Content-Type: application/pdf');
       header('Content-Disposition: inline; filename="orden_'.$r['order_no'].'.pdf"');
       header('Content-Length: ' . strlen($output));
@@ -724,7 +745,7 @@ class LegalController {
       header('Expires: 0');
       echo $output;
   }
-  
+
   public function getPublic($order = null){
     $order = trim((string)($order ?? ($_GET['order'] ?? '')));
     if ($order === '') return Response::json(['error'=>'order_required'], 400);
@@ -742,14 +763,14 @@ class LegalController {
     $stmt->execute([$id]);
     Response::json(["items"=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
   }
-  
+
   public function attachFile($id){
     $u = AuthController::requireAuth();
     $this->checkAccess($id, $u);
     $this->ensureMutable($id);
     $in = json_decode(file_get_contents('php://input'),true);
     $pdo = Database::pdo();
-    
+
     $kind = (string)($in['kind'] ?? '');
     if ($kind === 'document_pdf') {
         return Response::json(['error'=>'Usa el flujo de upload_pdf para el documento principal.'], 400);
@@ -772,9 +793,9 @@ class LegalController {
     if ($s->fetchColumn() > 0) {
         return Response::json(['error'=>'El archivo ya está adjunto a otra solicitud'], 400);
     }
-    
+
     $pdo->prepare("DELETE FROM legal_files WHERE legal_request_id=? AND kind=?")->execute([$id, $kind]);
-    
+
     $pdo->prepare("INSERT INTO legal_files(legal_request_id,file_id,kind,created_at) VALUES(?,?,?,?)")
         ->execute([$id, $fileId, $kind, gmdate('Y-m-d H:i:s')]);
     Response::json(['ok'=>true]);
@@ -796,7 +817,7 @@ class LegalController {
       }
 
       $pdo = Database::pdo();
-      
+
       // 1. Verify file exists in DB
       $s = $pdo->prepare('SELECT f.id, f.path, f.checksum FROM files f JOIN legal_files lf ON lf.file_id=f.id WHERE lf.legal_request_id=? AND f.id=?');
       $s->execute([$id, $fid]);
@@ -835,7 +856,7 @@ class LegalController {
 
       require_once __DIR__.'/Http/StoragePath.php';
       $dest = StoragePath::getFilePath($fileRow['path']);
-      
+
       $dir = dirname($dest);
       if (!is_dir($dir)) {
           mkdir($dir, 0755, true);

@@ -1,3 +1,4 @@
+import { editorialYearEnd } from '../lib/editorialDate'
 import { useEffect, useState } from 'react'
 import type React from 'react'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegal, updateLegal, uploadFiles, type LegalRequest } from '../lib/api'
@@ -74,10 +75,11 @@ export default function PublicarConvocatoria() {
   const priceUsd = Number(settings.convocatoria_usd || 0)
   // ...
   const unitBs = rate ? +(priceUsd * rate).toFixed(2) : undefined
-  const subTotal = unitBs && folios ? +(unitBs * folios).toFixed(2) : undefined
+  const finalAmount = unitBs && folios ? +(unitBs * folios).toFixed(2) : undefined
   const ivaPct = Number(settings.iva_percent || 16)
-  const ivaAmt = subTotal !== undefined ? +(subTotal * (ivaPct / 100)).toFixed(2) : undefined
-  const total = subTotal !== undefined && ivaAmt !== undefined ? +(subTotal + ivaAmt).toFixed(2) : undefined
+  const total = finalAmount
+  const subTotal = total !== undefined ? +(total / (1 + ivaPct / 100)).toFixed(2) : undefined
+  const ivaAmt = total !== undefined && subTotal !== undefined ? +(total - subTotal).toFixed(2) : undefined
 
   const nextToStep2 = async () => {
     setBusy(true)
@@ -266,7 +268,7 @@ export default function PublicarConvocatoria() {
               <div><span className="font-semibold">Teléfono:</span> <input className="input inline-block w-full md:w-auto" value={pay.telefono} onChange={e => setPay({ ...pay, telefono: e.target.value })} /></div>
               <div><span className="font-semibold">Correo electrónico:</span> <input className="input inline-block w-full md:w-auto" type="email" value={pay.email} onChange={e => setPay({ ...pay, email: e.target.value })} /></div>
               <div><span className="font-semibold">Dirección:</span> <input className="input inline-block w-full" value={pay.direccion} onChange={e => setPay({ ...pay, direccion: e.target.value })} /></div>
-              <div><span className="font-semibold">Fecha de la solicitud:</span> <input className="input inline-block w-full md:w-auto" type="date" value={pay.fecha_solicitud} onChange={e => setPay({ ...pay, fecha_solicitud: e.target.value })} /></div>
+              <div><span className="font-semibold">Fecha de la solicitud:</span> <input className="input inline-block w-full md:w-auto" type="date" max={editorialYearEnd()} value={pay.fecha_solicitud} onChange={e => setPay({ ...pay, fecha_solicitud: e.target.value })} /></div>
             </div>
 
             <div className="border rounded overflow-hidden">

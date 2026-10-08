@@ -22,6 +22,7 @@ final class SettingSchema
         'instructions_documents_image_url' => ['type' => 'string'],
         'instructions_convocatorias_text' => ['type' => 'string'],
         'default_user_role' => ['type' => 'string'],
+        'registration_enabled' => ['type' => 'boolean'],
         'raptor_mini_preview_enabled' => ['type' => 'boolean'],
     ];
 
@@ -49,6 +50,7 @@ final class SettingSchema
     public static function publicKeys(): array
     {
         return [
+            'registration_enabled',
             'bcv_rate',
             'price_per_folio_usd',
             'convocatoria_usd',

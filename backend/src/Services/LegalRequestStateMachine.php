@@ -125,6 +125,8 @@ final class LegalRequestStateMachine {
     }
 
     public function reject(int $id, string $reason): void {
+        $reason = trim($reason);
+        if ($reason === '') throw new InvalidArgumentException('Indique el motivo del rechazo.',422);
         $this->executeTransition($id, 'reject', function($req) use ($id, $reason) {
             if ($req['status'] !== 'Por verificar' && $req['status'] !== 'En trámite') {
                 throw new Exception("Solo se pueden rechazar solicitudes 'Por verificar' o 'En trámite'.", 409);

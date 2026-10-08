@@ -1,3 +1,4 @@
+import { editorialYearEnd } from '../lib/editorialDate'
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { editorialToday } from '../lib/editorialDate'
@@ -167,9 +168,7 @@ export default function Ediciones() {
     }
   }
 
-  const pdfUrl = detail?.edition.status === 'Publicada' && detail.edition.code
-    ? `/api/e/code/${encodeURIComponent(detail.edition.code)}/download`
-    : (selId ? `/api/editions/${selId}/download` : '')
+  const pdfUrl = detail?.edition.file_url || (selId ? `/api/editions/${selId}/download` : '')
   useEffect(() => {
     if (detail && pdfSectionRef.current) {
       const el = pdfSectionRef.current
@@ -200,7 +199,7 @@ export default function Ediciones() {
           <div className="grid md:grid-cols-3 gap-6">
             <label className="block">
               <span className="block text-sm font-semibold mb-1.5 text-slate-700">Fecha de la Edición</span>
-              <input className="input w-full bg-slate-50" type="date" value={form.date} onChange={e => {
+              <input className="input w-full bg-slate-50" type="date" max={editorialYearEnd()} value={form.date} onChange={e => {
                 // Multiple editions may share the latest publication date.
                 const lastPublished = rows.filter(r => r.status === 'Publicada').map(r => r.date).sort().reverse()[0]
                 if (lastPublished && e.target.value < lastPublished) {
@@ -236,7 +235,7 @@ export default function Ediciones() {
           {qrGenerated && (
             <div className="p-4 bg-brand-50 border border-brand-200 rounded-lg mb-6 animate-in fade-in slide-in-from-top-2">
               <h3 className="text-brand-800 font-semibold">Preparar nueva edición</h3>
-              <p className="text-sm text-brand-700 mt-1">Selecciona las publicaciones que compondrán el borrador. El CVE definitivo y su código QR se generan exclusivamente en el backend al crear la edición, usando el correlativo anual atómico.</p>
+              <p className="text-sm text-brand-700 mt-1">Selecciona las publicaciones que compondrán el borrador. El número y el código de verificación se asignan al crear la edición.</p>
               <button type="button" className="text-xs text-slate-500 hover:text-slate-700 underline mt-3" onClick={() => { setQrGenerated(false); setGeneratedCode(''); }}>
                 Cancelar
               </button>
@@ -268,10 +267,10 @@ export default function Ediciones() {
                           }} />
                           <div className="flex-1 text-sm">
                             <div className="flex items-center gap-2">
-                              <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
+                              <span className="font-bold text-brand-800">{o.order_no || `Orden #${String(o.id).padStart(8, '0')}`}</span>
                               <span className="text-xs text-slate-400">{o.date}</span>
                             </div>
-                           <div className="text-slate-700 font-medium mt-0.5">
+                           <div className="text-xs text-slate-500">Solicitante: {o.applicant_name || 'Sin nombre'}</div><div className="text-slate-700 font-medium mt-0.5">
                               {(() => {
                                 const m = typeof o.meta === 'string' ? (() => { try { return JSON.parse(o.meta) } catch { return {} } })() : (o.meta || {})
                                 return m.razon_denominacion_social || m.razon_social || o.name || 'Sin nombre asociado'
@@ -396,11 +395,11 @@ export default function Ediciones() {
                             <div className="grid sm:grid-cols-2 gap-4">
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Código de Verificación Electrónica (CVE)</span>
-                                <input className="input w-full font-mono bg-slate-50 text-slate-600" value={detail.edition.code} disabled title="El CVE es generado automáticamente y no puede modificarse" />
+                                <input className="input w-full font-mono bg-slate-50 text-slate-600" value={detail.edition.cve || ''} disabled title="El CVE es generado automáticamente y no puede modificarse" />
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Fecha de la Edición</span>
-                                <input className="input w-full" type="date" value={detail.edition.date} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
+                                <input className="input w-full" type="date" max={editorialYearEnd()} value={detail.edition.date} disabled={detail.edition.status === 'Publicada'} onChange={e => setDetail({ ...detail, edition: { ...detail.edition, date: e.target.value } })} />
                               </label>
                               <label className="block">
                                 <span className="block text-sm font-medium mb-2">Estado</span>
@@ -552,8 +551,8 @@ export default function Ediciones() {
                                     {detail.orders.map(o => (
                                       <li key={o.id} className="p-3 text-sm flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-white transition-colors">
                                         <div className="min-w-0">
-                                          <div className="font-semibold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</div>
-                                          <div className="text-slate-600 mt-0.5">{(o as any).company_name || o.name}</div>
+                                          <div className="font-semibold text-brand-800">{o.order_no || `Orden #${String(o.id).padStart(8, '0')}`}</div>
+                                          <div className="text-xs text-slate-500">Solicitante: {o.applicant_name || 'Sin nombre'}</div><div className="text-slate-600 mt-0.5">{(o as any).company_name || o.name}</div>
                                           <div className="mt-1 flex items-center gap-2 text-xs">
                                             {o.publication_file_id ? (
                                               <span className="text-emerald-700 font-medium">PDF individual listo · {o.publication_source === 'uploaded' ? 'carga manual' : 'generado'}</span>
@@ -618,10 +617,10 @@ export default function Ediciones() {
                                           <div key={o.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg border border-slate-200 bg-white hover:border-brand-300 transition-all">
                                             <div className="flex-1 text-sm">
                                               <div className="flex items-center gap-2">
-                                                <span className="font-bold text-brand-800">Orden #{String(o.id).padStart(8, '0')}</span>
+                                                <span className="font-bold text-brand-800">{o.order_no || `Orden #${String(o.id).padStart(8, '0')}`}</span>
                                                 <span className="text-xs text-slate-400">{o.date}</span>
                                               </div>
-                                              <div className="text-slate-700 font-medium mt-0.5">{(o as any).company_name || meta.razon_social || meta.razon_denominacion_social || o.name || 'Sin nombre'}</div>
+                                              <div className="text-xs text-slate-500">Solicitante: {o.applicant_name || 'Sin nombre'}</div><div className="text-slate-700 font-medium mt-0.5">{(o as any).company_name || meta.razon_social || meta.razon_denominacion_social || o.name || 'Sin nombre'}</div>
                                             </div>
                                             <button className="btn btn-outline text-xs px-3 py-1.5 shrink-0 whitespace-nowrap" onClick={async () => {
                                               const newOrders = [...detail.orders.map(ord => ord.id), o.id];
@@ -650,14 +649,14 @@ export default function Ediciones() {
                                 Código QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
                               {expanded.qr && detail.edition.status === 'Publicada' && detail.edition.file_is_valid && (() => {
-                                const qrUrl = `${location.origin}/edicion/${detail.edition.code}`
+                                const qrUrl = `${location.origin}/edicion/${detail.edition.cve || detail.edition.code}`
                                 return (
                                   <>
                                     <p className="text-xs text-slate-600 mb-3">Escanea para ver la edición publicada</p>
                                     <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
                                       <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
                                     </div>
-                                    <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.code}</div>
+                                    <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.cve || detail.edition.code}</div>
                                     <a href={qrUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:text-brand-800 underline text-xs break-all block mt-2">{qrUrl}</a>
                                     <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
                                       const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null

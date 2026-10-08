@@ -22,8 +22,8 @@ class PdfGenerationService {
         $ivaPercent = isset($requestData['porcentaje_iva']) ? (string)$requestData['porcentaje_iva'] : '0.00';
         
         $folios = (string)($requestData['folios'] ?? '1');
-        $totalUsd = bcmul($folios, $pricePerFolio, 2);
-        $subtotalBs = bcmul($totalUsd, $bcv, 2);
+        $totalUsd = (string)($requestData['subtotal_usd'] ?? '0');
+        $subtotalBs = number_format(round((float)$totalUsd * (float)$bcv,2),2,'.','');
         
         $clientData = [
             'Cliente:' => $requestData['name'] ?? '---',
@@ -41,10 +41,10 @@ class PdfGenerationService {
 
         $pdf->InfoSection($clientData, $orderDetails);
         
-        $ivaMultiplier = bcdiv($ivaPercent, '100.00', 4);
-        $ivaBs = bcmul($subtotalBs, $ivaMultiplier, 2);
+        $ivaBs = bcmul((string)($requestData['iva_usd'] ?? '0'),$bcv,2);
         
-        $totalBs = bcadd($subtotalBs, $ivaBs, 2);
+        $totalBs = (string)($requestData['total_bs'] ?? bcadd($subtotalBs,$ivaBs,2));
+        $ivaBs = bcsub($totalBs,$subtotalBs,2);
         
         $pdf->Totals([
             ['Subtotal USD', '$ ' . number_format((float)$totalUsd, 2)],

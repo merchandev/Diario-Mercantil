@@ -42,6 +42,17 @@ class FinancialSnapshotTest extends TestCase {
         $service->calculatePricing(2);
     }
     
+    public function testThirteenFoliosAtThreeDollarsIncludeVat(): void {
+        $pdo=$this->createMock(PDO::class); $stmt=$this->createMock(PDOStatement::class);
+        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(3.0,16.0);
+        $pdo->method('prepare')->willReturn($stmt);
+        $bcv=$this->createMock(BcvService::class); $bcv->method('getRate')->willReturn(40.0);
+        $price=(new PublicationService($pdo,$bcv))->calculatePricing(13);
+        $this->assertSame(39.0,$price['price_usd']);
+        $this->assertSame(1560.0,$price['total_bs']);
+        $this->assertEqualsWithDelta($price['total_bs'],$price['subtotal_bs']+$price['iva_bs'],0.00001);
+        $this->assertEqualsWithDelta(39.0,$price['subtotal_usd']+$price['iva_usd'],0.00001);
+    }
     public function testPricingCalculation() {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);
@@ -60,8 +71,8 @@ class FinancialSnapshotTest extends TestCase {
         $this->assertEquals(16.0, $pricing['iva_percent']);
         
         $this->assertEquals(6.0, $pricing['price_usd']);
-        $this->assertEquals(240.0, $pricing['subtotal_bs']);
-        $this->assertEquals(38.4, $pricing['iva_bs']);
-        $this->assertEquals(278.4, $pricing['total_bs']);
+        $this->assertEquals(206.9, $pricing['subtotal_bs']);
+        $this->assertEquals(33.1, $pricing['iva_bs']);
+        $this->assertEquals(240.0, $pricing['total_bs']);
     }
 }

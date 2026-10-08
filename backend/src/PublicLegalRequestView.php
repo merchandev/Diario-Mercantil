@@ -27,7 +27,7 @@ final class PublicLegalRequestView
         $stmt->execute([$order]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$row || $row['date'] > EditorialClock::today() || !(new EditionIntegrityService($pdo))->publishedFileIsValid($row)) return null;
-        return ['edition_code' => $row['edition_code']];
+        if (!$row || !(new EditionIntegrityService($pdo))->publishedFileIsValid($row)) return null;
+        return ['edition_code' => $row['cve'] ?? $row['edition_code']];
     }
 }

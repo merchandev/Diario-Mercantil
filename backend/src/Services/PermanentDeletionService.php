@@ -40,15 +40,22 @@ final class PermanentDeletionService
             }
 
             if (empty($request['deleted_at'])) throw new RuntimeException('Envía la publicación a la papelera antes de eliminarla definitivamente.',409);
-            $refs=$this->pdo->prepare('SELECT COUNT(*) FROM edition_orders WHERE legal_request_id=?');
+            $refs=$this->pdo->prepare('SELECT COUNT(*) FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=? AND e.deleted_at IS NULL');
             $refs->execute([$requestId]);
-            if ((int)$refs->fetchColumn()>0 || (new EditorialArchiveService($this->pdo))->references('request', $requestId)) {
-                throw new RuntimeException('La publicación forma parte del historial de una edición. Se conserva en la papelera y puede restaurarse.',409);
+            if ((int)$refs->fetchColumn()>0) throw new RuntimeException('Retira primero las ediciones activas que contienen esta publicación.',409);
+            // Explicit permanent deletion removes the request from archived compositions.
+            $archivedRequestFiles=[];
+            $archives=$this->tableExists('edition_archives') ? $this->pdo->query('SELECT id,snapshot_json FROM edition_archives')->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($archives as $archive) {
+                $snapshot=json_decode($archive['snapshot_json'],true,512,JSON_THROW_ON_ERROR);
+                foreach ($snapshot['orders'] ?? [] as $order) if ((int)($order['legal_request_id'] ?? 0)===$requestId) $archivedRequestFiles[]=$order['publication_file_id'] ?? null;
+                $snapshot['orders']=array_values(array_filter($snapshot['orders'] ?? [],static fn($o)=>(int)($o['legal_request_id'] ?? 0)!==$requestId));
+                $this->pdo->prepare('UPDATE edition_archives SET snapshot_json=? WHERE id=?')->execute([json_encode($snapshot,JSON_THROW_ON_ERROR),$archive['id']]);
             }
             $deletedEditions=0;
             $requeuedRequests=0;
 
-            $fileIds = array_merge(
+            $fileIds = array_merge($archivedRequestFiles,
                 $this->columnValues(
                     'SELECT file_id FROM legal_files WHERE legal_request_id=?',
                     [$requestId]
@@ -129,15 +136,18 @@ final class PermanentDeletionService
             [$editionId]
         );
         if (!$edition) return null;
-        if (($edition['status'] ?? '') === 'Publicada' || !empty($edition['published_at']) || !empty($edition['published_file_checksum'])) {
-            throw new RuntimeException('Una edición publicada conserva su identidad. Utilice Retirar edición.', 409);
-        }
-
         if (empty($edition['deleted_at'])) throw new RuntimeException('Envía la edición a la papelera antes de eliminarla definitivamente.',409);
-        if ((new EditorialArchiveService($this->pdo))->references('edition', $editionId)) {
-            throw new RuntimeException('La edición conserva un historial editorial. Puede restaurarse desde la papelera.', 409);
+        $archiveFiles=[];
+        if ($this->tableExists('edition_archives')) {
+        $s=$this->pdo->prepare('SELECT file_id,snapshot_json FROM edition_archives WHERE edition_id=?'); $s->execute([$editionId]);
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $archive) {
+            $snapshot=json_decode($archive['snapshot_json'],true,512,JSON_THROW_ON_ERROR);
+            $archiveFiles[]=$archive['file_id'];
+            foreach ($snapshot['orders'] ?? [] as $order) $archiveFiles[]=$order['publication_file_id'] ?? null;
         }
-
+        $this->pdo->prepare('DELETE FROM edition_archives WHERE edition_id=?')->execute([$editionId]);
+        }
+        // Alias tombstones intentionally remain: old URLs must not resolve to a replacement.
         $requestIds = $this->columnValues(
             'SELECT legal_request_id FROM edition_orders WHERE edition_id=?',
             [$editionId]
@@ -146,6 +156,7 @@ final class PermanentDeletionService
             'SELECT publication_file_id FROM edition_orders WHERE edition_id=? AND publication_file_id IS NOT NULL',
             [$editionId]
         );
+        $fileIds=array_merge($fileIds,$archiveFiles);
         if (!empty($edition['file_id'])) $fileIds[] = (int) $edition['file_id'];
 
         $this->pdo->prepare('DELETE FROM edition_orders WHERE edition_id=?')->execute([$editionId]);

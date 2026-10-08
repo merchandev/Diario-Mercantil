@@ -87,13 +87,14 @@ export default function PublicacionDetalle() {
     if (!item) return
     const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
     if (reason === null) return
+    if (!reason.trim()) { await showAlert('Indique un motivo.', { title: 'Motivo requerido' }); return }
     try {
       await rejectLegal(item.id, reason)
       await showAlert('Solicitud rechazada', { title: 'Solicitud actualizada' })
       navigate('/dashboard/publicaciones')
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error rejecting:', err)
-      void showAlert('Error al rechazar', { title: 'Error' })
+      void showAlert(err?.message || 'Error al rechazar', { title: 'Error' })
     }
   }
 
@@ -284,7 +285,7 @@ export default function PublicacionDetalle() {
         </div>
         <div className="flex gap-2">
           {item.status === 'Publicada' && item.edition_code && (
-            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: `${window.location.origin}/edicion/${encodeURIComponent(item.edition_code!)}`, title: `Edición ${item.edition_code}` })}>
+            <button className="btn" onClick={() => setQrModal({ isOpen: true, url: `${window.location.origin}/edicion/${encodeURIComponent(item.edition_cve || item.edition_code!)}`, title: `Edición ${item.edition_code}` })}>
               <IconQrCode /> Código QR
             </button>
           )}

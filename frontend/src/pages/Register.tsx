@@ -3,10 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone, IconMap } from '../components/icons'
 import { ESTADOS_VENEZUELA, MUNICIPIOS_VENEZUELA } from '../lib/constants'
 import { useAuth } from '../hooks/useAuth'
+import { getSettings } from '../lib/api'
 import { PASSWORD_MIN_LENGTH, PASSWORD_MIN_MESSAGE } from '../utils/passwordPolicy'
 
 export default function Register() {
   const navigate = useNavigate()
+  const [docPrefix, setDocPrefix] = useState('V')
+  const [registration, setRegistration] = useState<'loading' | 'enabled' | 'suspended'>('loading')
+  useEffect(() => { getSettings().then(r => setRegistration(String(r.settings.registration_enabled) === '1' || r.settings.registration_enabled === true ? 'enabled' : 'suspended')).catch(() => setRegistration('suspended')) }, [])
   const { refreshUser } = useAuth()
   const [formData, setFormData] = useState({
     document: '',
@@ -41,6 +45,7 @@ export default function Register() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (registration !== 'enabled') return
     setError('')
     setLoading(true)
 
@@ -68,7 +73,7 @@ export default function Register() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          document: formData.document,
+          document: docPrefix + formData.document,
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
@@ -117,7 +122,8 @@ export default function Register() {
         </div>
 
         <div className="card p-6">
-          <form onSubmit={onSubmit} className="space-y-4">
+          {registration !== 'enabled' && <p role="status" className="p-4 bg-amber-50 text-amber-900 mb-4 rounded">{registration === 'loading' ? 'Consultando disponibilidad de registro...' : 'El registro de nuevos usuarios está suspendido temporalmente.'}</p>}
+          <form onSubmit={onSubmit} className="space-y-4"><fieldset disabled={registration !== 'enabled' || loading} className="space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -161,6 +167,7 @@ export default function Register() {
                 <label htmlFor="document" className="block text-sm font-medium text-slate-700 mb-2">
                   {formData.person_type === 'natural' ? 'Cédula / Pasaporte' : 'RIF'} *
                 </label>
+                <select aria-label="Prefijo del documento" className="input mb-2" value={docPrefix} onChange={e => setDocPrefix(e.target.value)}>{['V','E','J','G','P'].map(p => <option key={p}>{p}</option>)}</select>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                     <IconIdCard />
@@ -169,9 +176,10 @@ export default function Register() {
                     type="text"
                     id="document"
                     name="document"
+                    inputMode="numeric" pattern="[0-9]{1,12}" maxLength={12}
                     value={formData.document}
-                    onChange={handleChange}
-                    placeholder={formData.person_type === 'natural' ? 'V12345678' : 'J123456789'}
+                    onChange={e => setFormData({ ...formData, document: e.target.value.replace(/\D/g, '') })}
+                    placeholder="Número de documento"
                     className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                     required
                   />
@@ -371,7 +379,7 @@ export default function Register() {
                 Iniciar sesión
               </Link>
             </p>
-          </form>
+          </fieldset></form>
         </div>
 
         <p className="text-center text-xs text-slate-500 mt-4">

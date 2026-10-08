@@ -7,7 +7,7 @@ export default function Configuracion() {
   const { showAlert, confirmAction, requestText } = useDialog()
   const [s, setS] = useState<Partial<Settings>>({})
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
+  const [tab, setTab] = useState<'Registro' | 'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
   const [areas, setAreas] = useState<{ id: number; name: string }[]>([])
   const [colleges, setColleges] = useState<{ id: number; name: string }[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState(0)
@@ -24,10 +24,10 @@ export default function Configuracion() {
   const onSave = async () => {
     setSaving(true)
     try {
-      await saveSettings(s)
+      await saveSettings(tab === 'Registro' ? { registration_enabled: s.registration_enabled === true || String(s.registration_enabled) === '1' } : s)
       const persisted = await getAdminSettings()
       setS(persisted.settings)
-      await showAlert(`Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
+      await showAlert(tab === 'Registro' ? 'Disponibilidad de registro actualizada.' : `Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
     } catch (error: any) {
       void showAlert(error?.message || 'No se pudo guardar la configuración.', { title: 'Error' })
     } finally {
@@ -39,17 +39,18 @@ export default function Configuracion() {
       <h1 className="text-xl font-semibold">Configuración</h1>
       <div className="card p-4">
         <div className="tabs flex gap-2 border-b mb-4">
-          {(['General', 'Medios de pago', 'Directorio Legal', 'Preguntas y Respuestas', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
+          {(['Registro', 'General', 'Medios de pago', 'Directorio Legal', 'Preguntas y Respuestas', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={["px-3 py-2 rounded-t-lg bg-white text-slate-700 border-b-2", tab === t ? 'border-brand-800' : 'border-transparent hover:border-brand-800/30'].join(' ')}>{t}</button>
           ))}
         </div>
+        {tab === 'Registro' && <div className="space-y-4"><h2 className="font-semibold">Registro de nuevos usuarios</h2><p>Al suspender el registro, las cuentas existentes podrán seguir entrando.</p><label className="flex gap-2 items-center"><input type="checkbox" checked={s.registration_enabled === true || String(s.registration_enabled) === '1'} onChange={e => setS({ ...s, registration_enabled: e.target.checked })} />Permitir nuevas cuentas</label></div>}
         {tab === 'General' && (
           <div className="space-y-6">
             <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">
               <h3 className="font-bold text-brand-900 mb-3">💰 Precios y Tasas</h3>
               <div className="grid md:grid-cols-2 gap-4">
                 <label className="text-sm">
-                  <span className="font-semibold text-slate-700 block mb-1">Precio por Folio (USD) *</span>
+                  <span className="font-semibold text-slate-700 block mb-1">Precio final por Folio (USD, IVA incluido) *</span>
                   <input
                     className="input w-full"
                     type="number"
@@ -58,7 +59,7 @@ export default function Configuracion() {
                     onChange={e => setS({ ...s, price_per_folio_usd: parseFloat(e.target.value) || 1.5 })}
                     placeholder="1.50"
                   />
-                  <span className="text-xs text-slate-500 mt-1 block">Precio base por cada folio (página) del documento</span>
+                  <span className="text-xs text-slate-500 mt-1 block">Precio final por cada folio (página), con IVA incluido</span>
                 </label>
                 <label className="text-sm">
                   <span className="font-semibold text-slate-700 block mb-1">Tasa Referencial BCV (Bs/USD)</span>

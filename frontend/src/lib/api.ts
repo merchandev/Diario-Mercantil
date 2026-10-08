@@ -63,7 +63,7 @@ export const api = {
   delete: (url: string) => fetchAuth(getUrl(url), { method: 'DELETE' }).then(r => r.json()),
 }
 
-export async function login(body: { document: string; password: string }) {
+export async function login(body: { document: string; password: string; administrative?: boolean }) {
   const res = await fetch(getUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -225,6 +225,7 @@ export async function getPublicationPublic(slug: string) {
 
 // Editions
 export type Edition = {
+  cve?: string;
   can_permanently_delete?: boolean;
   id: number;
   code: string;
@@ -386,6 +387,7 @@ export async function listPaymentMethods() {
 
 // Legal requests
 export type LegalRequest = {
+  subtotal_usd?: number; iva_usd?: number; tasa_bcv?: number; porcentaje_iva?: number; reject_reason?: string;
   can_permanently_delete?: boolean;
   active_edition_id?: number | null;
   id: number;
@@ -410,6 +412,8 @@ export type LegalRequest = {
   meta?: any;
   files?: LegalFile[];
   edition_code?: string;
+  edition_cve?: string;
+  applicant_name?: string;
   edition_no?: number;
   edition_id?: number | null;
   edition_file_id?: number | null;
@@ -627,6 +631,7 @@ export async function changeUserRole(id: number, role: string) {
 
 // Settings
 export type Settings = {
+  registration_enabled?: boolean | number | string;
   bcv_rate: number;
   price_per_folio_usd: number;
   convocatoria_usd: number;

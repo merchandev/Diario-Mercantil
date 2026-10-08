@@ -100,7 +100,7 @@ export default function PublicarDocumentoPDF() {
               <div>N.º de folios: <span className="font-medium">{folios}</span></div>
               <div>Precio unitario (Bs.): <span className="font-medium">{pricing?.unit_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               <div>Subtotal (Bs.): <span className="font-medium">{pricing?.subtotal_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-              <div className="hidden">IVA ({pricing?.iva_percent}%): <span className="font-medium">{pricing?.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              <div>IVA ({pricing?.iva_percent}%): <span className="font-medium">{pricing?.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               <div className="md:col-span-2">TOTAL (Bs.): <span className="font-semibold">{pricing?.total_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
             </div>
             <div className="mt-3">

@@ -1,3 +1,4 @@
+import { editorialYear } from '../lib/editorialDate'
 import { useState, useRef, useEffect } from 'react'
 import { IconCalendar, IconChevronLeft, IconChevronRight } from './icons'
 
@@ -15,7 +16,7 @@ export default function YearPicker({
     value,
     onChange,
     minYear = 2000,
-    maxYear = 2030,
+    maxYear = editorialYear(),
     placeholder = 'Seleccione año',
     className = '',
     disabled = false
@@ -44,7 +45,8 @@ export default function YearPicker({
     // But maybe we want to show them in descending order (newest first)? 
     // The user asked for "years available", usually for publication dates it's recent years.
     // Let's do descending order from max to min.
-    const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i)
+    const upperYear = Math.min(maxYear, editorialYear())
+    const years = Array.from({ length: Math.max(0, upperYear - minYear + 1) }, (_, i) => upperYear - i)
 
     const handleSelect = (year: number) => {
         onChange(year)

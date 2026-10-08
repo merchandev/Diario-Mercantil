@@ -1,3 +1,4 @@
+import { includedVat } from '../../lib/pricing'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -513,11 +514,11 @@ export default function Documento() {
       const bcvRate = bcv || Number(settings.bcv_rate || 36)
       const ivaPercent = Number(settings.iva_percent || 16)
 
-      const priceUsd = folios * pricePerFolio
-      const unitBs = pricePerFolio * bcvRate
-      const subtotalBs = folios * unitBs
-      const totalBs = subtotalBs * (1 + ivaPercent / 100)
-      const ivaBs = subtotalBs * (ivaPercent / 100)
+      const priceUsd = req.subtotal_usd != null && req.iva_usd != null ? Number(req.subtotal_usd) + Number(req.iva_usd) : folios * pricePerFolio
+      const storedRate = Number(req.tasa_bcv) || bcvRate
+      const totalBs = Number(req.total_bs) || Math.round(priceUsd * storedRate * 100) / 100
+      const subtotalBs = req.subtotal_usd != null ? Math.round(Number(req.subtotal_usd) * storedRate * 100) / 100 : includedVat(totalBs, ivaPercent).sub
+      const ivaBs = Math.round((totalBs - subtotalBs) * 100) / 100
 
       setPdfAnalysis({
         folios,
@@ -695,9 +696,7 @@ export default function Documento() {
   const totals = useMemo(() => {
     const folios = Number(req?.folios || meta.folios || 1)
     const unitBs = Number(settings.price_per_folio_usd || 0) * (bcv || Number(settings.bcv_rate || 0))
-    const sub = +(unitBs * folios).toFixed(2)
-    const iva = +(sub * ((Number(settings.iva_percent || 16)) / 100)).toFixed(2)
-    const total = +(sub + iva).toFixed(2)
+    const { sub, iva, total } = includedVat(unitBs * folios, Number(settings.iva_percent ?? 16))
     return { folios, unitBs, sub, iva, total }
   }, [req, meta, settings, bcv])
 
@@ -881,7 +880,7 @@ export default function Documento() {
             </div>
           </label>
           <div className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo **</span>
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo </span>
             <div className="flex gap-2">
               <input
                 className="input flex-1"
@@ -906,10 +905,10 @@ export default function Documento() {
                 </select>
               </div>
             </div>
-            <p className="text-[10px] text-brand-600 mt-1">** Debe permitir solo números. La nomenclatura máximo 3 dígitos</p>
+
           </div>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número **</span>
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número </span>
             <input className="input w-full" placeholder="000" maxLength={3} value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
           </label>
           <label className="block">
@@ -919,7 +918,7 @@ export default function Documento() {
               onChange={(y) => setMeta({ ...meta, anio: y })}
               className="w-full"
             />
-            <p className="text-[10px] text-brand-600 mt-1">Debe permitir la selección hasta el año en curso. Por ejemplo, actualmente hasta el 2026</p>
+
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente *</span>
@@ -928,7 +927,7 @@ export default function Documento() {
                    pattern="^\d{3}-\d{1,8}$" 
                    title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" 
                    value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: formatExpediente(e.target.value) })} />
-            <p className="text-[10px] text-brand-600 mt-1">Debe permitir solo números. La nomenclatura es 3 dígitos seguido de un guion y luego permitir hasta 8 dígitos</p>
+
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha *</span>
@@ -939,16 +938,16 @@ export default function Documento() {
               value={meta.fecha || ''} 
               onChange={e => setMeta({ ...meta, fecha: e.target.value })} 
             />
-            <p className="text-[10px] text-brand-600 mt-1">* No debe admitir fechas futuras al día de la solicitud</p>
+
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla **</span>
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla </span>
             <input className="input w-full" placeholder="391.2024.4.4388" 
                    maxLength={17} 
                    pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" 
                    title="Formato: 000.0000.0.000000" 
                    value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: formatPlanilla(e.target.value) })} />
-            <p className="text-[10px] text-brand-600 mt-1">** Debe admitir solo números. La nomenclatura es 3 dígitos seguido de un punto, 4 dígitos, punto, 1 dígito, punto y luego permitir hasta 6 dígitos</p>
+
           </label>
           <div className="md:col-span-2 flex gap-3 pt-4">
             <button type="submit" className="btn btn-primary flex-1" disabled={loading}>
@@ -1344,12 +1343,12 @@ export default function Documento() {
                     value={pay.ref} 
                     onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} 
                   />
-                  <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 4 dígitos numéricos</p>
+
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha del pago *</span>
                   <input className="input w-full" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
-                   <p className="text-[10px] text-brand-600 mt-1">* No debe admitir fechas futuras al día de la solicitud</p>
+
                 </label>
                 {pay.type === 'pago_movil' && (
                   <label className="block md:col-span-2">
@@ -1371,7 +1370,7 @@ export default function Documento() {
                         onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} 
                       />
                     </div>
-                    <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 7 dígitos numéricos</p>
+
                   </label>
                 )}
               </div>

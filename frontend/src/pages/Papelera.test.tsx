@@ -28,7 +28,7 @@ beforeEach(() => {
   mocks.role = 'admin'
   mocks.confirmAction.mockResolvedValue(true)
   mocks.listTrashedLegal.mockResolvedValue({ items: [{ id: 11, name: 'Solicitud conservada', status: 'En trámite', can_permanently_delete: true }] })
-  mocks.listRetiredEditions.mockResolvedValue({ items: [{ id: 22, code: 'MMXXVI-0022', status: 'Publicada', orders_count: 1, can_permanently_delete: false }] })
+  mocks.listRetiredEditions.mockResolvedValue({ items: [{ id: 22, code: 'MMXXVI-0022', status: 'Publicada', orders_count: 1, can_permanently_delete: true }] })
 })
 afterEach(cleanup)
 
@@ -72,6 +72,7 @@ describe('Papelera editorial', () => {
     await waitFor(() => expect(mocks.permanentDeleteLegal).toHaveBeenCalledWith(11))
     fireEvent.click(screen.getByRole('tab', { name: 'Ediciones (1)' }))
     await screen.findByText('MMXXVI-0022')
-    expect(screen.queryByRole('button', { name: 'Eliminar definitivamente' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }))
+    await waitFor(() => expect(mocks.permanentDeleteEdition).toHaveBeenCalledWith(22))
   })
 })

@@ -97,6 +97,11 @@ export default function Settings() {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <section className="bg-gray-800/50 border border-purple-500/30 rounded-2xl p-6 md:col-span-2">
+                        <h2 className="text-lg font-bold text-white mb-3">Registro de nuevos usuarios</h2>
+                        <label className="flex gap-2 text-gray-300"><input type="checkbox" checked={settings.registration_enabled === true || String(settings.registration_enabled) === '1'} onChange={e => setSettings({ ...settings, registration_enabled: e.target.checked })} />Permitir nuevas cuentas</label>
+                        <p className="text-sm text-gray-400 mt-2">Guarda los cambios para activar o suspender las nuevas altas. Las cuentas existentes siguen disponibles.</p>
+                    </section>
                     {/* Precios y Tasas */}
                     <div className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
                         <div className="flex items-center gap-3 mb-6">
@@ -129,7 +134,7 @@ export default function Settings() {
                                 <p className="text-xs text-gray-500 mt-1">Este valor se actualiza automáticamente. Use el botón para forzar actualización.</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">Precio por Folio (USD)</label>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Precio final por Folio (USD, IVA incluido)</label>
                                 <input
                                     type="number"
                                     step="0.01"

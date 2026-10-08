@@ -162,6 +162,8 @@ final class AuthController {
                 Response::json(["error"=>"invalid_credentials"], 401);
             }
 
+            $administrative = ($in['administrative'] ?? false) === true;
+            if (!$administrative && !preg_match('/^[VEJGP][0-9]{1,12}$/', strtoupper($doc))) Response::json(['error'=>'Documento inválido: seleccione prefijo e ingrese solo números'], 422);
             $this->checkRateLimit($doc);
             $u = $pdo->prepare("SELECT * FROM users WHERE (document=? OR email=?) AND status='active'");
             $u->execute([$doc, $doc]);
@@ -177,7 +179,7 @@ final class AuthController {
                 $user = $u->fetch(PDO::FETCH_ASSOC);
             }
 
-            if (!$user || !password_verify($pass, $user["password_hash"])) {
+            if (!$user || ($administrative && !in_array($user['role'], ['admin','superadmin'], true)) || !password_verify($pass, $user["password_hash"])) {
                 $this->recordFailedAttempt($doc);
                 Response::json(["error"=>"invalid_credentials"], 401);
             }
@@ -247,6 +249,8 @@ final class AuthController {
     public function register(): void {
         try {
             $pdo = Database::pdo();
+            $enabled=$pdo->query("SELECT value FROM settings WHERE `key`='registration_enabled'")->fetchColumn();
+            if ((string)$enabled !== '1') Response::json(['error'=>'registration_suspended','message'=>'El registro está temporalmente suspendido por mantenimiento.'],403);
             $in = $this->jsonInput();
             $document = trim($in["document"] ?? "");
             $name = trim($in["name"] ?? "");
@@ -266,7 +270,7 @@ final class AuthController {
             }
             if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) Response::json(["error"=>"Formato de correo electrónico inválido"], 400);
 
-            $document = strtoupper(preg_replace('/[^A-Z0-9-]/i', '', $document));
+            if (!preg_match('/^[VEJGP][0-9]{1,12}$/', $document)) Response::json(['error'=>'Seleccione un prefijo e ingrese solo números en la identificación.'],422);
 
             $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
             $check->execute([$document]);

@@ -47,7 +47,7 @@ final class PermanentDeletionServiceTest extends TestCase
         $this->seedPublishedEdition();
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Una edición publicada conserva su identidad. Utilice Retirar edición.');
+        $this->expectExceptionMessage('Envía la edición a la papelera antes de eliminarla definitivamente.');
         (new PermanentDeletionService($this->pdo))->deleteEdition(10, 99);
     }
 

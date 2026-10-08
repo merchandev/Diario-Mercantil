@@ -1,3 +1,4 @@
+import PublicationStatus from '../../components/PublicationStatus'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listLegal, type LegalRequest, downloadLegal, me, deleteLegal } from '../../lib/api'
@@ -93,7 +94,7 @@ export default function Historial() {
                 <div>
                   <h4 className="font-semibold text-sm">¡Publicación Confirmada!</h4>
                   <p className="text-sm">
-                    Tu publicación con CVE <span className="font-mono bg-emerald-100 px-1 rounded">{notif.edition_code}</span> ha sido publicada {notif.edition_no ? <span>en la Edición N° <strong>{notif.edition_no}</strong></span> : 'con éxito'}.
+                    Tu publicación con CVE <span className="font-mono bg-emerald-100 px-1 rounded">{(notif.edition_cve || notif.edition_code)}</span> ha sido publicada {notif.edition_no ? <span>en la Edición N° <strong>{notif.edition_no}</strong></span> : 'con éxito'}.
                   </p>
                 </div>
               </div>
@@ -206,9 +207,7 @@ export default function Historial() {
                       {r.status === 'Publicada' && r.publish_date ? r.publish_date : '-'}
                     </td>
                     <td className="px-4 py-2">
-                      {r.status === 'Pendiente' || r.status === 'Borrador'
-                        ? 'Borrador'
-                        : r.status}
+                      <PublicationStatus status={r.status} />
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-3">
