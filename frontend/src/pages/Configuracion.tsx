@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getSettings, getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
+import { getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
 import { useDialog } from '../contexts/DialogContext'
 import MediosPago from './MediosPago'
+import RegistrationControl from '../components/RegistrationControl'
 
 export default function Configuracion() {
   const { showAlert, confirmAction, requestText } = useDialog()
   const [s, setS] = useState<Partial<Settings>>({})
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'Registro' | 'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
+  const [tab, setTab] = useState<'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
   const [areas, setAreas] = useState<{ id: number; name: string }[]>([])
   const [colleges, setColleges] = useState<{ id: number; name: string }[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState(0)
@@ -24,10 +25,12 @@ export default function Configuracion() {
   const onSave = async () => {
     setSaving(true)
     try {
-      await saveSettings(tab === 'Registro' ? { registration_enabled: s.registration_enabled === true || String(s.registration_enabled) === '1' } : s)
+      const payload = { ...s }
+      delete payload.registration_enabled
+      await saveSettings(payload)
       const persisted = await getAdminSettings()
       setS(persisted.settings)
-      await showAlert(tab === 'Registro' ? 'Disponibilidad de registro actualizada.' : `Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
+      await showAlert(`Configuración guardada. Precio por folio vigente: USD ${Number(persisted.settings.price_per_folio_usd).toFixed(2)}.`, { title: 'Guardado' })
     } catch (error: any) {
       void showAlert(error?.message || 'No se pudo guardar la configuración.', { title: 'Error' })
     } finally {
@@ -37,13 +40,13 @@ export default function Configuracion() {
   return (
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Configuración</h1>
+      <RegistrationControl />
       <div className="card p-4">
-        <div className="tabs flex gap-2 border-b mb-4">
-          {(['Registro', 'General', 'Medios de pago', 'Directorio Legal', 'Preguntas y Respuestas', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
+        <div className="tabs flex flex-wrap gap-2 border-b mb-4">
+          {(['General', 'Medios de pago', 'Directorio Legal', 'Preguntas y Respuestas', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={["px-3 py-2 rounded-t-lg bg-white text-slate-700 border-b-2", tab === t ? 'border-brand-800' : 'border-transparent hover:border-brand-800/30'].join(' ')}>{t}</button>
           ))}
         </div>
-        {tab === 'Registro' && <div className="space-y-4"><h2 className="font-semibold">Registro de nuevos usuarios</h2><p>Al suspender el registro, las cuentas existentes podrán seguir entrando.</p><label className="flex gap-2 items-center"><input type="checkbox" checked={s.registration_enabled === true || String(s.registration_enabled) === '1'} onChange={e => setS({ ...s, registration_enabled: e.target.checked })} />Permitir nuevas cuentas</label></div>}
         {tab === 'General' && (
           <div className="space-y-6">
             <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">

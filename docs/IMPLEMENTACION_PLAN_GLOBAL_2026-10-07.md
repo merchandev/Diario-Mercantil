@@ -32,7 +32,7 @@ El PDF previo mencionado en C02 no está entre los archivos disponibles. No se i
 | C18 | Precio por folio final, IVA incluido: 13 × USD 3 = USD 39, sin incremento adicional. Nuevas solicitudes capturan base, IVA, tasa y total. |
 | C19 | Desglose subtotal sin IVA + IVA = total en formularios/pago y orden de servicio. Se respetan los importes históricos almacenados. Convocatorias usan su precio fijo final. |
 | C20 | CVE aleatorio independiente DM- + 24 dígitos hexadecimales. Código MMXXVI-0001 sigue como nomenclatura editorial. Enlaces históricos tienen alias por ID y nunca se reasignan a otra edición. |
-| C21 | Control persistente registration_enabled en Configuración → Registro y panel SuperAdmin; API y formulario público impiden nuevas altas cuando está suspendido. Migración inicializa en 0. |
+| C21 | Control persistente registration_enabled visible al inicio de Configuración, Gestión de Usuarios y panel SuperAdmin, con botón Activar/Desactivar registro que guarda y verifica el cambio directamente. Los formularios generales no sobrescriben esta opción. API y formulario público impiden nuevas altas cuando está suspendido. Migración inicializa en 0. |
 | C22 | Aplazado por el usuario. No se promete recuperación por correo ni envío real validado. |
 | C23 | Auditoría física de tamaño/checksum, integridad de ediciones y volumen Docker persistente. Nuevo CLI de diagnóstico de solo lectura. |
 | O01 | Recursos reales del VPS: 2 CPU, 7.8 GiB RAM, 2 GiB swap, disco 96 GiB con unos 30 GiB libres. El costo contratado no puede obtenerse del sistema operativo; requiere factura/panel del proveedor. |
@@ -67,8 +67,8 @@ El volumen `diario_mercantil_storage_data` se monta en `/var/www/html/storage`. 
 
 ## Pruebas
 
-- PHPUnit: 91 pruebas y 484 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas, integridad y permisos del borrado definitivo individual.
-- Frontend: TypeScript, 31 pruebas Vitest y compilación Vite, incluyendo la visibilidad del botón para Administrador/SuperAdmin y la cancelación de la confirmación.
+- PHPUnit: 91 pruebas y 490 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas, integridad y permisos del borrado definitivo individual. El control de registro se verifica mediante su API administrativa y su exposición pública.
+- Frontend: TypeScript, 37 pruebas Vitest y compilación Vite, incluyendo la visibilidad del botón para Administrador/SuperAdmin, la cancelación de la confirmación y la activación/desactivación del registro con verificación de persistencia y manejo de errores.
 - Regresiones añadidas: CVE independiente, enlace antiguo después de reciclar número, inicio desde 1 pese a secuencia de pruebas, contraseña limpia con errores asíncronos, IVA incluido.
 - PHP: comprobación de sintaxis de servicios, controladores, CLI y migraciones.
 

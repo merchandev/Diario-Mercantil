@@ -638,11 +638,15 @@ class AuthorizationIntegrationTest extends TestCase {
         $blocked=$this->request('POST','/api/auth/register',null,['document'=>'V789','name'=>'Blocked','password'=>'password123456']);
         $this->assertSame(403,$blocked['code']);
         $this->assertSame($before,(int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn());
-        $pdo->exec("UPDATE settings SET value='1' WHERE `key`='registration_enabled'");
+        $this->assertSame(403, $this->request('POST','/api/admin/settings','user_session_test',['registration_enabled'=>true])['code']);
+        $this->assertSame('0', $pdo->query("SELECT value FROM settings WHERE `key`='registration_enabled'")->fetchColumn());
+        $this->assertSame(200, $this->request('POST','/api/admin/settings','admin_session_test',['registration_enabled'=>true])['code']);
+        $this->assertSame('1', $this->request('GET','/api/settings')['body']['settings']['registration_enabled']);
         $invalid=$this->request('POST','/api/auth/register',null,['document'=>'Vabc','name'=>'Invalid','password'=>'password123456']);
         $this->assertSame(422,$invalid['code']);
         $this->assertSame(422,$this->request('POST','/api/auth/login',null,['document'=>'soporte','password'=>'anything'])['code']);
-        $pdo->exec("UPDATE settings SET value='0' WHERE `key`='registration_enabled'");
+        $this->assertSame(200, $this->request('POST','/api/admin/settings','admin_session_test',['registration_enabled'=>false])['code']);
+        $this->assertSame('0', $this->request('GET','/api/settings')['body']['settings']['registration_enabled']);
     }
     public function testFutureYearsAreRejectedButPublishedSameYearFuturePdfIsPublic(): void {
         $year=(int)date('Y');

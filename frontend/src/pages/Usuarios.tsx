@@ -5,6 +5,7 @@ import RolesModal from '../components/RolesModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import PromptDialog from '../components/PromptDialog'
 import AlertDialog from '../components/AlertDialog'
+import RegistrationControl from '../components/RegistrationControl'
 import { Edit2, Key, Activity, Eye, Trash2 } from 'lucide-react'
 import { PASSWORD_MIN_LENGTH, PASSWORD_MIN_MESSAGE } from '../utils/passwordPolicy'
 
@@ -55,6 +56,7 @@ export default function Usuarios() {
           <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Cerrar' : 'Agregar Usuario'}</button>
         </div>
       </div>
+      <RegistrationControl />
       {showForm && (
         <form onSubmit={async e => {
           e.preventDefault()
