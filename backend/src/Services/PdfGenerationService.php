@@ -44,6 +44,10 @@ class PdfGenerationService {
         $ivaBs = bcmul((string)($requestData['iva_usd'] ?? '0'),$bcv,2);
         
         $totalBs = (string)($requestData['total_bs'] ?? bcadd($subtotalBs,$ivaBs,2));
+        // Extract from the stored Bs total to avoid multiplying a rounded USD base.
+        if (isset($requestData['porcentaje_iva'], $requestData['total_bs'])) {
+            $subtotalBs = number_format(round((float)$totalBs / (1 + (float)$ivaPercent / 100),2),2,'.','');
+        }
         $ivaBs = bcsub($totalBs,$subtotalBs,2);
         
         $pdf->Totals([

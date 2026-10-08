@@ -53,6 +53,17 @@ class FinancialSnapshotTest extends TestCase {
         $this->assertEqualsWithDelta($price['total_bs'],$price['subtotal_bs']+$price['iva_bs'],0.00001);
         $this->assertEqualsWithDelta(39.0,$price['subtotal_usd']+$price['iva_usd'],0.00001);
     }
+    public function testBolivarBreakdownRoundsAfterConversionOfTheFinalAmount(): void {
+        $pdo=$this->createMock(PDO::class); $stmt=$this->createMock(PDOStatement::class);
+        $stmt->method('fetchColumn')->willReturnOnConsecutiveCalls(3.0,16.0);
+        $pdo->method('prepare')->willReturn($stmt);
+        $bcv=$this->createMock(BcvService::class); $bcv->method('getRate')->willReturn(195.0);
+        $price=(new PublicationService($pdo,$bcv))->calculatePricing(13);
+        $this->assertSame(7605.0,$price['total_bs']);
+        $this->assertSame(6556.03,$price['subtotal_bs']);
+        $this->assertSame(1048.97,$price['iva_bs']);
+        $this->assertSame($price['total_bs'],$price['subtotal_bs']+$price['iva_bs']);
+    }
     public function testPricingCalculation() {
         $pdo = $this->createMock(PDO::class);
         $stmt = $this->createMock(PDOStatement::class);

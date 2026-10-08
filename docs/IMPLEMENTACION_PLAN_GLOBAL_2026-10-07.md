@@ -57,13 +57,13 @@ Retirar sigue siendo reversible: guarda composición y devuelve las publicacione
 
 ### Precio final y persistencia
 
-Para total USD 39 con IVA 16%: base mostrada USD 33.62, IVA USD 5.38. Se conserva precisión de cuatro decimales en el snapshot USD y dos en el total Bs. Las órdenes antiguas mantienen su total almacenado; no se recotiza producción retroactivamente.
+Para total USD 39 con IVA 16%: base mostrada USD 33.62, IVA USD 5.38. Se conserva precisión de cuatro decimales en el snapshot USD y dos en el total Bs. El desglose Bs se extrae del total Bs almacenado para evitar diferencias de un centavo al multiplicar una base USD ya redondeada. Las órdenes antiguas mantienen su total almacenado; no se recotiza producción retroactivamente.
 
 El volumen `diario_mercantil_storage_data` se monta en `/var/www/html/storage`. UPLOAD_DIR es `/var/www/html/storage/uploads`. La auditoría anterior al despliegue comprobó 15 archivos sin discrepancias y tres ediciones publicadas con PDF válido. Por tanto no se constató pérdida física actual; el filtro de fecha y las URL explicaban la falta de acceso.
 
 ## Pruebas
 
-- PHPUnit: 89 pruebas y 442 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas e integridad.
+- PHPUnit: 90 pruebas y 446 aserciones, con integración HTTP de carga/descarga, papelera, numeración, registro, fechas e integridad.
 - Frontend: TypeScript, 26 pruebas Vitest y compilación Vite.
 - Regresiones añadidas: CVE independiente, enlace antiguo después de reciclar número, inicio desde 1 pese a secuencia de pruebas, contraseña limpia con errores asíncronos, IVA incluido.
 - PHP: comprobación de sintaxis de servicios, controladores, CLI y migraciones.
@@ -98,3 +98,15 @@ La migración cambia la identidad y los índices de unicidad. No debe desplegars
 2. C22/O02: correo aplazado expresamente. Las comprobaciones previas mostraron TLS accesible con rechazo de autenticación y ausencia de MX/SPF/DMARC en la consulta pública; no se cambia nada. La guía oficial de Hostinger para la futura configuración está en [Configuración manual de correo](https://www.hostinger.com/support/8671319-set-up-a-domain-for-hostinger-email-manually/).
 3. O01: factura vigente para informar el costo real contratado, incluidos renovación, impuestos y servicios adicionales. No se sustituye por una tarifa promocional inventada.
 
+## Verificación efectiva del VPS
+
+Durante el despliegue se comprobó:
+
+- Backend, frontend y MySQL saludables; página principal HTTP 200.
+- Las ediciones 10, 13 y 15 aparecen en el listado público, en ese orden descendente de publicación: 15, 13, 10.
+- Descargas por CVE y por código antiguo HTTP 200, con SHA-256 idéntico al publicado para cada una.
+- 15 archivos físicos auditados, sin diferencias de tamaño/checksum ni PDF publicado inválido, después de recrear los contenedores.
+- `registration_enabled=0`; un POST al registro responde 403 registration_suspended.
+- La reserva anual comprobada en una transacción revertida devuelve el siguiente número 1, sin crear ediciones ni cambiar la secuencia persistida.
+- El ID, la imagen y la fecha de arranque del worker permanecen idénticos a los anteriores al despliegue.
+- GitHub Actions aprobó la primera entrega; el ajuste de redondeo se valida igualmente antes del despliegue final.

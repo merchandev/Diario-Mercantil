@@ -517,7 +517,7 @@ export default function Documento() {
       const priceUsd = req.subtotal_usd != null && req.iva_usd != null ? Number(req.subtotal_usd) + Number(req.iva_usd) : folios * pricePerFolio
       const storedRate = Number(req.tasa_bcv) || bcvRate
       const totalBs = Number(req.total_bs) || Math.round(priceUsd * storedRate * 100) / 100
-      const subtotalBs = req.subtotal_usd != null ? Math.round(Number(req.subtotal_usd) * storedRate * 100) / 100 : includedVat(totalBs, ivaPercent).sub
+      const subtotalBs = includedVat(totalBs, Number(req.porcentaje_iva ?? ivaPercent)).sub
       const ivaBs = Math.round((totalBs - subtotalBs) * 100) / 100
 
       setPdfAnalysis({
