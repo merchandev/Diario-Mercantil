@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { LockKeyhole, Wrench } from 'lucide-react'
 import LoadingFallback from './LoadingFallback'
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || ''
@@ -83,19 +82,22 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
 
   if (!status) return <LoadingFallback />
   if (!status.enabled || status.unlocked) return <>{children}</>
-  return <main className="min-h-screen bg-slate-950 flex items-center justify-center px-5 py-12">
+  return <main className="min-h-screen flex items-center justify-center bg-[radial-gradient(ellipse_at_top,_#1b2435_0%,_#020617_70%)] px-5 py-10 sm:py-14">
     <Helmet><title>Mantenimiento programado | Diario Mercantil de Venezuela</title><meta name="robots" content="noindex, nofollow" /></Helmet>
-    <section className="w-full max-w-lg rounded-3xl bg-white p-7 sm:p-10 shadow-2xl">
-      <img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil de Venezuela" className="h-auto w-64 max-w-full" />
-      <div className="mt-8 mb-5 inline-flex rounded-2xl bg-slate-100 p-4 text-brand-800"><Wrench size={32} aria-hidden="true" /></div>
-      <h1 className="text-3xl font-semibold text-slate-900">Mantenimiento programado</h1>
-      <p className="mt-4 text-slate-600 leading-relaxed">Estamos realizando mejoras en el sistema. El acceso al sitio está temporalmente restringido.</p>
+    <section className="w-full max-w-xl rounded-[2rem] border border-white/70 bg-white px-7 py-10 shadow-[0_28px_90px_rgba(0,0,0,0.3)] sm:px-12 sm:py-12">
+      <img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil de Venezuela" className="mx-auto block h-auto w-full max-w-[25rem]" />
+      <div className="mt-8 text-center">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 sm:text-[1.75rem]">Mantenimiento programado</h1>
+        <p className="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-500 sm:text-base">Estamos realizando mejoras en el sistema. El acceso al sitio está temporalmente restringido.</p>
+      </div>
       <form onSubmit={unlock} className="mt-8 space-y-4">
-        <label className="block text-sm font-medium text-slate-800" htmlFor="maintenance-password">Contraseña de administrador</label>
-        <input id="maintenance-password" className="input w-full" type="password" required maxLength={1024} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-slate-700" htmlFor="maintenance-password">Contraseña de administrador</label>
+          <input id="maintenance-password" className="input h-12 w-full rounded-xl bg-slate-50/70 px-4" type="password" required maxLength={1024} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
+        </div>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-        <button type="submit" disabled={busy} className="btn btn-primary w-full flex items-center justify-center gap-2"><LockKeyhole size={18} aria-hidden="true" />{busy ? 'Verificando...' : 'Autorizar acceso'}</button>
-        {error && <button type="button" onClick={() => void check()} className="text-sm underline text-brand-800">Comprobar disponibilidad</button>}
+        <button type="submit" disabled={busy} className="btn btn-primary h-12 w-full rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-800 disabled:cursor-wait disabled:opacity-70">{busy ? 'Verificando...' : 'Autorizar acceso'}</button>
+        {error && <button type="button" onClick={() => void check()} className="block w-full text-center text-sm underline text-brand-800">Comprobar disponibilidad</button>}
       </form>
     </section>
   </main>
