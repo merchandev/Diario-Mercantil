@@ -1,6 +1,7 @@
+import { editorialToday } from '../lib/editorialDate'
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getLegal, updateLegal, rejectLegal, verifyLegal, returnToDraftLegal, addLegalPayment, verifyLegalPayment, rejectLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
+import { getLegal, updateLegal, returnToDraftLegal, verifyLegal, addLegalPayment, verifyLegalPayment, rejectLegalPayment, deleteLegalPayment, downloadLegal, listLegalFiles, type LegalRequest, type LegalPayment, type LegalFile } from '../lib/api'
 import ProtectedPdfViewer from '../components/ProtectedPdfViewer'
 import { IconTrash, IconDownload, IconSave, IconClose, IconPlus, IconArrowLeft, IconQrCode } from '../components/icons'
 import QRCodeModal from '../components/QRCodeModal'
@@ -83,21 +84,6 @@ export default function PublicacionDetalle() {
     }
   }
 
-  const onReject = async () => {
-    if (!item) return
-    const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
-    if (reason === null) return
-    if (!reason.trim()) { await showAlert('Indique un motivo.', { title: 'Motivo requerido' }); return }
-    try {
-      await rejectLegal(item.id, reason)
-      await showAlert('Solicitud rechazada', { title: 'Solicitud actualizada' })
-      navigate('/dashboard/publicaciones')
-    } catch (err: any) {
-      console.error('Error rejecting:', err)
-      void showAlert(err?.message || 'Error al rechazar', { title: 'Error' })
-    }
-  }
-
   const onApprove = async () => {
     if (!item) return
     if (!(await confirmAction('¿Verificar esta solicitud y marcarla como En trámite?', { title: 'Verificar solicitud' }))) return
@@ -113,9 +99,10 @@ export default function PublicacionDetalle() {
 
   const onReturnToDraft = async () => {
     if (!item) return
-    if (!(await confirmAction('¿Devolver esta solicitud a Borrador?', { title: 'Devolver solicitud' }))) return
+    const reason = await requestText('Indique qué debe corregir el solicitante.', { title: 'Motivo de devolución', confirmText: 'Devolver solicitud' })
+    if (!reason?.trim()) return
     try {
-      await returnToDraftLegal(item.id)
+      await returnToDraftLegal(item.id, reason.trim())
       await showAlert('Solicitud devuelta a Borrador', { title: 'Solicitud actualizada' })
       loadData()
     } catch (err: any) {
@@ -132,9 +119,9 @@ export default function PublicacionDetalle() {
     const prefix = String(fd.get('mobile_prefix') || '')
     const phone = String(fd.get('mobile_phone') || '').replace(/\D/g, '')
     const ref = String(fd.get('ref') || '').replace(/\D/g, '')
-    const date = String(fd.get('date') || new Date().toISOString().slice(0, 10))
+    const date = String(fd.get('date') || editorialToday())
     const amount = Number(fd.get('amount_bs') || 0)
-    if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
+    if (!/^\d{6}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
       void showAlert('Referencia, teléfono o monto inválidos. Revise los datos del Pago Móvil.', { title: 'Datos inválidos' })
       return
     }
@@ -142,7 +129,7 @@ export default function PublicacionDetalle() {
       setPaymentError(`El monto supera el saldo pendiente de ${formatBs(remainingBalance)} Bs.`)
       return
     }
-    if (date > new Date().toISOString().slice(0, 10)) {
+    if (date > editorialToday()) {
       void showAlert('La fecha del pago no puede ser futura.', { title: 'Fecha inválida' })
       return
     }
@@ -310,11 +297,9 @@ export default function PublicacionDetalle() {
                 Verificar publicación
               </button>
             )}
-            <button className="btn bg-red-600 text-white hover:bg-red-700" onClick={onReject}>
-              Rechazar
-            </button>
+
             <button className="btn bg-slate-600 text-white hover:bg-slate-700" onClick={onReturnToDraft}>
-              Devolver a Borrador
+              Devolver solicitud
             </button>
           </div>
         </div>
@@ -422,8 +407,8 @@ export default function PublicacionDetalle() {
             <p className="text-xs text-slate-500 mt-1">Registre únicamente pagos móviles. El monto puede ser parcial y quedará pendiente de verificación.</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-3">
-            <input className="input" name="ref" inputMode="numeric" maxLength={4} pattern="\d{4}" placeholder="Últimos 4 dígitos" required />
-            <input className="input" type="date" name="date" max={new Date().toISOString().slice(0, 10)} defaultValue={new Date().toISOString().slice(0, 10)} required />
+            <input className="input" name="ref" inputMode="numeric" maxLength={6} pattern="\d{6}" placeholder="Últimos 6 dígitos" required />
+            <input className="input" type="date" name="date" max={editorialToday()} defaultValue={editorialToday()} required />
             <select className="input" name="bank" required defaultValue="">
               <option value="" disabled>Banco emisor</option>
               {BANCOS_VENEZUELA.map(bank => (
@@ -431,8 +416,8 @@ export default function PublicacionDetalle() {
               ))}
             </select>
             <input className="input" name="amount_bs" type="number" min="0.01" max={remainingBalance} step="0.01" placeholder="Monto parcial Bs." required />
-            <select className="input" name="mobile_prefix" defaultValue="0412" required>
-              {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
+            <select className="input" name="mobile_prefix" defaultValue="" required>
+              <option value="">Seleccione operadora</option>{['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
             </select>
             <input className="input" name="mobile_phone" inputMode="numeric" maxLength={7} pattern="\d{7}" placeholder="7 dígitos del teléfono" required />
             <input className="input md:col-span-2" name="comment" placeholder="Comentario (opcional)" />

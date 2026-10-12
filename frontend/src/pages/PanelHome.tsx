@@ -9,9 +9,8 @@ export default function PanelHome() {
   const load = () => getStats().then(s => setStats(s as any)).catch(() => setStats({ publications: 0, editions: 0, editions_published: 0, users_active: 0 }))
   useEffect(() => { load() }, [])
   const onClear = async () => {
-    if (!(await confirmAction('¿Seguro que deseas borrar todas las publicaciones, ediciones y pagos? Esta acción no se puede deshacer.', { title: 'Limpiar datos', danger: true }))) return
     setLoading(true)
-    try { const r = await clearStats(); setStats(r as any) } finally { setLoading(false) }
+    try { await load() } finally { setLoading(false) }
   }
 
   const onClearCache = async () => {
@@ -54,7 +53,7 @@ export default function PanelHome() {
             Vaciar Caché
           </button>
           <button className="btn btn-ghost" onClick={onClear} disabled={loading}>
-            {loading ? 'Limpiando...' : 'Limpiar datos'}
+            {loading ? 'Actualizando...' : 'Actualizar indicadores'}
           </button>
         </div>
       </div>

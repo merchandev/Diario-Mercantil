@@ -2,6 +2,7 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import MaintenanceGate from './components/MaintenanceGate'
 import ErrorBoundary from './components/ErrorBoundary'
 import { HelmetProvider } from 'react-helmet-async'
 import './setupLogging'
@@ -22,7 +23,7 @@ createRoot(document.getElementById('root')!).render(
           }}
         >
           <DialogProvider>
-            <App />
+            <MaintenanceGate><App /></MaintenanceGate>
           </DialogProvider>
         </BrowserRouter>
       </HelmetProvider>

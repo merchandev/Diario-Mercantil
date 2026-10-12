@@ -252,8 +252,10 @@ final class AuthController {
             $enabled=$pdo->query("SELECT value FROM settings WHERE `key`='registration_enabled'")->fetchColumn();
             if ((string)$enabled !== '1') Response::json(['error'=>'registration_suspended','message'=>'El registro está temporalmente suspendido por mantenimiento.'],403);
             $in = $this->jsonInput();
+            require_once __DIR__.'/Services/TermsAcceptanceService.php';
+            $terms = TermsAcceptanceService::validate($pdo, $in);
             $document = trim($in["document"] ?? "");
-            $name = trim($in["name"] ?? "");
+            $name = mb_strtoupper(trim($in["name"] ?? ""), "UTF-8");
             $password = (string)($in["password"] ?? "");
             $personType = trim($in["person_type"] ?? "natural");
             $email = trim($in["email"] ?? "");
@@ -270,8 +272,10 @@ final class AuthController {
             }
             if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) Response::json(["error"=>"Formato de correo electrónico inválido"], 400);
 
-            if (!preg_match('/^[VEJGP][0-9]{1,12}$/', $document)) Response::json(['error'=>'Seleccione un prefijo e ingrese solo números en la identificación.'],422);
+            $allowedPrefix = $personType === 'natural' ? 'VEP' : ($personType === 'juridica' ? 'VJG' : '');
+            if ($allowedPrefix === '' || !preg_match('/^[' . $allowedPrefix . '][0-9]{1,12}$/', $document)) Response::json(['error'=>'Seleccione un prefijo e ingrese solo números en la identificación.'],422);
 
+            if (!preg_match('/^04(12|14|16|22|24|26)[0-9]{7}$/', $phone)) Response::json(['error'=>'Seleccione la operadora y complete siete dígitos del teléfono.'],422);
             $check = $pdo->prepare("SELECT id FROM users WHERE document=?");
             $check->execute([$document]);
             if ($check->fetch()) Response::json(["error"=>"Documento ya registrado"], 400);
@@ -288,9 +292,11 @@ final class AuthController {
             // Atomic: user + session in one transaction
             $pdo->beginTransaction();
             try {
+                $terms = TermsAcceptanceService::validate($pdo, $in);
                 $ins = $pdo->prepare("INSERT INTO users(document,name,password_hash,role,phone,email,person_type,state,municipality,address,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)");
                 $ins->execute([$document, $name, $hash, "solicitante", $phone, $email, $personType, $state, $municipality, $address, "active", $now, $now]);
                 $uid = $pdo->lastInsertId();
+                TermsAcceptanceService::record($pdo, (int)$uid, $terms, $now);
 
                 $pdo->prepare("INSERT INTO sessions (user_id, token_hash, ip_hash, user_agent_hash, expires_at) VALUES (?, ?, ?, ?, ?)")
                     ->execute([$uid, $tokenHash, $ipHash, $userAgentHash, $expiresAt]);
@@ -321,6 +327,8 @@ final class AuthController {
                     "role" => "solicitante"
                 ]
             ]);
+        } catch (InvalidArgumentException $e) {
+            Response::json(['error'=>$e->getMessage()], in_array($e->getCode(), [409,422], true) ? $e->getCode() : 422);
         } catch (Throwable $e) {
             error_log("REGISTER FATAL ERROR: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             http_response_code(500);

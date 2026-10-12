@@ -1,3 +1,6 @@
+import { isUnchangedPayment, paymentIdempotency } from '../../lib/legalPayment'
+import { normalizeLegalMeta } from '../../lib/legalMeta'
+import { editorialToday } from '../../lib/editorialDate'
 import { includedVat } from '../../lib/pricing'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type React from 'react'
@@ -443,7 +446,8 @@ export default function Documento() {
   const [settings, setSettings] = useState<any>({})
   const [bcv, setBcv] = useState<number>(0)
   const [accept, setAccept] = useState(false)
-  const [pay, setPay] = useState({ name: '', document: '', phone: '', email: '', address: '', type: 'pago_movil', bank: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone_prefix: '0414', mobile_phone: '' })
+  const [originalPayment, setOriginalPayment] = useState<any>(null)
+  const [pay, setPay] = useState({ name: '', document: '', phone: '', email: '', address: '', type: 'pago_movil', bank: '', ref: '', date: editorialToday(), amount_bs: '' as any, mobile_phone_prefix: '', mobile_phone: '' })
   const [loading, setLoading] = useState(false)
   const [uploadingPdf, setUploadingPdf] = useState(false)
   const [pdfAnalysis, setPdfAnalysis] = useState<{ folios: number; price_usd: number; price_bs: number; subtotal_bs: number; iva_bs: number; total_bs: number } | null>(null)
@@ -473,22 +477,24 @@ export default function Documento() {
         } else if (typeof item.meta === 'object') {
           parsedMeta = item.meta || {};
         }
-        setMeta(parsedMeta);
+        setMeta(normalizeLegalMeta(parsedMeta));
+        setPay(prev => ({ ...prev, name: item.name || prev.name, document: item.document || prev.document, phone: item.phone || prev.phone, email: item.email || prev.email, address: item.address || prev.address }));
 
         listLegalFiles(item.id).then(r => setFiles(r.items));
 
         // Pre-fill payment info if exists
         if (data.payments && data.payments.length > 0) {
           const last = data.payments[0];
+          setOriginalPayment(last);
           const storedMobile = String(last.mobile_phone || '').replace(/\D/g, '')
-          const storedPrefix = /^04(12|14|16|22|24|26)/.test(storedMobile) ? storedMobile.slice(0, 4) : '0414'
+          const storedPrefix = /^04(12|14|16|22|24|26)/.test(storedMobile) ? storedMobile.slice(0, 4) : ''
           const storedSuffix = storedMobile.length >= 11 ? storedMobile.slice(4, 11) : storedMobile.slice(0, 7)
           setPay(prev => ({
             ...prev,
             type: 'pago_movil',
             bank: last.bank || '',
             ref: last.ref || '',
-            date: last.date || new Date().toISOString().slice(0, 10),
+            date: last.date || editorialToday(),
             amount_bs: last.amount_bs,
             mobile_phone_prefix: storedPrefix,
             mobile_phone: storedSuffix
@@ -508,13 +514,13 @@ export default function Documento() {
   // }, [step])
 
   useEffect(() => {
-    if (req && req.folios && req.folios > 0 && !pdfAnalysis && settings.price_per_folio_usd && bcv) {
+    if (req && req.folios && req.folios > 0 && !pdfAnalysis && (Number(req.total_bs) > 0 || (settings.price_per_folio_usd && bcv))) {
       const folios = req.folios
       const pricePerFolio = Number(settings.price_per_folio_usd || 1.5)
       const bcvRate = bcv || Number(settings.bcv_rate || 36)
       const ivaPercent = Number(settings.iva_percent || 16)
 
-      const priceUsd = req.subtotal_usd != null && req.iva_usd != null ? Number(req.subtotal_usd) + Number(req.iva_usd) : folios * pricePerFolio
+      const priceUsd = req.subtotal_usd != null && req.iva_usd != null ? Number(req.subtotal_usd) + Number(req.iva_usd) : Number(req.precio_unitario_usd) > 0 ? Number(req.precio_unitario_usd) * folios : Number(req.tasa_bcv) > 0 && Number(req.total_bs) > 0 ? Number(req.total_bs) / Number(req.tasa_bcv) : folios * pricePerFolio
       const storedRate = Number(req.tasa_bcv) || bcvRate
       const totalBs = Number(req.total_bs) || Math.round(priceUsd * storedRate * 100) / 100
       const subtotalBs = includedVat(totalBs, Number(req.porcentaje_iva ?? ivaPercent)).sub
@@ -535,8 +541,8 @@ export default function Documento() {
   const ensureDraft = async () => {
     if (req) return req
     // Crear el borrador con el mínimo de campos para evitar fallos por metadatos
-    const r = await createLegal({ status: 'Borrador', pub_type: 'Documento', name: '', document: '', date: new Date().toISOString().slice(0, 10) })
-    const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Documento', date: new Date().toISOString().slice(0, 10) }
+    const r = await createLegal({ status: 'Borrador', pub_type: 'Documento', name: '', document: '', date: editorialToday() })
+    const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Documento', date: editorialToday() }
     setReq(created)
     return created
   }
@@ -572,7 +578,7 @@ export default function Documento() {
       })
 
       const data = await res.json()
-      
+
       const serverFolios = data.folios
       const serverPricing = data.pricing || {}
 
@@ -585,11 +591,11 @@ export default function Documento() {
         total_bs: serverPricing.total_bs || 0
       })
 
-      if (req && req.id) {
-        setReq({ ...req, folios: serverFolios })
-      } else {
-        setReq({ id: data.id, status: 'Borrador', pub_type: 'Documento', folios: serverFolios } as any)
-      }
+      const requestId = Number(data.id || req?.id)
+      const saved = await getLegal(requestId)
+      setReq(saved.item)
+      const attached = await listLegalFiles(requestId)
+      setFiles(attached.items)
 
       setMeta({ ...meta, folios: serverFolios })
       setAlertDialog({ isOpen: true, title: 'Éxito', message: `✓ Documento procesado: ${serverFolios} folio${serverFolios !== 1 ? 's' : ''}`, variant: 'success' })
@@ -635,7 +641,7 @@ export default function Documento() {
       if (req && req.id) {
         // console.log('📝 Actualizando solicitud existente:', req.id)
         await updateLegal(req.id, {
-          meta,
+          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla },
           name: meta.razon_social || '',
           document: meta.rif || '',
           date: meta.fecha || req.date
@@ -647,7 +653,7 @@ export default function Documento() {
         const r = await ensureDraft()
         // console.log('✓ Solicitud creada:', r)
         await updateLegal(r.id, {
-          meta,
+          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla },
           name: meta.razon_social || '',
           document: meta.rif || '',
           date: meta.fecha || r.date
@@ -703,11 +709,13 @@ export default function Documento() {
   const submitStep3 = async () => {
     if (!req || !pdfAnalysis) return
 
-    if (!pay.bank || !/^\d{4}$/.test(pay.ref) || !/^\d{7}$/.test(pay.mobile_phone)) {
-      setAlertDialog({ isOpen: true, title: 'Datos incompletos', message: 'Seleccione el banco, indique exactamente los últimos 4 dígitos de la referencia y los 7 dígitos del teléfono de Pago Móvil.', variant: 'warning' })
+    const paymentUnchanged = isUnchangedPayment(originalPayment, pay)
+    if (!accept) { setAlertDialog({ isOpen: true, title: 'Aceptación requerida', message: 'Acepte los Términos y condiciones para reportar la solicitud.', variant: 'warning' }); return }
+    if (!paymentUnchanged && (!pay.bank || !/^\d{6}$/.test(pay.ref) || !/^04(12|14|16|22|24|26)$/.test(pay.mobile_phone_prefix) || !/^\d{7}$/.test(pay.mobile_phone))) {
+      setAlertDialog({ isOpen: true, title: 'Datos incompletos', message: 'Seleccione el banco, indique exactamente los últimos 6 dígitos de la referencia y los 7 dígitos del teléfono de Pago Móvil.', variant: 'warning' })
       return
     }
-    const today = new Date().toISOString().slice(0, 10)
+    const today = editorialToday()
     if (!pay.date || pay.date > today) {
       setAlertDialog({ isOpen: true, title: 'Fecha inválida', message: 'La fecha del pago no puede ser futura.', variant: 'warning' })
       return
@@ -716,12 +724,7 @@ export default function Documento() {
     if (loading) return
     setLoading(true)
     try {
-      // Get or create idempotency key for this request
-      let idempotencyKey = sessionStorage.getItem(`dm-payment-idempotency-${req.id}`)
-      if (!idempotencyKey) {
-        idempotencyKey = crypto.randomUUID()
-        sessionStorage.setItem(`dm-payment-idempotency-${req.id}`, idempotencyKey)
-      }
+      const idempotencyKey = paymentIdempotency(req.id, { bank: pay.bank, ref: pay.ref, date: pay.date, phone: pay.mobile_phone_prefix + pay.mobile_phone })
 
       await updateLegal(req.id, {
         name: pay.name,
@@ -731,7 +734,7 @@ export default function Documento() {
         address: pay.address,
         folios: pdfAnalysis.folios
       })
-      await addLegalPayment(req.id, {
+      if (!paymentUnchanged) await addLegalPayment(req.id, {
         type: 'pago_movil',
         bank: pay.bank,
         ref: pay.ref,
@@ -739,10 +742,10 @@ export default function Documento() {
         mobile_phone: pay.type === 'pago_movil' ? (pay.mobile_phone_prefix + pay.mobile_phone) : undefined
       }, idempotencyKey)
       await submitLegal(req.id)
-      
+
       // Clear idempotency key on success
       sessionStorage.removeItem(`dm-payment-idempotency-${req.id}`)
-      
+
       setLoading(false)
       setAlertDialog({ isOpen: true, title: 'Éxito', message: '¡Solicitud registrada! Su solicitud fue registrada correctamente y se encuentra en espera de aprobación.', variant: 'success' })
       // Redirigir a Mis Publicaciones
@@ -771,16 +774,17 @@ export default function Documento() {
 
   return (
     <section className="space-y-4">
-      <h1 className="text-xl font-semibold">Solicitud de publicación de documento</h1>
+      <h1 className="rounded-xl bg-brand-800 px-5 py-4 text-lg md:text-xl font-bold text-white">SOLICITUD DE PUBLICACIÓN DE DOCUMENTO</h1>
       <div className="text-sm text-slate-700">¡Completa estos tres pasos y obtén la publicación de tu documento en la próxima edición!</div>
 
+      {req?.status === 'Borrador' && req.comment && <div className="rounded-xl border border-amber-300 bg-amber-50 p-4"><strong>Solicitud devuelta</strong><p className="whitespace-pre-wrap">{req.comment}</p></div>}
       {/* Paso 1 - Modernizado */}
       <div ref={step1Ref} className="card p-6 space-y-4 shadow-md step-anim">
         <div className="flex items-center gap-3 pb-3 border-b">
-          <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-lg">1</div>
+          <div className="w-10 h-10 shrink-0 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-lg">1</div>
           <div>
-            <h2 className="font-bold text-lg">Datos del Documento</h2>
-            <p className="text-sm text-slate-600">Complete los datos según el documento protocolizado</p>
+            <h2 className="font-bold text-lg">Datos registrales del documento</h2>
+            <p className="text-sm text-slate-600">Estimado usuario, por favor complete los campos según los datos que constan en el documento debidamente protocolizado.</p>
           </div>
         </div>
         {imgUrl && (
@@ -788,21 +792,22 @@ export default function Documento() {
             💡 ¿Tienes dudas sobre dónde están los datos? <button type="button" className="font-semibold underline hover:no-underline" onClick={() => setShowImg(true)}>Ver imagen de ayuda</button>
           </div>
         )}
-        <form onSubmit={saveStep1} className="grid md:grid-cols-2 gap-4">
+        <form onSubmit={saveStep1} className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="relative">
-            <select className="input w-full" value={meta.tipo_sociedad || ''} onChange={e => setMeta({ ...meta, tipo_sociedad: e.target.value })}>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="registral-tipo_sociedad">Tipo de sociedad</label>
+            <select id="registral-tipo_sociedad" className="input w-full" value={meta.tipo_sociedad || ''} onChange={e => setMeta({ ...meta, tipo_sociedad: e.target.value, tipo_acto: '' })}>
               <option value="">Seleccione tipo de sociedad</option>
-              <option value="Firma Personal (F.P.)">Firma Personal (F.P.)</option>
-              <option value="Compañía Anónima (C.A.)">Compañía Anónima (C.A.)</option>
-              <option value="Compañía de Responsabilidad Limitada (C.R.L.)">Compañía de Responsabilidad Limitada (C.R.L.)</option>
-              <option value="Compañía en Comandita Simple (C.C.S.)">Compañía en Comandita Simple (C.C.S.)</option>
-              <option value="Compañía en Comandita por Acciones (C.C.A.)">Compañía en Comandita por Acciones (C.C.A.)</option>
+              <option value="FIRMA PERSONAL (F.P.)">Firma Personal (F.P.)</option>
+              <option value="COMPAÑÍA ANÓNIMA (C.A.)">Compañía Anónima (C.A.)</option>
+              <option value="COMPAÑÍA DE RESPONSABILIDAD LIMITADA (C.R.L.)">Compañía de Responsabilidad Limitada (C.R.L.)</option>
+              <option value="COMPAÑÍA EN COMANDITA SIMPLE (C.C.S.)">Compañía en Comandita Simple (C.C.S.)</option>
+              <option value="COMPAÑÍA EN COMANDITA POR ACCIONES (C.C.A.)">Compañía en Comandita por Acciones (C.C.A.)</option>
               <option value="Consorcio">Consorcio</option>
-              <option value="Sociedades Anónimas (S.A.)">Sociedades Anónimas (S.A.)</option>
-              <option value="Sociedad en Comandita Simple (S.C.S.)">Sociedad en Comandita Simple (S.C.S.)</option>
-              <option value="Sociedad en Comandita por Acciones (S.C.A.)">Sociedad en Comandita por Acciones (S.C.A.)</option>
-              <option value="Sociedad Mercantil Extranjera">Sociedad Mercantil Extranjera</option>
-              <option value="Sociedades de Responsabilidad Limitada (S.R.L.)">Sociedades de Responsabilidad Limitada (S.R.L.)</option>
+              <option value="SOCIEDADES ANÓNIMAS (S.A.)">Sociedades Anónimas (S.A.)</option>
+              <option value="SOCIEDAD EN COMANDITA SIMPLE (S.C.S.)">Sociedad en Comandita Simple (S.C.S.)</option>
+              <option value="SOCIEDAD EN COMANDITA POR ACCIONES (S.C.A.)">Sociedad en Comandita por Acciones (S.C.A.)</option>
+              <option value="SOCIEDAD MERCANTIL EXTRANJERA">Sociedad Mercantil Extranjera</option>
+              <option value="SOCIEDADES DE RESPONSABILIDAD LIMITADA (S.R.L.)">Sociedades de Responsabilidad Limitada (S.R.L.)</option>
             </select>
             <div className="flex absolute inset-y-0 right-0 items-center pr-3 pointer-events-none">
               <svg className="w-4 h-4 fill-brand-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
@@ -811,10 +816,11 @@ export default function Documento() {
             </div>
           </div>
           <div className="relative">
-            <select className="input w-full" value={meta.tipo_acto || ''} onChange={e => setMeta({ ...meta, tipo_acto: e.target.value })} disabled={!meta.tipo_sociedad}>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="registral-tipo_acto">Tipo de acto inscrito</label>
+            <select id="registral-tipo_acto" className="input w-full" value={meta.tipo_acto || ''} onChange={e => setMeta({ ...meta, tipo_acto: e.target.value })} disabled={!meta.tipo_sociedad}>
               <option value="">Seleccione tipo de trámite</option>
-              {meta.tipo_sociedad && TRAMITES_POR_TIPO[meta.tipo_sociedad]?.map((t: string) => (
-                <option key={t} value={t}>{t}</option>
+              {meta.tipo_sociedad && Object.entries(TRAMITES_POR_TIPO).find(([key]) => key.toUpperCase() === meta.tipo_sociedad)?.[1]?.map((t: string) => (
+                <option key={t} value={t.toUpperCase()}>{t}</option>
               ))}
             </select>
             <div className="flex absolute inset-y-0 right-0 items-center pr-3 pointer-events-none">
@@ -825,19 +831,20 @@ export default function Documento() {
           </div>
           <label className="block md:col-span-2">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Razón o denominación social (nombre de la sociedad mercantil) *</span>
-            <input 
-              className="input w-full" 
-              placeholder="RAZÓN SOCIAL" 
-              value={meta.razon_social || ''} 
-              onChange={e => setMeta({ ...meta, razon_social: e.target.value.toUpperCase() })} 
-              required 
+            <input
+              className="input w-full"
+              placeholder="RAZÓN SOCIAL"
+              value={meta.razon_social || ''}
+              onChange={e => setMeta({ ...meta, razon_social: e.target.value.toUpperCase() })}
+              required
             />
           </label>
           <div className="relative">
-            <select className="input w-full" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value, oficina: '' })}>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="registral-estado">Estado</label>
+            <select id="registral-estado" className="input w-full" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value, oficina: '' })}>
               <option value="">Seleccione estado</option>
               {ESTADOS_VENEZUELA.map(est => (
-                <option key={est} value={est}>{est}</option>
+                <option key={est} value={est.toUpperCase()}>{est}</option>
               ))}
             </select>
             <div className="flex absolute inset-y-0 right-0 items-center pr-3 pointer-events-none">
@@ -847,10 +854,11 @@ export default function Documento() {
             </div>
           </div>
           <div className="relative">
-            <select className="input w-full" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value })} disabled={!meta.estado}>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="registral-oficina">Oficina de Registro Mercantil</label>
+            <select id="registral-oficina" className="input w-full" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value })} disabled={!meta.estado}>
               <option value="">Seleccione registro mercantil</option>
-              {meta.estado && REGISTROS_POR_ESTADO[meta.estado]?.map((reg: string) => (
-                <option key={reg} value={reg}>{reg}</option>
+              {meta.estado && Object.entries(REGISTROS_POR_ESTADO).find(([key]) => key.toUpperCase() === meta.estado)?.[1]?.map((reg: string) => (
+                <option key={reg} value={reg.toUpperCase()}>{reg}</option>
               ))}
             </select>
             <div className="flex absolute inset-y-0 right-0 items-center pr-3 pointer-events-none">
@@ -868,9 +876,9 @@ export default function Documento() {
             <div className="relative">
               <select className="input w-full" value={meta.tipo_registrador || ''} onChange={e => setMeta({ ...meta, tipo_registrador: e.target.value })}>
                 <option value="">Seleccione el tipo</option>
-                <option value="TITULAR">TITULAR</option>
-                <option value="SUPLENTE">SUPLENTE</option>
-                <option value="AUXILIAR">AUXILIAR</option>
+                <option value="TITULAR">Titular</option>
+                <option value="SUPLENTE">Suplente</option>
+                <option value="AUXILIAR">Auxiliar</option>
               </select>
               <div className="flex absolute inset-y-0 right-0 items-center pr-3 pointer-events-none">
                 <svg className="w-4 h-4 fill-brand-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
@@ -879,34 +887,15 @@ export default function Documento() {
               </div>
             </div>
           </label>
-          <div className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Tomo </span>
-            <div className="flex gap-2">
-              <input
-                className="input flex-1"
-                placeholder="000"
-                maxLength={3}
-                value={meta.tomo || ''}
-                onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })}
-              />
-              <div className="w-24">
-                <span className="text-[10px] text-slate-500 mb-1 block">Letra</span>
-                <select
-                  className="input w-full"
-                  value={meta.letra || ''}
-                  onChange={e => setMeta({ ...meta, letra: e.target.value })}
-                >
-                  <option value="">-</option>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                  <option value="D">D</option>
-                  <option value="E">E</option>
-                </select>
-              </div>
-            </div>
-
-          </div>
+          <div className="md:col-span-2 grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <label className="block"><span className="text-sm font-medium text-slate-700 mb-1 block">Tomo</span>
+            <input className="input w-full" placeholder="000" maxLength={3} inputMode="numeric" value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
+          </label>
+          <label className="block"><span className="text-sm font-medium text-slate-700 mb-1 block">Letra</span>
+            <select className="input w-full" value={meta.letra || ''} onChange={e => setMeta({ ...meta, letra: e.target.value })}>
+              <option value="">Seleccione</option>{['A','B','C','D','E'].map(letter => <option key={letter}>{letter}</option>)}
+            </select>
+          </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número </span>
             <input className="input w-full" placeholder="000" maxLength={3} value={meta.numero || ''} onChange={e => setMeta({ ...meta, numero: e.target.value.replace(/\D/g, '').slice(0, 3) })} />
@@ -920,35 +909,38 @@ export default function Documento() {
             />
 
           </label>
+          </div>
+          <div className="md:col-span-2 grid md:grid-cols-3 gap-4">
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Número de expediente *</span>
-            <input className="input w-full" placeholder="391-456987" 
-                   maxLength={12} 
-                   pattern="^\d{3}-\d{1,8}$" 
-                   title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)" 
+            <input className="input w-full" placeholder="391-456987"
+                   maxLength={12}
+                   pattern="^\d{3}-\d{1,8}$"
+                   title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)"
                    value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: formatExpediente(e.target.value) })} />
 
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha *</span>
-            <input 
-              className="input w-full" 
-              type="date" 
-              max={new Date().toISOString().split('T')[0]} 
-              value={meta.fecha || ''} 
-              onChange={e => setMeta({ ...meta, fecha: e.target.value })} 
+            <input
+              className="input w-full"
+              type="date"
+              max={editorialToday()}
+              value={meta.fecha || ''}
+              onChange={e => setMeta({ ...meta, fecha: e.target.value })}
             />
 
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla </span>
-            <input className="input w-full" placeholder="391.2024.4.4388" 
-                   maxLength={17} 
-                   pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" 
-                   title="Formato: 000.0000.0.000000" 
+            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla (PUB) o número de trámite</span>
+            <input className="input w-full" placeholder="391.2024.4.4388"
+                   maxLength={17}
+                   pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$"
+                   title="Formato: 000.0000.0.000000"
                    value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: formatPlanilla(e.target.value) })} />
 
           </label>
+          </div>
           <div className="md:col-span-2 flex gap-3 pt-4">
             <button type="submit" className="btn btn-primary flex-1" disabled={loading}>
               {loading ? (
@@ -975,14 +967,15 @@ export default function Documento() {
       {/* Paso 2 - Carga de PDF con análisis */}
       <div ref={step2Ref} className="card p-6 space-y-4 shadow-md step-anim">
         <div className="flex items-center gap-3 pb-3 border-b">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${step >= 2 ? 'bg-brand-100 text-brand-700' : 'bg-slate-200 text-slate-500'
+          <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-lg ${step >= 2 ? 'bg-brand-100 text-brand-700' : 'bg-slate-200 text-slate-500'
             }`}>2</div>
           <div>
-            <h2 className="font-bold text-lg">Cargar Documento PDF</h2>
-            <p className="text-sm text-slate-600">Suba el documento completo en formato PDF</p>
+            <h2 className="font-bold text-lg">Adjuntar el documento digitalizado</h2>
+            <p className="text-sm text-slate-600">Estimado(a) usuario: para continuar con la solicitud, deberá digitalizar todos los folios (páginas) del documento en formato PDF y adjuntar en este paso.</p>
           </div>
         </div>
 
+        <p className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Importante: Asegúrese de que todos los folios (páginas) del documento estén correctamente digitalizadas y sean totalmente legibles. Verifique que textos, datos, sellos y firmas se visualicen completos, sin cortes, desenfoques ni zonas oscuras. Si el documento presenta información ilegible o incompleta, la solicitud podrá ser devuelta para su corrección.</p>
         {step < 2 ? (
           <div className="text-center py-8 text-slate-400 step-anim">
             <svg className="w-16 h-16 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1071,7 +1064,7 @@ export default function Documento() {
                 <div>
                   <h3 className="font-bold text-green-900 text-lg">¡Documento analizado exitosamente!</h3>
                   <p className="text-sm text-green-700 font-medium">
-                    {files.find(f => f.kind === 'document_pdf')?.name || 'El sistema ha contado las páginas y calculado el precio'}
+                    {files.find(f => ['document_pdf','documento_pdf'].includes(f.kind))?.name || 'El sistema ha contado las páginas y calculado el precio'}
                   </p>
                 </div>
               </div>
@@ -1112,40 +1105,17 @@ export default function Documento() {
               </div>
 
               {/* Vista Previa del Documento y Descargar Orden */}
-              <div className="mt-6 border-t border-green-200 pt-6">
+              {files.some(f => ['document_pdf','documento_pdf'].includes(f.kind)) && <div className="mt-6 border-t border-green-200 pt-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-lg text-brand-900">Vista Previa del Documento</h3>
-                  {req && (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          const b = await downloadLegal(req.id);
-                          const url = URL.createObjectURL(b);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `orden-servicio-${req.id}.pdf`;
-                          a.click();
-                          URL.revokeObjectURL(url);
-                        } catch(e) {
-                          setAlertDialog({ isOpen: true, title: 'Error', message: 'Error al descargar orden.', variant: 'error' });
-                        }
-                      }}
-                      className="btn btn-outline text-brand-700 border-brand-200 hover:bg-brand-50 gap-2"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Descargar Orden
-                    </button>
-                  )}
+
                 </div>
-                {files.find(f => f.kind === 'document_pdf') && (
+                {files.find(f => ['document_pdf','documento_pdf'].includes(f.kind)) && (
                   <div className="h-96 rounded-lg overflow-hidden border border-slate-200 bg-white">
-                    <ProtectedPdfViewer src={`/api/uploads/${files.find(f => f.kind === 'document_pdf')?.file_id}`} />
+                    <ProtectedPdfViewer height={384} src={`/api/uploads/${files.find(f => ['document_pdf','documento_pdf'].includes(f.kind))?.file_id}`} />
                   </div>
                 )}
-              </div>
+              </div>}
             </div>
 
             <div className="flex gap-3">
@@ -1182,8 +1152,8 @@ export default function Documento() {
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white ${step >= 3 ? 'bg-brand-600' : 'bg-gray-400'}`}>3</div>
             <div>
-              <h2 className="text-xl font-bold text-brand-900">Datos de Pago</h2>
-              <p className="text-sm text-brand-700">Complete su información y reporte el pago realizado</p>
+              <h2 className="text-xl font-bold text-brand-900">Reportar el pago de la publicación</h2>
+              <p className="text-sm text-brand-700">Estimado(a) usuario: a continuación, se muestra el detalle de su orden de servicio y el monto correspondiente a cancelar.</p>
             </div>
           </div>
         </div>
@@ -1197,14 +1167,14 @@ export default function Documento() {
           </div>
         ) : (
           <div className="p-6 space-y-6 step-anim">
-            {/* Resumen de la Orden + Datos del Solicitante (Solo Lectura) */}
+            {/* Resumen de la orden + Datos del Solicitante (Solo Lectura) */}
             {pdfAnalysis && (
               <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-brand-900">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
-                  Resumen de la Orden
+                  Resumen de la orden
                 </h3>
 
                 {/* Datos del Solicitante (Integrados) */}
@@ -1236,19 +1206,20 @@ export default function Documento() {
 
                 {/* Totales */}
                 <div className="space-y-3">
+                  <h4 className="font-semibold text-slate-800">Descripción y costo</h4>
                   <div className="p-4 bg-white rounded-lg border border-slate-200 text-slate-800 text-sm leading-relaxed mb-4">
-                    <p className="text-blue-700 font-medium text-[11px] uppercase mb-2">Servicio de publicación electrónica en el Diario Mercantil de Venezuela de un documento protocolizado que corresponde a la razón social:</p>
-                    <div className="font-bold border-b pb-2 mb-2 text-brand-900">[{meta.razon_social || 'REVISAR'}]</div>
-                    
-                    <div className="text-[12px] space-y-1 text-slate-600">
+                    <p className="text-slate-700 text-sm mb-2">Servicio de publicación electrónica en el Diario Mercantil de Venezuela de un documento protocolizado que corresponde a la razón social:</p>
+                    <div className="font-bold border-b pb-2 mb-2 text-slate-800 uppercase">{meta.razon_social || 'REVISAR'}</div>
+
+                    <div className="text-sm space-y-1 text-slate-700">
                       <p>Datos de registro mercantil:</p>
-                      <p>Oficina de registro mercantil: <span className="font-medium">[{meta.oficina || 'REVISAR'}]</span></p>
-                      <p>Tomo: <span className="font-medium">[{meta.tomo || 'REVISAR'}]</span> Letra: <span className="font-medium">[{meta.letra || '-'}]</span></p>
-                      <p>Número: <span className="font-medium">[{meta.numero || 'REVISAR'}]</span></p>
-                      <p>Año: <span className="font-medium">[{meta.anio || 'REVISAR'}]</span></p>
-                      <p>Número de expediente: <span className="font-medium">[{meta.expediente || 'REVISAR'}]</span></p>
-                      <p>Número de planilla: <span className="font-medium">[{meta.planilla || 'REVISAR'}]</span></p>
-                      <p>Registrador: <span className="font-medium">[{meta.registrador || 'REVISAR'}] [{meta.tipo_registrador || 'REVISAR'}]</span></p>
+                      <p>Oficina de registro mercantil: <span className="font-semibold">{meta.oficina || 'REVISAR'}</span></p>
+                      <p>Tomo: <span className="font-semibold">{meta.tomo || 'REVISAR'}</span> Letra: <span className="font-semibold">{meta.letra || '-'}</span></p>
+                      <p>Número: <span className="font-semibold">{meta.numero || 'REVISAR'}</span></p>
+                      <p>Año: <span className="font-semibold">{meta.anio || 'REVISAR'}</span></p>
+                      <p>Número de expediente: <span className="font-semibold">{meta.expediente || 'REVISAR'}</span></p>
+                      <p>Número de planilla: <span className="font-semibold">{meta.planilla || 'REVISAR'}</span></p>
+                      <p>Registrador: <span className="font-semibold">{meta.registrador || '-'} ({meta.tipo_registrador ? meta.tipo_registrador.charAt(0) + meta.tipo_registrador.slice(1).toLowerCase() : '-'})</span></p>
                     </div>
                   </div>
 
@@ -1259,23 +1230,23 @@ export default function Documento() {
                   <div className="flex justify-between items-center py-2 px-1">
                     <span className="text-slate-600">Precio por folio:</span>
                     <div className="text-right">
-                      <div className="font-semibold text-green-700">Bs. {(((pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)) * bcv) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                      <div className="font-semibold text-slate-800">Bs. {(((pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)) * (Number(req?.tasa_bcv) || bcv)) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                       <div className="text-[10px] text-slate-400">Equivalente a ${(pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)).toFixed(2)} USD / folio</div>
                     </div>
                   </div>
                   {/* Detalles ocultos a petición del cliente:
                   <div className="flex justify-between items-center border-t border-slate-300 pt-2">
                     <span className="text-slate-600">Subtotal:</span>
-                    <span className="font-semibold">Bs. {pdfAnalysis.subtotal_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-semibold">Bs. {pdfAnalysis.subtotal_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-600">IVA ({settings.iva_percent || 16}%):</span>
-                    <span className="font-semibold">Bs. {pdfAnalysis.iva_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-semibold">Bs. {pdfAnalysis.iva_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   */}
                   <div className="flex justify-between items-center border-t-2 border-brand-600 pt-3">
                     <span className="text-lg font-bold text-brand-900">TOTAL A PAGAR:</span>
-                    <span className="text-2xl font-bold text-brand-600">Bs. {pdfAnalysis.total_bs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-2xl font-bold text-brand-600">Bs. {pdfAnalysis.total_bs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-sm text-orange-800 mt-4">
                     <strong>Importante:</strong> El pago debe realizarse por el monto exacto indicado, sin redondeos.
@@ -1293,15 +1264,9 @@ export default function Documento() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-                Información del Pago Realizado
+                Información del pago realizado
               </h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Tipo de operación *</span>
-                  <select className="input w-full" value={pay.type} onChange={e => setPay({ ...pay, type: e.target.value })}>
-                    <option value="pago_movil">Pago Móvil</option>
-                  </select>
-                </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <label className="block relative">
                   <span className="text-sm font-medium text-slate-700 mb-1 block">Banco emisor *</span>
                   <input
@@ -1314,7 +1279,7 @@ export default function Documento() {
                   />
 
                   {showBankList && (
-                    <ul className="absolute z-50 w-full bg-slate-800 text-white border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto mt-1 left-0">
+                    <ul className="absolute z-50 w-full bg-brand-800 text-white border border-brand-700 rounded-lg shadow-xl max-h-60 overflow-y-auto mt-1 left-0">
                       {BANCOS_VENEZUELA.filter(b => b.toLowerCase().includes(pay.bank.toLowerCase())).length > 0 ? (
                         BANCOS_VENEZUELA.filter(b => b.toLowerCase().includes(pay.bank.toLowerCase())).map(b => (
                           <li
@@ -1323,7 +1288,7 @@ export default function Documento() {
                               setPay({ ...pay, bank: b })
                               setShowBankList(false)
                             }}
-                            className="px-4 py-2 hover:bg-slate-700 cursor-pointer transition-colors text-sm"
+                            className="px-4 py-2 hover:bg-brand-700 cursor-pointer transition-colors text-sm"
                           >
                             {b}
                           </li>
@@ -1334,27 +1299,12 @@ export default function Documento() {
                     </ul>
                   )}
                 </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">N° de Referencia *</span>
-                  <input 
-                    className="input w-full" 
-                    placeholder="Últimos 4 dígitos" 
-                    maxLength={4}
-                    value={pay.ref} 
-                    onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} 
-                  />
-
-                </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha del pago *</span>
-                  <input className="input w-full" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
-
-                </label>
                 {pay.type === 'pago_movil' && (
-                  <label className="block md:col-span-2">
+                  <label className="block ">
                     <span className="text-sm font-medium text-slate-700 mb-1 block">Teléfono desde donde realizó el pago móvil *</span>
                     <div className="flex gap-2">
                       <select className="input w-32" value={pay.mobile_phone_prefix} onChange={e => setPay({ ...pay, mobile_phone_prefix: e.target.value })}>
+                        <option value="">Seleccione</option>
                         <option>0412</option>
                         <option>0414</option>
                         <option>0416</option>
@@ -1362,17 +1312,34 @@ export default function Documento() {
                         <option>0424</option>
                         <option>0426</option>
                       </select>
-                      <input 
-                        className="input flex-1" 
-                        placeholder="1234567" 
+                      <input
+                        className="input flex-1 min-w-0"
+                        placeholder="1234567"
                         maxLength={7}
-                        value={pay.mobile_phone} 
-                        onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} 
+                        value={pay.mobile_phone}
+                        onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })}
                       />
                     </div>
 
                   </label>
                 )}
+
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">Fecha del pago *</span>
+                  <input className="input w-full" type="date" max={editorialToday()} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-slate-700 mb-1 block">N° de Referencia *</span>
+                  <input
+                    className="input w-full"
+                    placeholder="Últimos 6 dígitos"
+                    maxLength={6}
+                    value={pay.ref}
+                    onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })}
+                  />
+
+                </label>
               </div>
             </div>
 
@@ -1381,7 +1348,7 @@ export default function Documento() {
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" className="mt-1 w-5 h-5 rounded border-gray-300 text-brand-600 focus:ring-brand-500" checked={accept} onChange={e => setAccept(e.target.checked)} />
                 <span className="text-sm text-slate-700">
-                  Al hacer clic en <strong>REPORTAR SOLICITUD</strong>, confirmo que acepto y cumplo con los <span className="text-brand-600 font-medium">Términos y Condiciones</span> del Diario Mercantil de Venezuela.
+                  Al hacer clic en <strong>REPORTAR SOLICITUD</strong>, confirmo que acepto y cumplo con los <a href="/p/terminos-y-condiciones" target="_blank" rel="noreferrer" className="text-brand-700 underline font-medium">Términos y condiciones</a> del Diario Mercantil de Venezuela.
                 </span>
               </label>
             </div>
@@ -1390,7 +1357,7 @@ export default function Documento() {
             <div className="flex gap-3 pt-4">
               <button
                 className="btn btn-primary flex-1 h-12 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={!accept || loading || !pay.bank || !pay.ref || pay.ref.length < 4 || !pay.date || (pay.type === 'pago_movil' && (!pay.mobile_phone || pay.mobile_phone.length < 7))}
+                disabled={!accept || loading}
                 onClick={submitStep3}
               >
                 {loading ? (
@@ -1406,7 +1373,7 @@ export default function Documento() {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Reportar pago
+                    Reportar solicitud
                   </>
                 )}
               </button>

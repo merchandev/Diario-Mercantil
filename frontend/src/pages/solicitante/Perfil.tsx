@@ -6,6 +6,8 @@ interface UserProfile {
   id: number
   document: string
   name: string
+  role: string
+  address?: string
   email: string | null
   phone: string | null
   person_type: string
@@ -17,7 +19,8 @@ export default function Perfil() {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    address: ''
   })
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
@@ -37,7 +40,8 @@ export default function Perfil() {
       setFormData({
         name: data.user.name || '',
         email: data.user.email || '',
-        phone: data.user.phone || ''
+        phone: data.user.phone || '',
+        address: data.user.address || ''
       })
       setAvatarPreview(data.user.avatar_url)
     } catch (err) {
@@ -207,6 +211,7 @@ export default function Perfil() {
                   type="text"
                   id="name"
                   name="name"
+                  disabled={profile?.role === 'solicitante'}
                   value={formData.name}
                   onChange={handleChange}
                   required
@@ -214,6 +219,10 @@ export default function Perfil() {
                 />
               </div>
             </div>
+
+            <label className="block text-sm font-medium text-slate-700">Dirección de habitación o domicilio fiscal
+              <input name="address" value={formData.address} onChange={handleChange} className="input w-full mt-2" />
+            </label>
 
             {/* Email */}
             <div>

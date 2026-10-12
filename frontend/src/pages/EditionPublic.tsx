@@ -1,3 +1,4 @@
+import PublicEditionPanel from '../components/PublicEditionPanel'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { IconSearch, IconCalendar, IconBuilding, IconChevronRight } from '@tabler/icons-react'
@@ -23,6 +24,7 @@ export default function EditionPublic() {
 
   useEffect(() => {
     if (!activeCode) return
+    setErr(''); setEdition(null)
     fetch(`/api/dm/e-${encodeURIComponent(activeCode)}`)
       .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
       .then(d => { setEdition(d.edition); setOrders(d.orders || []) })
@@ -53,7 +55,7 @@ export default function EditionPublic() {
 
   const pdfUrl = useMemo(() => edition?.file_url || '', [edition])
 
-  if (err) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">{err}</div></div>
+  if (err) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6"><h1 className="font-semibold">Edición no disponible</h1><p>La edición puede estar aún en preparación o haber sido retirada. Consulte las ediciones publicadas.</p><Link className="text-brand-700 underline" to="/ediciones">Ver ediciones</Link></div></div>
   if (!edition) return <div className="max-w-4xl mx-auto p-6"><div className="card p-6">Cargando...</div></div>
 
   return (
@@ -114,46 +116,7 @@ export default function EditionPublic() {
 
       <div className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 space-y-6">
 
-        {/* Encabezado e Info */}
-        <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 sm:px-6 rounded-xl shadow-sm border border-slate-200">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">
-              Edición {edition.code}
-              {edition.status === 'Publicada' ?
-                <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-medium">Publicada</span> :
-                <span className="bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-medium">{edition.status}</span>
-              }
-            </h1>
-            <div className="text-sm text-slate-500 mt-1 flex gap-4">
-              <span>📅 Fecha: {edition.date}</span>
-              <span>📰 Número: {edition.edition_no}</span>
-            </div>
-          </div>
-          <div>
-            {pdfUrl ? (
-              <a className="btn btn-outline text-brand-700 border-brand-200 hover:bg-brand-50" href={`${pdfUrl}?download=1`} target="_blank" rel="noreferrer">
-                Descargar PDF
-              </a>
-            ) : (
-              <span className="text-sm text-amber-700">PDF no disponible</span>
-            )}
-          </div>
-        </div>
-
-        <p className="text-sm font-mono text-slate-600">CVE: {edition.cve || edition.code}</p>
-        {/* 2. Revista PDF Central */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2 sm:p-4 overflow-hidden">
-          {pdfUrl ? (
-            <div className="bg-neutral-900 rounded-lg overflow-hidden flex flex-col p-2 sm:p-4 shadow-inner">
-              <FlipbookViewer src={pdfUrl} className="w-full h-full" minHeight={800} />
-            </div>
-          ) : (
-            <div className="p-12 text-center text-slate-500 bg-slate-50 rounded-lg border border-dashed border-slate-200 min-h-[680px] flex flex-col items-center justify-center">
-              <IconSearch className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-              Esta edición aún no tiene un archivo PDF disponible para visualizar.
-            </div>
-          )}
-        </div>
+        <PublicEditionPanel edition={edition} />
 
         {/* 3. Ediciones Anteriores Widgets */}
         {recentEditions.length > 0 && (

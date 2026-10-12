@@ -12,7 +12,7 @@ import { useDialog } from '../contexts/DialogContext'
 
 export default function Ediciones() {
   const [searchParams] = useSearchParams()
-  const { confirmAction } = useDialog()
+  const { confirmAction, showAlert } = useDialog()
   const [rows, setRows] = useState<Edition[]>([])
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<{ date: string; selectedOrders: number[] }>({ date: editorialToday(), selectedOrders: [] })
@@ -382,7 +382,7 @@ export default function Ediciones() {
                             {detail.edition.status === 'Borrador' && (
                               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                                 <strong className="block mb-1">Estado: Borrador</strong>
-                                La edición fue creada como borrador. Revise las publicaciones, prepare o cargue el PDF final y publique la edición cuando esté lista. El enlace y el QR públicos permanecerán inactivos hasta entonces.
+                                La edición fue creada como borrador. Revise las publicaciones, prepare o cargue el PDF final y publique la edición cuando esté lista. El CVE, enlace y QR ya están disponibles para diagramación; el PDF se hará público al publicar.
                               </div>
                             )}
                             {detail.edition.status === 'Publicada' && !detail.edition.file_is_valid && (
@@ -419,7 +419,7 @@ export default function Ediciones() {
                                   <IconSave className="w-4 h-4" /> <span>Guardar cambios</span>
                                 </button>
                               )}
-                              
+
                               {detail.edition.status === 'Publicada' && (
                                 <button className="btn btn-outline border-brand-200 text-brand-700 hover:bg-brand-50 inline-flex items-center gap-2" onClick={async () => {
                                   try {
@@ -504,7 +504,7 @@ export default function Ediciones() {
                                         <span className="block text-xs text-slate-500">{detail.edition.file_name || 'edicion.pdf'}</span>
                                       </div>
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-2">
                                       <a
                                         href={pdfUrl}
@@ -648,15 +648,16 @@ export default function Ediciones() {
                               <h3 className="font-semibold mb-2 text-brand-800 cursor-pointer flex items-center justify-between select-none" onClick={() => setExpanded({ ...expanded, qr: !expanded.qr })}>
                                 Código QR <span className="text-slate-400 text-xs">{expanded.qr ? '▲ Minimizar' : '▼ Expandir'}</span>
                               </h3>
-                              {expanded.qr && detail.edition.status === 'Publicada' && detail.edition.file_is_valid && (() => {
+                              {expanded.qr && detail.edition.cve && (() => {
                                 const qrUrl = `${location.origin}/edicion/${detail.edition.cve || detail.edition.code}`
                                 return (
                                   <>
-                                    <p className="text-xs text-slate-600 mb-3">Escanea para ver la edición publicada</p>
-                                    <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border">
-                                      <QRCode value={qrUrl} size={200} includeMargin={false} level="M" renderAs="canvas" />
+                                    <p className="text-sm text-slate-600 mb-3">{detail.edition.status === 'Publicada' ? 'Escanea para consultar la edición publicada.' : 'Descargue este QR para incorporarlo al PDF de la edición. El mismo enlace estará disponible para el público al publicar.'}</p>
+                                    <div ref={qrWrapRef} className="bg-white inline-block p-3 rounded-lg shadow-md border [&_canvas]:!w-52 [&_canvas]:!h-52">
+                                      <QRCode value={qrUrl} size={1000} includeMargin={true} level="M" renderAs="canvas" />
                                     </div>
                                     <div className="text-xs text-center mt-2 text-slate-500 font-mono">{detail.edition.cve || detail.edition.code}</div>
+                                    <button type="button" className="btn btn-outline mt-2" onClick={async () => { try { await navigator.clipboard.writeText((detail.edition.cve || '') + '\n' + qrUrl); await showAlert('CVE y enlace copiados.', { title: 'Copiado' }) } catch { await showAlert('No se pudieron copiar. Seleccione el CVE y el enlace manualmente.', { title: 'Copiar datos' }) } }}>Copiar CVE y enlace</button>
                                     <a href={qrUrl} target="_blank" rel="noreferrer" className="text-brand-600 hover:text-brand-800 underline text-xs break-all block mt-2">{qrUrl}</a>
                                     <button className="btn btn-outline w-full mt-3 inline-flex items-center justify-center gap-2" onClick={() => {
                                       const canvas = qrWrapRef.current?.querySelector('canvas') as HTMLCanvasElement | null
@@ -670,8 +671,8 @@ export default function Ediciones() {
                                   </>
                                 )
                               })()}
-                              {expanded.qr && (detail.edition.status !== 'Publicada' || !detail.edition.file_is_valid) && (
-                                <p className="text-sm text-slate-600">El QR y el enlace público se activarán únicamente cuando la edición tenga un PDF final válido y sea publicada.</p>
+                              {expanded.qr && !detail.edition.cve && (
+                                <p className="text-sm text-slate-600">No se pudo obtener la identidad de la edición. Recargue el detalle.</p>
                               )}
                             </div>
 
@@ -740,15 +741,15 @@ export default function Ediciones() {
       <Link to="/dashboard/papelera?tab=ediciones" className="btn btn-outline inline-flex items-center gap-2"><IconTrash /> Abrir papelera de ediciones</Link>
       <ConfirmDialog isOpen={confirmDialog.isOpen} title={confirmDialog.title} message={confirmDialog.message} variant="warning" onConfirm={confirmDialog.onConfirm} onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       <AlertDialog {...alertDialog} onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })} />
-      
+
       {publishingState.active && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100]">
           <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6 mx-4">
             <h3 className="text-lg font-semibold text-brand-900 mb-2">Publicando Edición</h3>
             <p className="text-slate-600 text-sm mb-4">{publishingState.message || 'Generando documento consolidado...'}</p>
             <div className="w-full bg-slate-100 rounded-full h-3 mb-2 overflow-hidden relative">
-              <div 
-                className="bg-brand-600 h-3 rounded-full transition-all duration-300 ease-out" 
+              <div
+                className="bg-brand-600 h-3 rounded-full transition-all duration-300 ease-out"
                 style={{ width: `${publishingState.progress}%` }}
               ></div>
             </div>

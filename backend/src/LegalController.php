@@ -65,6 +65,18 @@ class LegalController {
     }
   }
 
+  public function applicantSummary() {
+    $user = AuthController::requireAuth();
+    $pdo = Database::pdo();
+    $query = $pdo->prepare('SELECT status,COUNT(*) AS total FROM legal_requests WHERE user_id=? AND deleted_at IS NULL GROUP BY status');
+    $query->execute([(int)$user['id']]);
+    $counts = [];
+    foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $counts[$row['status']] = (int)$row['total'];
+    $query = $pdo->prepare("SELECT id,name,meta,status,comment FROM legal_requests WHERE user_id=? AND deleted_at IS NULL AND (status='Publicada' OR (status='Borrador' AND comment IS NOT NULL AND comment<>'')) ORDER BY id DESC LIMIT 12");
+    $query->execute([(int)$user['id']]);
+    return Response::json(['counts'=>$counts,'total'=>array_sum($counts),'notices'=>$query->fetchAll(PDO::FETCH_ASSOC)]);
+  }
+
   public function list(){
     $u = AuthController::requireAuth();
     $pdo = Database::pdo();
@@ -203,7 +215,7 @@ class LegalController {
         ? '/api/editions/' . $r['edition_id'] . '/orders/' . $r['id'] . '/pdf'
         : null;
 
-    $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY date DESC'); $p->execute([$id]);
+    $p = $pdo->prepare('SELECT * FROM legal_payments WHERE legal_request_id=? ORDER BY date DESC, id DESC'); $p->execute([$id]);
     $pay = $p->fetchAll(PDO::FETCH_ASSOC);
 
     $f = $pdo->prepare('SELECT lf.id, lf.kind, lf.file_id, f.name FROM legal_files lf JOIN files f ON f.id=lf.file_id WHERE lf.legal_request_id=?'); $f->execute([$id]);
@@ -302,8 +314,11 @@ class LegalController {
         if (!empty($m['letra']) && !preg_match('/^[A-E]$/i', $m['letra'])) {
             return Response::json(['error'=>'La letra del tomo debe estar entre A y E'], 400);
         }
-        if (!empty($m['fecha_registro']) && strtotime($m['fecha_registro']) > time()) {
-            return Response::json(['error'=>'La fecha de registro no puede ser futura'], 400);
+        if (!empty($m['fecha_registro'])) {
+            $day = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$m['fecha_registro']);
+            if (!$day || $day->format('Y-m-d') !== $m['fecha_registro'] || $m['fecha_registro'] > EditorialClock::today()) {
+                return Response::json(['error'=>'La fecha de registro debe ser válida y no futura'], 400);
+            }
         }
         foreach (['tipo_sociedad','tipo_acto','razon_social','estado','oficina','registrador','tipo_registrador','letra'] as $key) {
             if (isset($m[$key]) && is_string($m[$key])) {
@@ -375,7 +390,8 @@ class LegalController {
 
        $machine = new LegalRequestStateMachine($pdo);
        try {
-           $machine->returnToDraft($id);
+           $input = json_decode(file_get_contents('php://input'), true) ?: [];
+           $machine->returnToDraft($id, trim((string)($input['reason'] ?? '')));
            Response::json(['ok'=>true]);
        } catch (Exception $e) {
            Response::json(['error'=>$e->getMessage()], 400);
@@ -517,9 +533,9 @@ class LegalController {
           }
       }
 
-      $ref = preg_replace('/\D+/', '', (string)($in['ref'] ?? ''));
-      if (!preg_match('/^\d{4}$/', $ref)) {
-          return Response::json(['error'=>'La referencia debe tener exactamente 4 dígitos'], 400);
+      $ref = trim((string)($in['ref'] ?? ''));
+      if (!preg_match('/^\d{6}$/', $ref)) {
+          return Response::json(['error'=>'La referencia debe tener exactamente 6 dígitos'], 400);
       }
 
       $paymentDate = trim((string)($in['date'] ?? ''));
@@ -527,7 +543,7 @@ class LegalController {
       if (!$paymentDateObj || $paymentDateObj->format('Y-m-d') !== $paymentDate) {
           return Response::json(['error'=>'La fecha de pago es inválida. Use YYYY-MM-DD'], 400);
       }
-      if ($paymentDate > gmdate('Y-m-d')) {
+      if ($paymentDate > EditorialClock::today()) {
           return Response::json(['error'=>'La fecha de pago no puede ser futura'], 400);
       }
 

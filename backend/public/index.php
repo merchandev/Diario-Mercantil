@@ -14,7 +14,7 @@ $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (in_array($origin, $allowedOrigins) || getenv('APP_ENV') === 'development') {
     header("Access-Control-Allow-Origin: " . ($origin ?: '*'));
 } else {
-    header("Access-Control-Allow-Origin: null"); 
+    header("Access-Control-Allow-Origin: null");
 }
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, X-CSRF-Token");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
@@ -33,11 +33,18 @@ require_once __DIR__."/../src/Response.php";
 require_once __DIR__."/../src/Http/Router.php";
 require_once __DIR__."/../src/Http/Middleware.php";
 
+require_once __DIR__.'/../src/MaintenanceController.php';
+
 $router = new Router();
 $auth = [Middleware::requireSession()];
 $csrf = [Middleware::requireSession(), Middleware::requireCsrf()];
 $admin = [Middleware::requireSession(), Middleware::requireRole('admin', 'superadmin', 'manager', 'staff')];
 $adminCsrf = array_merge($admin, [Middleware::requireCsrf()]);
+
+// MAINTENANCE
+$router->get('/api/maintenance/status', [MaintenanceController::class, 'status']);
+$router->post('/api/maintenance/unlock', [MaintenanceController::class, 'unlock']);
+$router->post('/api/admin/maintenance', [MaintenanceController::class, 'configure'], $adminCsrf);
 
 // AUTH
 $router->post('/api/auth/login', [AuthController::class, 'login']);
@@ -65,7 +72,7 @@ $router->put('/api/admin/users/{id}', [UserController::class, 'adminUpdate'], $a
 $router->post('/api/users/{id}/password', [UserController::class, 'resetPassword'], $adminCsrf); // Alias for backward compatibility
 
 // PROFILE
-class ProfileProxy { 
+class ProfileProxy {
     public function update() { $u = AuthController::requireAuth(); (new UserController())->update($u['id']); }
 }
 $router->put('/api/user/profile', [ProfileProxy::class, 'update'], $csrf);
@@ -79,6 +86,7 @@ $router->delete('/api/legal/trash', [LegalController::class, 'emptyTrash'], $csr
 $router->delete('/api/legal/trash/{id}', [LegalController::class, 'permanentDelete'], $csrf);
 $router->get('/api/legal', [LegalController::class, 'list'], $auth);
 $router->post('/api/legal', [LegalController::class, 'create'], $csrf);
+$router->get('/api/legal/summary', [LegalController::class, 'applicantSummary'], $auth);
 $router->get('/api/legal/{id}', [LegalController::class, 'get'], $auth);
 $router->put('/api/legal/{id}', [LegalController::class, 'update'], $csrf);
 $router->delete('/api/legal/{id}', [LegalController::class, 'softDelete'], $csrf);
@@ -220,6 +228,7 @@ $method = $_SERVER["REQUEST_METHOD"];
 require_once __DIR__."/../src/Exceptions/HttpException.php";
 
 try {
+    MaintenanceController::enforce($uri, $method);
     $router->dispatch($method, $uri);
 } catch (HttpException $e) {
     Response::json(['error' => $e->errorCode, 'message' => $e->getMessage()], $e->status);

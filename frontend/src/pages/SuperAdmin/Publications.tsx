@@ -1,3 +1,4 @@
+import { editorialToday } from '../../lib/editorialDate'
 import { useState, useEffect, useMemo } from 'react'
 import { ArrowLeft, Search, Trash2, Eye, CheckCircle, XCircle, FileText, DollarSign, Download, QrCode, Clock, AlertCircle } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -6,7 +7,7 @@ import {
     getLegal,
     updateLegal,
     verifyLegal,
-    rejectLegal,
+    returnToDraftLegal,
     deleteLegal,
     addLegalPayment,
     deleteLegalPayment,
@@ -96,10 +97,10 @@ export default function Publications() {
     }
 
     async function handleReject(id: number) {
-        const reason = await requestText('Indique el motivo del rechazo.', { title: 'Motivo del rechazo', confirmText: 'Confirmar rechazo', danger: true })
+        const reason = await requestText('Indique el motivo de la devolución.', { title: 'Motivo de devolución', confirmText: 'Devolver solicitud', danger: true })
         if (reason === null) return
 
-        await rejectLegal(id, reason)
+        await returnToDraftLegal(id, reason)
         loadSubmissions()
         setSelected(null)
     }
@@ -143,13 +144,13 @@ export default function Publications() {
         const prefix = String(formData.get('mobile_prefix') || '0412')
         const phone = String(formData.get('mobile_phone') || '').replace(/\D/g, '').slice(0, 7)
         const amount = Number(formData.get('amount_bs') || 0)
-        if (!/^\d{4}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
+        if (!/^\d{6}$/.test(ref) || !/^04(12|14|16|22|24|26)$/.test(prefix) || !/^\d{7}$/.test(phone) || amount <= 0) {
             void showAlert('Revise referencia, operadora, teléfono y monto del Pago Móvil.', { title: 'Datos inválidos' })
             return
         }
         const paymentData = {
             ref,
-            date: String(formData.get('date') || new Date().toISOString().slice(0, 10)),
+            date: String(formData.get('date') || editorialToday()),
             bank: String(formData.get('bank') || ''),
             type: 'pago_movil',
             amount_bs: amount,
@@ -345,7 +346,7 @@ export default function Publications() {
                                                 <button
                                                     onClick={() => handleReject(sub.id)}
                                                     className="p-2 hover:bg-red-500/10 rounded-lg text-red-400 hover:text-red-300 transition-colors"
-                                                    title="Rechazar"
+                                                    title="Devolver solicitud"
                                                 >
                                                     <XCircle className="w-4 h-4" />
                                                 </button>
@@ -404,17 +405,17 @@ export default function Publications() {
                                         <input
                                             name="ref"
                                             inputMode="numeric"
-                                            maxLength={4}
-                                            pattern="\d{4}"
-                                            placeholder="Últimos 4 dígitos"
+                                            maxLength={6}
+                                            pattern="\d{6}"
+                                            placeholder="Últimos 6 dígitos"
                                             required
                                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
                                         />
                                         <input
                                             type="date"
                                             name="date"
-                                            max={new Date().toISOString().slice(0, 10)}
-                                            defaultValue={new Date().toISOString().slice(0, 10)}
+                                            max={editorialToday()}
+                                            defaultValue={editorialToday()}
                                             required
                                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
                                         />
@@ -427,8 +428,8 @@ export default function Publications() {
                                             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none"
                                         />
                                         <div className="grid grid-cols-[110px,1fr] gap-2">
-                                            <select name="mobile_prefix" defaultValue="0412" required className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none">
-                                                {['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
+                                            <select name="mobile_prefix" defaultValue="" required className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none">
+                                                <option value="">Seleccione operadora</option>{['0412','0414','0416','0422','0424','0426'].map(prefix => <option key={prefix} value={prefix}>{prefix}</option>)}
                                             </select>
                                             <input name="mobile_phone" inputMode="numeric" maxLength={7} pattern="\d{7}" required placeholder="7 dígitos" className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:border-purple-500 outline-none" />
                                         </div>
@@ -566,7 +567,7 @@ export default function Publications() {
                                                 onClick={() => handleReject(selected.id)}
                                                 className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors"
                                             >
-                                                ✗ Rechazar
+                                                Devolver solicitud
                                             </button>
                                         </div>
                                     </div>

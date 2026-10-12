@@ -1,3 +1,6 @@
+import { isUnchangedPayment, paymentIdempotency } from '../../lib/legalPayment'
+import { normalizeLegalMeta } from '../../lib/legalMeta'
+import { editorialToday } from '../../lib/editorialDate'
 import { includedVat } from '../../lib/pricing'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -29,7 +32,9 @@ export default function Convocatoria() {
   const [settings, setSettings] = useState<any>({})
   const [bcv, setBcv] = useState<number>(0)
   const [accept, setAccept] = useState(false)
-  const [pay, setPay] = useState<ConvocatoriaPaymentForm>({ type: 'pago_movil', bank: '', ref: '', date: new Date().toISOString().slice(0, 10), amount_bs: '' as any, mobile_phone: '', mobile_phone_prefix: '0414' })
+  const [originalPayment, setOriginalPayment] = useState<any>(null)
+  const [sending, setSending] = useState(false)
+  const [pay, setPay] = useState<ConvocatoriaPaymentForm>({ type: 'pago_movil', bank: '', ref: '', date: editorialToday(), amount_bs: '' as any, mobile_phone: '', mobile_phone_prefix: '' })
   const [user, setUser] = useState<any>({})
 
   useEffect(() => { getSettings().then(r => setSettings(r.settings || {})); getBcvRate().then(r => setBcv(r.rate)).catch(() => { }) }, [])
@@ -41,19 +46,20 @@ export default function Convocatoria() {
       setReq(data.item);
       let parsedMeta = {};
       try { parsedMeta = typeof data.item.meta === 'string' ? JSON.parse(data.item.meta) : data.item.meta || {} } catch { }
-      setMeta(parsedMeta);
+      setMeta(normalizeLegalMeta(parsedMeta));
       listLegalFiles(data.item.id).then(r => setFiles(r.items));
       if (data.payments && data.payments.length > 0) {
         const last = data.payments[0];
+        setOriginalPayment(last);
         const storedMobile = String(last.mobile_phone || '').replace(/\D/g, '')
         setPay(prev => ({
           ...prev,
           type: 'pago_movil',
           bank: last.bank || '',
           ref: last.ref || '',
-          date: last.date || new Date().toISOString().slice(0, 10),
+          date: last.date || editorialToday(),
           amount_bs: String(last.amount_bs) as any,
-          mobile_phone_prefix: /^04(12|14|16|22|24|26)/.test(storedMobile) ? storedMobile.slice(0, 4) : '0414',
+          mobile_phone_prefix: /^04(12|14|16|22|24|26)/.test(storedMobile) ? storedMobile.slice(0, 4) : '',
           mobile_phone: storedMobile.length === 11 ? storedMobile.slice(4) : ''
         }));
       }
@@ -62,8 +68,8 @@ export default function Convocatoria() {
 
   const ensureDraft = async () => {
     if (req) return req
-    const r = await createLegal({ status: 'Borrador', pub_type: 'Convocatoria', name: '', document: '', date: new Date().toISOString().slice(0, 10), meta })
-    const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Convocatoria', date: new Date().toISOString().slice(0, 10) }
+    const r = await createLegal({ status: 'Borrador', pub_type: 'Convocatoria', name: '', document: '', date: editorialToday(), meta })
+    const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Convocatoria', date: editorialToday() }
     setReq(created)
     return created
   }
@@ -84,26 +90,31 @@ export default function Convocatoria() {
   }, [req, settings, bcv])
 
   const submit = async () => {
-    if (!req) return
-
-    if (!pay.bank || !/^\d{4}$/.test(pay.ref) || !/^\d{7}$/.test(pay.mobile_phone)) {
-      void showAlert('Complete banco, referencia de 4 dígitos y teléfono de 7 dígitos.', { title: 'Datos incompletos' })
+    if (!req || sending) return
+    const paymentUnchanged = isUnchangedPayment(originalPayment, pay)
+    if (!accept) { void showAlert('Acepte los Términos y condiciones.', { title: 'Aceptación requerida' }); return }
+    if (!paymentUnchanged && (!pay.bank || !/^\d{6}$/.test(pay.ref) || !/^\d{7}$/.test(pay.mobile_phone) || !/^04(12|14|16|22|24|26)$/.test(pay.mobile_phone_prefix))) {
+      void showAlert('Complete banco, referencia de 6 dígitos y teléfono de 7 dígitos.', { title: 'Datos incompletos' })
       return
     }
-    if (!pay.date || pay.date > new Date().toISOString().slice(0, 10)) {
+    if (!pay.date || pay.date > editorialToday()) {
       void showAlert('La fecha del pago no puede ser futura.', { title: 'Fecha inválida' })
       return
     }
 
-    await updateLegal(req.id, { meta, name: meta.razon_social || '', document: meta.rif || '' })
-    await addLegalPayment(req.id, { type: 'pago_movil', bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Por verificar', mobile_phone: pay.mobile_phone_prefix + pay.mobile_phone })
+    setSending(true)
+    try {
+    await updateLegal(req.id, { meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla }, name: meta.razon_social || '', document: meta.rif || '' })
+    if (!paymentUnchanged) await addLegalPayment(req.id, { type: 'pago_movil', bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Por verificar', mobile_phone: pay.mobile_phone_prefix + pay.mobile_phone }, paymentIdempotency(req.id, pay))
     await submitLegal(req.id)
     await showAlert('Solicitud de convocatoria enviada para verificación.', { title: 'Solicitud enviada' })
     navigate('/solicitante/historial')
+    } catch (e: any) { await showAlert(e.message || 'No se pudo enviar la solicitud.', { title: 'Error' }) } finally { setSending(false) }
   }
 
   return (
     <section className="space-y-4">
+      {req?.status === 'Borrador' && req.comment && <div className="rounded border border-amber-300 bg-amber-50 p-4"><strong>Solicitud devuelta</strong><p>{req.comment}</p></div>}
       <h1 className="text-xl font-semibold">Solicitud de publicación de convocatoria</h1>
       <div className="text-sm text-slate-700">¡Completa estos tres pasos y obtén la publicación de tu convocatoria en la próxima edición!</div>
 
@@ -121,8 +132,8 @@ export default function Convocatoria() {
           <input className="input" placeholder="RIF" value={meta.rif || ''} onChange={e => setMeta({ ...meta, rif: e.target.value.toUpperCase() })} />
           <input className="input" placeholder="ESTADO" value={meta.estado || ''} onChange={e => setMeta({ ...meta, estado: e.target.value.toUpperCase() })} />
           <input className="input" placeholder="OFICINA DE REGISTRO MERCANTIL" value={meta.oficina || ''} onChange={e => setMeta({ ...meta, oficina: e.target.value.toUpperCase() })} />
-          <input className="input" placeholder="TOMO (Máx 3)" 
-                 maxLength={3} 
+          <input className="input" placeholder="TOMO (Máx 3)"
+                 maxLength={3}
                  pattern="^\d{1,3}$"
                  title="Debe ingresar hasta 3 números"
                  value={meta.tomo || ''} onChange={e => setMeta({ ...meta, tomo: e.target.value.replace(/\D/g, '') })} />
@@ -132,13 +143,13 @@ export default function Convocatoria() {
             onChange={(y) => setMeta({ ...meta, anio: y })}
             placeholder="Año"
           />
-          <input className="input" placeholder="Número de expediente" 
-                 maxLength={12} 
+          <input className="input" placeholder="Número de expediente"
+                 maxLength={12}
                  pattern="^\d{3}-\d{1,8}$"
                  title="Formato: 3 dígitos, un guion, y hasta 8 dígitos (Ej. 391-456987)"
                  value={meta.expediente || ''} onChange={e => setMeta({ ...meta, expediente: e.target.value.toUpperCase() })} />
-          <input className="input" type="date" placeholder="Fecha" 
-                 max={new Date().toISOString().split('T')[0]}
+          <input className="input" type="date" placeholder="Fecha"
+                 max={editorialToday()}
                  value={meta.fecha || ''} onChange={e => setMeta({ ...meta, fecha: e.target.value })} />
           <input className="input md:col-span-2" placeholder="Nombres y apellidos del representante legal" value={meta.representante || ''} onChange={e => setMeta({ ...meta, representante: e.target.value })} />
           <input className="input" placeholder="Documento de identidad del representante" value={meta.ci_representante || ''} onChange={e => setMeta({ ...meta, ci_representante: e.target.value })} />
@@ -246,36 +257,37 @@ export default function Convocatoria() {
               </select>
             </label>
             <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Últimos 4 dígitos Referencia *</span>
-              <input 
-                className="input w-full" 
-                maxLength={4} 
-                value={pay.ref} 
-                onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })} 
-                placeholder="0000" 
+              <span className="block text-slate-600 mb-1">Últimos 6 dígitos Referencia *</span>
+              <input
+                className="input w-full"
+                maxLength={6}
+                value={pay.ref}
+                onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })}
+                placeholder="0000"
               />
             </label>
             <label className="text-sm block">
               <span className="block text-slate-600 mb-1">Fecha</span>
-              <input className="input w-full" type="date" max={new Date().toISOString().slice(0, 10)} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+              <input className="input w-full" type="date" max={editorialToday()} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
             </label>
             <label className="text-sm md:col-span-2 block">
                 <span className="block text-slate-600 mb-1">Teléfono origen (Pago Móvil) *</span>
                 <div className="flex gap-2">
                    <select className="input w-28 text-xs" value={pay.mobile_phone_prefix} onChange={e => setPay({ ...pay, mobile_phone_prefix: e.target.value })}>
-                     <option>0412</option>
+                     <option value="">Seleccione</option>
+                        <option>0412</option>
                      <option>0414</option>
                      <option>0416</option>
                      <option>0422</option>
                      <option>0424</option>
                      <option>0426</option>
                    </select>
-                   <input 
-                    className="input flex-1" 
-                    maxLength={7} 
-                    value={pay.mobile_phone} 
-                    onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })} 
-                    placeholder="1234567" 
+                   <input
+                    className="input flex-1"
+                    maxLength={7}
+                    value={pay.mobile_phone}
+                    onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })}
+                    placeholder="1234567"
                    />
                 </div>
                 <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 7 dígitos numéricos</p>
@@ -290,8 +302,8 @@ export default function Convocatoria() {
           </div>
 
           <div className="flex gap-2">
-            <button className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg" disabled={!accept || !pay.bank || pay.ref.length !== 4 || !pay.date || pay.mobile_phone.length !== 7} onClick={submit}>
-              Reportar pago
+            <button className="btn btn-primary w-full py-3 font-bold text-lg shadow-lg" disabled={!accept || sending} onClick={submit}>
+              Reportar solicitud
             </button>
           </div>
         </div>

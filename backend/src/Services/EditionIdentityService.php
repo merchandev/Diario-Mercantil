@@ -15,7 +15,30 @@ final class EditionIdentityService
         return $roman . '-' . str_pad((string)$number, 4, '0', STR_PAD_LEFT);
     }
 
-    public static function cve(): string { return 'DM-' . strtoupper(bin2hex(random_bytes(12))); }
+    public static function cve(): string
+    {
+        $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $value = '';
+        for ($i = 0; $i < 8; $i++) $value .= $alphabet[random_int(0, 35)];
+        return 'DMV-' . $value;
+    }
+
+    /** Retry only a CVE collision, never a number/composition conflict. */
+    public static function insertWithCve(PDOStatement $statement, array $params, int $cveIndex): string
+    {
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $params[$cveIndex] = self::cve();
+            try {
+                $statement->execute($params);
+                return $params[$cveIndex];
+            } catch (PDOException $error) {
+                $message = strtolower((string)($error->errorInfo[2] ?? $error->getMessage()));
+                if (!str_contains($message, 'uq_editions_cve') && !str_contains($message, 'editions.cve')) throw $error;
+                if ($attempt === 4) throw $error;
+            }
+        }
+        throw new RuntimeException('No se pudo reservar un CVE único.');
+    }
 
     /** Must run inside the yearly reservation transaction. */
     public function nextNumber(int $year): int

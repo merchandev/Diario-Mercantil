@@ -17,9 +17,9 @@ function HeroSlider() {
       })
       .catch(() => setBanner(undefined))
   }, []);
-  
+
   if (!banner) return null;
-  
+
   return (
     <div className="relative w-full h-28 md:h-32 bg-slate-100 overflow-hidden">
       <img src={banner} className="w-full h-full object-cover" alt="Publicidad del Diario Mercantil" />
@@ -70,7 +70,6 @@ export default function PublicHeader() {
     { label: 'SOBRE EL DIARIO', to: '/p/sobre-el-diario' },
     { label: 'CÓMO PUBLICAR', to: '/p/como-publicar' },
     { label: 'EDICIONES', to: '/ediciones' },
-    { label: 'DIRECTORIO LEGAL', to: '/p/directorio-legal' },
     { label: 'CONTACTO', to: '/contacto' },
     { label: 'PREGUNTAS FRECUENTES', to: '/p/preguntas-frecuentes' },
   ] as const
@@ -98,6 +97,7 @@ export default function PublicHeader() {
       }
 
       const order = ['inicio', 'sobre-el-diario', 'como-publicar', 'ediciones', 'directorio-legal', 'preguntas-frecuentes']
+      items = items.filter(it => !['directorio-legal','terminos-y-condiciones','politicas-de-privacidad'].includes(it.slug))
       const bySlug = new Map(items.map(it => [it.slug, it]))
       const sorted = [
         ...order.filter(s => bySlug.has(s)).map(slug => bySlug.get(slug)!),

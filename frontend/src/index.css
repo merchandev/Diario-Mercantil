@@ -34,7 +34,7 @@ html, body { overflow-x: hidden; max-width: 100vw; }
   .btn-outline { @apply border border-slate-300 text-slate-700 hover:bg-slate-50; }
   .btn-ghost { @apply text-slate-700 hover:bg-slate-100; }
   .btn-icon { @apply w-10 h-10 p-0 rounded-3xl inline-grid place-items-center; }
-  .input { @apply border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300; }
+  .input { @apply min-w-0 border border-slate-300 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-300; }
   select.input { @apply appearance-none pr-10; }
   .pill { @apply px-2 py-1 rounded-full text-xs font-medium; }
 }

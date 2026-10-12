@@ -76,7 +76,7 @@ export default function Login() {
             <h2 className="text-xl font-semibold tracking-tight text-slate-800 mb-6">Inicia sesión</h2>
             <form onSubmit={onSubmit} className="space-y-5">
               <div className="group">
-                <label className="block text-sm mb-1 text-slate-600">N° de documento</label>
+                <label className="block text-sm mb-1 text-slate-600">Nro. de documento de identidad</label>
                 <div className="flex items-center rounded-2xl ring-1 ring-slate-200 bg-white focus-within:ring-2 focus-within:ring-brand-600 transition px-2 h-12 shadow-sm">
                   <span className="text-slate-500 w-8 grid place-items-center"><IconIdCard /></span>
                   {!administrative && <select aria-label="Prefijo" value={docPrefix} onChange={e => setDocPrefix(e.target.value as any)} className="h-8 rounded-md bg-transparent px-1 text-slate-700 focus:outline-none">
@@ -96,7 +96,6 @@ export default function Login() {
                   />
                 </div>
               </div>
-              <button type="button" className="text-sm text-brand-700 underline" onClick={() => { setAdministrative(!administrative); setDocNumber(''); setError('') }}>{administrative ? 'Acceso con documento' : 'Acceso administrativo con usuario'}</button>
               <div className="group">
                 <label className="block text-sm mb-1 text-slate-600">Contraseña</label>
                 <div className="flex items-center rounded-2xl ring-1 ring-slate-200 bg-white focus-within:ring-2 focus-within:ring-brand-600 transition px-2 h-12 shadow-sm">
@@ -127,8 +126,9 @@ export default function Login() {
                 <span className="relative z-10">{loading ? 'Ingresando...' : 'Ingresar'}</span>
                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
               </button>
+              <button type="button" className="text-sm text-brand-700 underline" onClick={() => { setAdministrative(!administrative); setDocNumber(''); setError('') }}>{administrative ? 'Acceso con documento' : 'Acceso administrativo con usuario'}</button>
               <div className="text-center">
-                <span className="text-sm text-slate-600">¿No tiene una cuenta? </span>
+                <span className="text-sm text-slate-600">¿No tienes cuenta? </span>
                 <Link to="/register" className="text-sm text-brand-600 hover:text-brand-700 font-medium">Crear cuenta</Link>
               </div>
             </form>

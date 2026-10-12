@@ -23,3 +23,10 @@ backend/*.sqlite
 backend/storage/*.log
 backend/storage/database.sqlite*
 backend/.phpunit.result.cache
+
+# Local diagnostics may contain deployment credentials
+/get_logs.sh
+/ssh_logs.sh
+/public_test.php
+/test_auth.php
+/test_forgot.php

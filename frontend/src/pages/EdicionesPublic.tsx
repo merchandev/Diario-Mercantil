@@ -1,3 +1,4 @@
+import PublicEditionPanel from '../components/PublicEditionPanel'
 import React, { useEffect, useMemo, useState } from 'react'
 import { listPublicEditions, type Edition } from '../lib/api'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -63,53 +64,7 @@ export default function EdicionesPublic() {
             {loading ? (
               <div className="card p-8 text-center text-slate-500">Cargando ediciones...</div>
             ) : latestEdition ? (
-              <div className="card p-6 space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-brand-800">
-                      Edición N° {latestEdition.edition_no}
-                    </h2>
-                    <p className="text-sm text-slate-600">
-                      Fecha: {latestEdition.date ? new Date(latestEdition.date).toLocaleDateString('es-VE') : '-'}
-                    </p>
-                    {latestEdition.code && (
-                      <p className="text-xs text-slate-500 font-mono mt-1">
-                        CVE: {latestEdition.cve || latestEdition.code}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    {latestEdition.code && (
-                      <Link
-                        className="btn btn-outline text-sm"
-                        to={`/edicion/${encodeURIComponent(latestEdition.cve || latestEdition.code)}`}
-                      >
-                        Ver en línea
-                      </Link>
-                    )}
-                    {latestPdfUrl && (
-                      <a
-                        className="btn btn-primary text-sm"
-                        href={`${latestPdfUrl}?download=1`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Descargar PDF
-                      </a>
-                    )}
-                  </div>
-                </div>
-                {latestPdfUrl && (
-                  <div className="h-[600px] border rounded-lg overflow-hidden bg-slate-800">
-                    <FlipbookViewer src={latestPdfUrl} height={580} />
-                  </div>
-                )}
-                {!latestPdfUrl && (
-                  <div className="p-6 text-center text-slate-500 bg-slate-100 rounded-lg">
-                    PDF no disponible para esta edición.
-                  </div>
-                )}
-              </div>
+              <PublicEditionPanel edition={latestEdition} link />
             ) : (
               <div className="card p-8 text-center text-slate-500">
                 No hay ediciones publicadas aún.
@@ -146,11 +101,10 @@ export default function EdicionesPublic() {
                 <table className="min-w-[800px] w-full text-left text-sm">
                   <thead>
                     <tr className="text-left border-b bg-brand-800 text-white">
-                      <th className="p-3">Fecha de la Edición</th>
-                      <th className="p-3">N° de Edición</th>
+                      <th className="p-3">Fecha de edición</th>
+                      <th className="p-3">Número de edición</th>
                       <th className="p-3">Razón social</th>
-                      <th className="p-3">Código de Verificación (CVE)</th>
-                      <th className="p-3">Estado</th>
+                                            <th className="p-3">Estado</th>
                       <th className="p-3 text-right">Acciones</th>
                     </tr>
                   </thead>
@@ -162,9 +116,8 @@ export default function EdicionesPublic() {
                       return (
                         <tr key={ed.id || ed.code} className="border-b last:border-0 hover:bg-slate-50">
                           <td className="p-3 whitespace-nowrap">{dateTxt ? new Date(dateTxt).toLocaleDateString('es-VE') : '-'}</td>
-                          <td className="p-3">{ed.edition_no ? `N° ${ed.edition_no}` : '-'}</td>
+                          <td className="p-3">{ed.code || '-'}</td>
                           <td className="p-3">{ed.company_name || ed.name || '-'}</td>
-                          <td className="p-3 font-mono text-xs">{ed.cve || ed.code || '-'}</td>
                           <td className="p-3">
                             <span className={`pill text-xs ${ed.status === 'Publicada' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                               {ed.status || '-'}

@@ -77,13 +77,7 @@ const services = [
     icon: IconSearch,
     action: 'Ver ediciones',
   },
-  {
-    title: 'Directorio legal',
-    description: 'Accede a la sección del Directorio Legal y a la información profesional publicada en el portal.',
-    to: '/p/directorio-legal',
-    icon: IconUserCircle,
-    action: 'Abrir directorio',
-  },
+
 ]
 
 export default function Home() {
@@ -112,7 +106,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid md:grid-cols-2 gap-4">
               {services.map(({ title, description, to, icon: Icon, action }) => (
                 <article key={title} className="card p-5 bg-white border border-slate-200 flex flex-col">
                   <div className="w-11 h-11 rounded-xl bg-brand-50 text-brand-700 flex items-center justify-center mb-4">
@@ -141,9 +135,9 @@ export default function Home() {
       <footer className="bg-white border-t border-slate-200 mt-4">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row gap-1.5 sm:items-center sm:justify-between text-xs sm:text-sm text-slate-500">
           <span>© 2026 Diario Mercantil. Todos los derechos reservados.</span>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link to="/p/preguntas-frecuentes" className="hover:text-brand-700">Preguntas frecuentes</Link>
-            <Link to="/contacto" className="hover:text-brand-700">Contacto</Link>
+            <Link to="/contacto" className="hover:text-brand-700">Contacto</Link><Link to="/p/terminos-y-condiciones" className="hover:text-brand-700">Términos y condiciones</Link><Link to="/p/politicas-de-privacidad" className="hover:text-brand-700">Políticas de privacidad</Link>
           </div>
         </div>
       </footer>

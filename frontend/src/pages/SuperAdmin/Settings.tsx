@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { getAdminSettings, saveSettings, forceRefreshBcv, Settings as SettingsType } from '../../lib/api'
 import { verifySuperAdmin } from '../../lib/api'
 import { useDialog } from '../../contexts/DialogContext'
+import MaintenanceControl from '../../components/MaintenanceControl'
 import RegistrationControl from '../../components/RegistrationControl'
 
 export default function Settings() {
@@ -101,6 +102,7 @@ export default function Settings() {
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <RegistrationControl dark />
+      <MaintenanceControl dark />
                     {/* Precios y Tasas */}
                     <div className="bg-gray-800/50 backdrop-blur-xl border border-purple-500/30 rounded-2xl p-6">
                         <div className="flex items-center gap-3 mb-6">

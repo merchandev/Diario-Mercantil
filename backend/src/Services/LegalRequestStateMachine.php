@@ -8,7 +8,7 @@ final class LegalRequestStateMachine {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
-    
+
     private function executeTransition(int $id, string $action, callable $logic) {
         $ownsTransaction = !$this->pdo->inTransaction();
         if ($ownsTransaction) {
@@ -25,7 +25,7 @@ final class LegalRequestStateMachine {
             if (!$req) {
                 throw new Exception("Solicitud no encontrada.", 404);
             }
-            
+
             // Execute specific logic
             $result = $logic($req);
 
@@ -37,14 +37,22 @@ final class LegalRequestStateMachine {
             } catch (Exception $e) {
                 // Background worker or test execution
             }
-            
-            $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
-                ->execute([$actorId, $action, 'legal_request', $id]);
+
+            if ($action === 'returnToDraft') {
+                $updated = $this->pdo->prepare('SELECT status,comment FROM legal_requests WHERE id=?');
+                $updated->execute([$id]);
+                $after = $updated->fetch(PDO::FETCH_ASSOC);
+                $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id, before_data, after_data) VALUES(?,?,?,?,?,?)")
+                    ->execute([$actorId, $action, 'legal_request', $id, json_encode(['status'=>$req['status']]), json_encode($after, JSON_UNESCAPED_UNICODE)]);
+            } else {
+                $this->pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
+                    ->execute([$actorId, $action, 'legal_request', $id]);
+            }
 
             if ($ownsTransaction) {
                 $this->pdo->commit();
             }
-            
+
             return $result;
 
         } catch (Throwable $exception) {
@@ -70,7 +78,7 @@ final class LegalRequestStateMachine {
 
             $update = $this->pdo->prepare("UPDATE legal_requests SET status='Por verificar', submitted_at=?, order_no=? WHERE id=?");
             $update->execute([$now, $orderNo, $id]);
-            
+
             try {
                 $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
                 $userStmt->execute([$id]);
@@ -96,9 +104,9 @@ final class LegalRequestStateMachine {
             // Lock associated payments FOR UPDATE to prevent race conditions
             $lockClause = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE';
             $this->pdo->prepare("SELECT id FROM legal_payments WHERE legal_request_id=?" . $lockClause)->execute([$id]);
-            
+
             $now = gmdate('Y-m-d H:i:s');
-            
+
             // Mark payments as Aprobado
             $this->pdo->prepare("UPDATE legal_payments SET status='Aprobado' WHERE legal_request_id=?")
                  ->execute([$id]);
@@ -107,7 +115,7 @@ final class LegalRequestStateMachine {
             $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', verification_date=? WHERE id=?")
                  ->execute([$now, $id]);
 
-            
+
             try {
                 $userStmt = $this->pdo->prepare("SELECT email, name FROM users WHERE id=(SELECT user_id FROM legal_requests WHERE id=?)");
                 $userStmt->execute([$id]);
@@ -155,12 +163,18 @@ final class LegalRequestStateMachine {
         });
     }
 
-    public function returnToDraft(int $id, string $comment = 'Devuelto a borrador por administrador.'): void {
+    public function returnToDraft(int $id, string $comment): void {
+        $comment = trim($comment);
+        if ($comment === '') throw new InvalidArgumentException('Indique el motivo de la devolución.', 422);
+        if (mb_strlen($comment) > 2000) throw new InvalidArgumentException('El motivo es demasiado largo.', 422);
         $this->executeTransition($id, 'returnToDraft', function($req) use ($id, $comment) {
             if ($req['status'] !== 'Por verificar' && $req['status'] !== 'En trámite') {
                 throw new Exception("Solo se puede devolver a borrador si la solicitud está 'Por verificar' o 'En trámite'.", 409);
             }
 
+            $active = $this->pdo->prepare("SELECT 1 FROM edition_orders eo JOIN editions e ON e.id=eo.edition_id WHERE eo.legal_request_id=? AND e.deleted_at IS NULL LIMIT 1");
+            $active->execute([$id]);
+            if ($active->fetchColumn()) throw new RuntimeException('Retire primero la solicitud de la edición activa para devolverla.', 409);
             $this->pdo->prepare("UPDATE legal_requests SET status='Borrador', submitted_at=NULL, verification_date=NULL, comment=? WHERE id=?")
                  ->execute([$comment, $id]);
             return true;
@@ -175,7 +189,7 @@ final class LegalRequestStateMachine {
 
             $this->pdo->prepare("DELETE FROM edition_orders WHERE legal_request_id=?")->execute([$id]);
             $this->pdo->prepare("UPDATE legal_requests SET status='En trámite', publish_date=NULL WHERE id=?")->execute([$id]);
-            
+
             return true;
         });
     }

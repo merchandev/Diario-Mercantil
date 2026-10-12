@@ -140,9 +140,9 @@ class EditionController {
     $this->requireAdmin();
     $pdo = Database::pdo();
     $stmt = $pdo->query('
-        SELECT e.*, u.name as published_by_name 
-        FROM editions e 
-        LEFT JOIN users u ON e.published_by = u.id 
+        SELECT e.*, u.name as published_by_name
+        FROM editions e
+        LEFT JOIN users u ON e.published_by = u.id
         WHERE e.deleted_at IS NULL
         ORDER BY e.id DESC LIMIT 200
     ');
@@ -187,11 +187,11 @@ class EditionController {
 
     if ($q !== '') {
         if ($isSqlite) {
-            $sql .= 'AND (e.code LIKE ? OR e.cve LIKE ? OR CAST(e.edition_no AS TEXT) LIKE ? OR l.name LIKE ? OR l.meta LIKE ?) ';
-            for ($i=0; $i<5; $i++) $params[] = "%$q%";
+            $sql .= 'AND (DM_UPPER(e.code) LIKE ? OR DM_UPPER(e.cve) LIKE ? OR CAST(e.edition_no AS TEXT) LIKE ? OR DM_UPPER(l.name) LIKE ? OR (json_valid(l.meta) AND (DM_UPPER(json_extract(l.meta, "$.razon_social")) LIKE ? OR DM_UPPER(json_extract(l.meta, "$.razon_denominacion_social")) LIKE ? OR DM_UPPER(json_extract(l.meta, "$.razon_social_convocatoria")) LIKE ?))) ';
+            for ($i=0; $i<7; $i++) $params[] = "%" . mb_strtoupper($q, "UTF-8") . "%";
         } else {
-            $sql .= 'AND (e.code LIKE ? OR e.cve LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR l.name LIKE ? OR (JSON_VALID(l.meta) AND (JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social")) LIKE ? OR JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social")) LIKE ?))) ';
-            for ($i=0; $i<6; $i++) $params[] = "%$q%";
+            $sql .= 'AND (UPPER(e.code) LIKE ? OR UPPER(e.cve) LIKE ? OR CAST(e.edition_no AS CHAR) LIKE ? OR UPPER(l.name) LIKE ? OR (JSON_VALID(l.meta) AND (UPPER(JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social"))) LIKE ? OR UPPER(JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_denominacion_social"))) LIKE ? OR UPPER(JSON_UNQUOTE(JSON_EXTRACT(l.meta, "$.razon_social_convocatoria"))) LIKE ?))) ';
+            for ($i=0; $i<7; $i++) $params[] = "%" . mb_strtoupper($q, "UTF-8") . "%";
         }
     }
 
@@ -203,9 +203,9 @@ class EditionController {
         $sql .= 'AND e.date < ? ';
         $params[] = EditorialClock::nextDay($to);
     }
-    
+
     $sql .= 'ORDER BY e.published_at DESC, e.id DESC LIMIT 50';
-    
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -235,31 +235,31 @@ class EditionController {
   public function exportCsv($id) {
     $this->requireAdmin();
     $pdo = Database::pdo();
-    
+
     $edStmt = $pdo->prepare('SELECT code, date FROM editions WHERE id=? AND deleted_at IS NULL');
     $edStmt->execute([$id]);
     $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
-    
+
     if (!$edition) {
         http_response_code(404);
         echo "Edition not found";
         return;
     }
-    
+
     $stmt = $pdo->prepare("SELECT l.order_no, l.name, u.name as applicant_name, u.email, l.status, l.total_bs FROM edition_orders eo JOIN legal_requests l ON eo.legal_request_id = l.id JOIN users u ON l.user_id = u.id WHERE eo.edition_id=? ORDER BY l.id");
     $stmt->execute([$id]);
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
+
     $filename = "Edicion_" . ($edition['code'] ?: $id) . ".csv";
-    
+
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
-    
+
     $output = fopen('php://output', 'w');
     // Add BOM for Excel UTF-8 support
     fputs($output, "\xEF\xBB\xBF");
     fputcsv($output, ['N° Orden', 'Razón / Denominación', 'Solicitante', 'Correo', 'Estado', 'Monto (Bs)']);
-    
+
     foreach ($items as $row) {
         fputcsv($output, [
             $row['order_no'],
@@ -384,7 +384,7 @@ class EditionController {
             'INSERT INTO editions(code,status,date,edition_no,orders_count,created_at,publication_year,cve) '
             . 'VALUES(?,?,?,?,?,?,?,?)'
         );
-        $stmt->execute([$code, $status, $date, $editionNo, 0, $now, $year, $cve]);
+        $cve = EditionIdentityService::insertWithCve($stmt, [$code, $status, $date, $editionNo, 0, $now, $year, $cve], 7);
         $editionId = (int)$pdo->lastInsertId();
 
         $orderService = new EditionOrderService($pdo);
@@ -514,13 +514,13 @@ class EditionController {
   public function update($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
-    
+
     $s = $pdo->prepare('SELECT status FROM editions WHERE id=? AND deleted_at IS NULL'); $s->execute([$id]);
     if ($s->fetchColumn() === 'Publicada') {
         Response::json(['error'=>'No se puede modificar una edición publicada'], 409);
         exit;
     }
-    
+
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $fields = ['date'];
     if (isset($in['date'])) {
@@ -530,11 +530,11 @@ class EditionController {
     }
     $set=[]; $vals=[];
     foreach ($fields as $f) if (isset($in[$f])) { $set[]="$f=?"; $vals[]=$in[$f]; }
-    
+
     if (!$set) return Response::json(['ok'=>true]);
     $sql = 'UPDATE editions SET '.implode(',', $set).' WHERE id=?';
     $vals[] = $id;
-    
+
     try {
         $pdo->prepare($sql)->execute($vals);
         $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
@@ -552,7 +552,7 @@ class EditionController {
   public function setOrders($id){
     $u = $this->requireAdmin();
     $pdo = Database::pdo();
-    
+
     $in = json_decode(file_get_contents('php://input'), true) ?: [];
     $ids = $in['order_ids'] ?? ($in['orders'] ?? []);
     if (!is_array($ids)) $ids = [];
@@ -560,14 +560,14 @@ class EditionController {
     if ($ids === []) {
         return Response::json(['error'=>'La edición debe conservar al menos una solicitud asociada.'], 422);
     }
-    
+
     try {
         $orderService = new EditionOrderService($pdo);
         $cnt = $orderService->setOrdersForEdition($id, $ids, (int)$u['id']);
-        
+
         $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
             ->execute([$u['id'], 'set_orders_edition', 'edition', $id]);
-            
+
         Response::json(['ok'=>true,'orders_count'=>$cnt]);
     } catch (Throwable $e) {
         $codeResp = $e->getCode() ?: 500;
@@ -575,14 +575,14 @@ class EditionController {
         Response::json(['error'=>$e->getMessage()], $codeResp);
     }
   }
-  
+
   public function autoSelect($id){
       $u = $this->requireAdmin();
       $pdo = Database::pdo();
-      
+
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
       $limit = (int)($in['limit'] ?? 100);
-      
+
       try {
           $s = $pdo->prepare(
               "SELECT lr.id FROM legal_requests lr WHERE lr.status='En trámite' "
@@ -593,23 +593,23 @@ class EditionController {
           );
           $s->execute();
           $ids = $s->fetchAll(PDO::FETCH_COLUMN);
-          
+
           $cnt = 0;
           if (!empty($ids)) {
               // We should get existing orders and append these new ones
               $exStmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
               $exStmt->execute([$id]);
               $existingIds = $exStmt->fetchAll(PDO::FETCH_COLUMN);
-              
+
               $mergedIds = array_unique(array_merge($existingIds, $ids));
-              
+
               $orderService = new EditionOrderService($pdo);
               $cnt = $orderService->setOrdersForEdition($id, $mergedIds, (int)$u['id']);
           }
-          
+
           $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
               ->execute([$u['id'], 'auto_select_edition_orders', 'edition', $id]);
-              
+
           Response::json(['ok'=>true, 'count'=>count($ids), 'added'=>$ids]);
     } catch (Exception $e) {
         $code = (int)$e->getCode();
@@ -617,11 +617,11 @@ class EditionController {
         Response::json(['error'=>$e->getMessage()], $code);
     }
   }
-  
+
     public function publish($id){
       $u = $this->requireAdmin();
       $pdo = Database::pdo();
-      
+
       require_once __DIR__ . '/Services/EditionReadinessService.php';
       $readiness = (new EditionReadinessService($pdo))->check((int)$id);
       if (!$readiness['ready']) {
@@ -634,7 +634,7 @@ class EditionController {
 
       require_once __DIR__ . '/Services/EditionPublicationService.php';
       $service = new EditionPublicationService($pdo);
-      
+
       try {
           $service->publish((int)$id, (int)$u['id']);
           Response::json(['ok' => true]);
@@ -657,28 +657,28 @@ class EditionController {
     public function notify($id) {
         $u = $this->requireAdmin();
         $pdo = Database::pdo();
-        
+
         $edStmt = $pdo->prepare('SELECT code, status FROM editions WHERE id=? AND deleted_at IS NULL');
         $edStmt->execute([$id]);
         $edition = $edStmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$edition || $edition['status'] !== 'Publicada') {
             return Response::json(['error' => 'Edición no encontrada o no publicada'], 400);
         }
-        
+
         $stmt = $pdo->prepare("SELECT legal_request_id FROM edition_orders WHERE edition_id=?");
         $stmt->execute([$id]);
         $orderIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
+
         if (count($orderIds) === 0) {
             return Response::json(['error' => 'No hay publicaciones en esta edición'], 400);
         }
-        
+
         $inQuery = implode(',', array_fill(0, count($orderIds), '?'));
         $ownersStmt = $pdo->prepare("SELECT u.email, u.name, l.order_no FROM legal_requests l JOIN users u ON l.user_id = u.id WHERE l.id IN ($inQuery)");
         $ownersStmt->execute($orderIds);
         $owners = $ownersStmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         require_once __DIR__ . '/Services/EmailService.php';
         $sentCount = 0;
         foreach ($owners as $owner) {
@@ -691,7 +691,7 @@ class EditionController {
                 }
             }
         }
-        
+
         Response::json(['ok' => true, 'sent' => $sentCount]);
     }
 
@@ -704,7 +704,7 @@ class EditionController {
     $edition = $ed->fetch(PDO::FETCH_ASSOC);
     if (!$edition) return Response::json(['error'=>'not_found'],404);
     if ($edition['status'] !== 'Borrador') return Response::json(['error'=>'La edición debe estar en Borrador para subir o reemplazar un archivo.'], 409);
-    
+
     if (!isset($_FILES['file'])) return Response::json(['error'=>'file_required'],400);
 
     $file = $_FILES['file'];
@@ -716,11 +716,11 @@ class EditionController {
     if ($err !== UPLOAD_ERR_OK) {
       return Response::json(['error'=>'Error al subir archivo (codigo '.$err.')'],400);
     }
-    
+
     $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
     if ($ext !== 'pdf') return Response::json(['error'=>'Solo se aceptan archivos PDF'],400);
     if ($size <= 0 || !is_uploaded_file($tmp)) return Response::json(['error'=>'Archivo invalido'],400);
-    
+
     $maxMb = min(50, max(1, (int) (getenv('MAX_FILE_MB') ?: 50)));
     if ($size > $maxMb * 1024 * 1024) return Response::json(['error'=>"PDF demasiado grande (max {$maxMb}MB)"],400);
 
@@ -731,7 +731,7 @@ class EditionController {
     if ($mime !== 'application/pdf') {
         return Response::json(['error'=>'MIME inválido, no es un PDF.'], 400);
     }
-    
+
     // Check %PDF- signature
     $handle = fopen($tmp, 'r');
     $header = fread($handle, 5);
@@ -739,7 +739,7 @@ class EditionController {
     if ($header !== '%PDF-') {
         return Response::json(['error'=>'Firma de archivo PDF inválida.'], 400);
     }
-    
+
     // Check page count and parseability
     try {
         require_once __DIR__ . '/Services/PdfInspector.php';
@@ -791,12 +791,12 @@ class EditionController {
           "UPDATE files SET status='replaced',deleted_at=?,updated_at=? WHERE id=?"
         )->execute([$now,$now,$oldFileId]);
       }
-      
+
       $pdo->prepare("INSERT INTO audit_logs(actor_user_id, action, resource_type, resource_id) VALUES(?,?,?,?)")
             ->execute([$u['id'], 'upload_edition_pdf', 'edition', $id]);
-            
+
       $pdo->commit();
-      
+
       Response::json(['ok'=>true,'file_id'=>$fileId,'file_name'=>$name]);
     } catch (Throwable $e) {
       if ($pdo->inTransaction()) $pdo->rollBack();

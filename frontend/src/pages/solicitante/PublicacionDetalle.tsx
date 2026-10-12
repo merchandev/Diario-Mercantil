@@ -109,12 +109,11 @@ export default function PublicacionDetalleSolicitante() {
           </div>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleDownloadPDF} className="btn btn-primary inline-flex items-center gap-2">
-            <IconDownload /> Descargar Orden
-          </button>
+
         </div>
       </div>
 
+      {req.status === 'Borrador' && req.comment && <div className="rounded-xl border border-amber-300 bg-amber-50 p-4"><strong>Solicitud devuelta</strong><p className="whitespace-pre-wrap">{req.comment}</p></div>}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Columna principal */}
         <div className="lg:col-span-2 space-y-6">
@@ -130,7 +129,7 @@ export default function PublicacionDetalleSolicitante() {
                   Bs. {Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(req?.total_bs ?? 0))}
                 </p>
               </div>
-              
+
               {payments.length === 0 ? (
                 <div className="flex items-center justify-start md:justify-end text-slate-500 text-sm">
                   No hay pago reportado
@@ -144,7 +143,7 @@ export default function PublicacionDetalleSolicitante() {
                     </div>
                     <div>
                       <p className="text-slate-500 text-xs">Tipo</p>
-                      <p>{payments[0].type}</p>
+                      <p>{payments[0].type === 'pago_movil' ? 'Pago móvil' : payments[0].type}</p>
                     </div>
                     <div>
                       <p className="text-slate-500 text-xs">Banco</p>

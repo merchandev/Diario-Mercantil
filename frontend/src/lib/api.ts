@@ -31,7 +31,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
 
   const url = typeof input === 'string' ? getUrl(input) : input;
   const reqInit = { ...init, headers, credentials: 'include' as RequestCredentials };
-  
+
   const res = await fetch(url, reqInit)
   if (res.status === 401 && !noRedirect) {
       if (typeof window !== 'undefined') {
@@ -51,6 +51,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
         errorMsg = await res.text() || errorMsg;
       }
     } catch { }
+    if (data?.error === 'maintenance_required' && typeof window !== 'undefined') window.dispatchEvent(new Event('dm-maintenance-required'));
     throw new ApiError(errorMsg, res.status, data);
   }
   return res
@@ -387,6 +388,7 @@ export async function listPaymentMethods() {
 
 // Legal requests
 export type LegalRequest = {
+  precio_unitario_usd?: number;
   subtotal_usd?: number; iva_usd?: number; tasa_bcv?: number; porcentaje_iva?: number; reject_reason?: string;
   can_permanently_delete?: boolean;
   active_edition_id?: number | null;
@@ -497,8 +499,8 @@ export async function verifyLegal(id: number) {
   const res = await fetchAuth(`/api/legal/${id}/verify`, { method: 'POST' })
   return res.json() as Promise<{ ok: boolean; error?: string }>
 }
-export async function returnToDraftLegal(id: number) {
-  const res = await fetchAuth(`/api/legal/${id}/return-to-draft`, { method: 'POST' })
+export async function returnToDraftLegal(id: number, reason: string) {
+  const res = await fetchAuth(`/api/legal/${id}/return-to-draft`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) })
   return res.json() as Promise<{ ok: boolean; error?: string }>
 }
 export async function addLegalPayment(id: number, body: Partial<LegalPayment>, idempotencyKey?: string) {
@@ -774,7 +776,7 @@ export async function deletePage(id: number) {
 export async function getPagePublic(slug: string) {
   const res = await fetch(getUrl(`/api/page/${encodeURIComponent(slug)}`))
   if (!res.ok) throw new Error(await res.text())
-  return res.json() as Promise<{ page: { slug: string; title: string; header_html?: string; footer_html?: string; body_blocks: PageBlock[]; status: string; updated_at: string } }>
+  return res.json() as Promise<{ page: { slug: string; title: string; header_html?: string; footer_html?: string; body_blocks: PageBlock[]; status: string; updated_at: string; version?: string } }>
 }
 
 // Public list of published pages (for navigation)

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 final class PasswordPolicy
 {
-    public const MIN_LENGTH = 12;
-    public const MIN_LENGTH_MSG = 'La contraseña debe tener al menos 12 caracteres';
+    public const MIN_LENGTH = 9;
+    public const MIN_LENGTH_MSG = 'La contraseña debe tener al menos 9 caracteres';
 
     /**
      * Validates the password meets the minimum length policy.
@@ -14,7 +14,7 @@ final class PasswordPolicy
      */
     public static function validate(string $password): void
     {
-        if (strlen($password) < self::MIN_LENGTH) {
+        if (mb_strlen($password, "UTF-8") < self::MIN_LENGTH) {
             throw new InvalidArgumentException(self::MIN_LENGTH_MSG);
         }
     }

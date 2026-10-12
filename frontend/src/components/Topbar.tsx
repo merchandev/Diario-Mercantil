@@ -71,10 +71,10 @@ export default function Topbar({ onMenuToggle }: { onMenuToggle?: () => void }) 
           >
             <IconMenu className="w-6 h-6" />
           </button>
-          <div className="flex-1" />
+          <a href={isAdminRole(user?.role) ? "/dashboard" : "/solicitante"} className="flex-1 min-w-0"><img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil de Venezuela" className="h-10 md:h-14 max-w-full" /></a>
           <div className="hidden md:flex items-center gap-2">
             <div className="text-xs text-slate-600">Tasa BCV: {ticker.rate?.toFixed?.(2) ?? '—'} Bs/USD</div>
-            <div className="text-xs text-slate-600">Caracas, {new Date().toLocaleDateString('es-VE', { dateStyle: 'full' })}</div>
+            <div className="text-xs text-slate-600">Caracas, {new Date().toLocaleDateString('es-VE', { dateStyle: 'full', timeZone: 'America/Caracas' })}</div>
           </div>
           {/* Hidden legacy snippet to support external selectors */}
           <div id="dolar" className="hidden">

@@ -1,14 +1,16 @@
+import EditorialContentEditor from '../components/EditorialContentEditor'
 import { useEffect, useState } from 'react'
 import { getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
 import { useDialog } from '../contexts/DialogContext'
 import MediosPago from './MediosPago'
+import MaintenanceControl from '../components/MaintenanceControl'
 import RegistrationControl from '../components/RegistrationControl'
 
 export default function Configuracion() {
   const { showAlert, confirmAction, requestText } = useDialog()
   const [s, setS] = useState<Partial<Settings>>({})
   const [saving, setSaving] = useState(false)
-  const [tab, setTab] = useState<'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias'>('Directorio Legal')
+  const [tab, setTab] = useState<'General' | 'Medios de pago' | 'Directorio Legal' | 'Preguntas y Respuestas' | 'Instrucciones: Documentos' | 'Instrucciones: Convocatorias' | 'Términos y condiciones' | 'Políticas de privacidad'>('General')
   const [areas, setAreas] = useState<{ id: number; name: string }[]>([])
   const [colleges, setColleges] = useState<{ id: number; name: string }[]>([])
   const [selectedAreaId, setSelectedAreaId] = useState(0)
@@ -41,12 +43,16 @@ export default function Configuracion() {
     <section className="space-y-4">
       <h1 className="text-xl font-semibold">Configuración</h1>
       <RegistrationControl />
+      <MaintenanceControl />
       <div className="card p-4">
         <div className="tabs flex flex-wrap gap-2 border-b mb-4">
-          {(['General', 'Medios de pago', 'Directorio Legal', 'Preguntas y Respuestas', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
+          {(['General', 'Medios de pago', 'Preguntas y Respuestas', 'Términos y condiciones', 'Políticas de privacidad', 'Instrucciones: Documentos', 'Instrucciones: Convocatorias'] as typeof tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} className={["px-3 py-2 rounded-t-lg bg-white text-slate-700 border-b-2", tab === t ? 'border-brand-800' : 'border-transparent hover:border-brand-800/30'].join(' ')}>{t}</button>
           ))}
         </div>
+        {tab === 'Preguntas y Respuestas' && <EditorialContentEditor key="faq" slug="preguntas-frecuentes" title="Preguntas frecuentes" faq />}
+        {tab === 'Términos y condiciones' && <EditorialContentEditor key="terms" slug="terminos-y-condiciones" title="Términos y condiciones" />}
+        {tab === 'Políticas de privacidad' && <EditorialContentEditor key="privacy" slug="politicas-de-privacidad" title="Políticas de privacidad" />}
         {tab === 'General' && (
           <div className="space-y-6">
             <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">

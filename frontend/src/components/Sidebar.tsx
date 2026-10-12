@@ -59,8 +59,8 @@ export default function Sidebar({
         />
       )}
 
-      <aside className={`fixed left-0 top-0 h-screen flex flex-col p-4 bg-brand-800 text-white transition-all duration-300 z-50 shadow-2xl border-r border-white/5 
-        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} 
+      <aside className={`fixed left-0 top-0 h-screen flex flex-col p-4 bg-brand-800 text-white transition-all duration-300 z-50 shadow-2xl border-r border-white/5
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         ${collapsed ? 'w-20' : 'w-64'}`}>
 
         {/* Profile elements: Requesting specifically to be hidden on mobile */}
@@ -106,7 +106,6 @@ export default function Sidebar({
               <LinkItem to="/dashboard/publicaciones" icon={<IconDocs />} label="Publicaciones" collapsed={collapsed} />
               <LinkItem to="/dashboard/papelera" icon={<IconTrash />} label="Papelera" collapsed={collapsed} />
               <LinkItem to="/dashboard/pagos" icon={<IconPayments />} label="Medios de pago" collapsed={collapsed} />
-              <LinkItem to="/dashboard/directorio" icon={<IconLegal />} label="Directorio legal" collapsed={collapsed} />
               <LinkItem to="/dashboard/perfil" icon={<IconUser />} label="Mi perfil" collapsed={collapsed} />
               <LinkItem to="/dashboard/usuarios" icon={<IconUsers />} label="Gestionar usuarios" collapsed={collapsed} />
               <LinkItem to="/dashboard/paginas" icon={<IconDocs />} label="Gestor Páginas" collapsed={collapsed} />

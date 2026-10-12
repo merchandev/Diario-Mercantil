@@ -116,11 +116,16 @@ class PagesController {
 
   // Public endpoint by slug
   public function publicGet($slug){
+    if ($slug === 'directorio-legal') return Response::json(['error'=>'module_paused'],404);
     $pdo = Database::pdo();
     $s = $pdo->prepare("SELECT slug, title, header_html, body_json, footer_html, status, updated_at FROM pages WHERE slug=?");
     $s->execute([$slug]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
     if (!$row || ($row['status'] ?? 'published')!=='published') return Response::json(['error'=>'not_found'],404);
+    if ($slug === 'terminos-y-condiciones') {
+        require_once __DIR__.'/Services/TermsAcceptanceService.php';
+        $row['version'] = TermsAcceptanceService::current($pdo)['version'] ?? null;
+    }
     $row['body_blocks'] = $this->normalizeBlocks(json_decode($row['body_json'] ?? '[]', true) ?: []);
     unset($row['body_json']);
     Response::json(['page'=>$row]);
@@ -129,7 +134,7 @@ class PagesController {
   // Public list endpoint for navigation
   public function publicList(){
     $pdo = Database::pdo();
-    $stmt = $pdo->query("SELECT slug, title FROM pages WHERE status='published' AND slug!='contacto' ORDER BY id ASC");
+    $stmt = $pdo->query("SELECT slug, title FROM pages WHERE status='published' AND slug NOT IN ('contacto','directorio-legal','terminos-y-condiciones','politicas-de-privacidad') ORDER BY id ASC");
     $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     Response::json(['items'=>$items]);
   }

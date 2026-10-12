@@ -11,7 +11,7 @@ function RenderBlocks({blocks}:{blocks:PageBlock[]}){
           return <Tag key={b.id} className={{left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</Tag>
         }
         if (b.type==='paragraph'){
-          return <p key={b.id} className={{left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</p>
+          return <p key={b.id} style={{ whiteSpace: 'pre-wrap' }} className={{left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</p>
         }
         return <img key={b.id} src={(b as any).props.url} alt={(b as any).props.alt||''} className="max-w-full rounded"/>
       })}

@@ -20,7 +20,7 @@ class SystemController {
     public function getStats(){
         $this->requireAdmin();
         $pdo = Database::pdo();
-        
+
         $stats = [
             "users_total" => 0,
             "users_active" => 0,
@@ -45,40 +45,41 @@ class SystemController {
             try { $stats["users_active"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='active' OR status IS NULL")->fetchColumn(); } catch(Throwable $e){}
             try { $stats["users_suspended"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE status='suspended'")->fetchColumn(); } catch(Throwable $e){}
             try { $stats["users_admin"] = (int)$pdo->query("SELECT COUNT(*) FROM users WHERE role='admin'")->fetchColumn(); } catch(Throwable $e){}
-            
+
             // Publication Statistics
-            try { $stats["publications"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
-            try { $stats["publications_pending"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE status IN ('Por verificar', 'En trámite')")->fetchColumn(); } catch(Throwable $e){}
-            
+            try { $stats["publications"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE deleted_at IS NULL AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["publications_pending"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE deleted_at IS NULL AND status IN ('Por verificar', 'En trámite')")->fetchColumn(); } catch(Throwable $e){}
+
             // Publications by type
-            try { $stats["publications_documents"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE pub_type='Documento' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
-            try { $stats["publications_convocations"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE pub_type='Convocatoria' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
-            
+            try { $stats["publications_documents"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE deleted_at IS NULL AND pub_type='Documento' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["publications_convocations"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE deleted_at IS NULL AND pub_type='Convocatoria' AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+
             // Edition Statistics
-            try { $stats["editions"] = (int)$pdo->query("SELECT COUNT(*) FROM editions")->fetchColumn(); } catch(Throwable $e){}
-            try { $stats["editions_published"] = (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
-            
+            try { $stats["editions"] = (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE deleted_at IS NULL")->fetchColumn(); } catch(Throwable $e){}
+            try { $stats["editions_published"] = (int)$pdo->query("SELECT COUNT(*) FROM editions WHERE deleted_at IS NULL AND status='Publicada'")->fetchColumn(); } catch(Throwable $e){}
+
             // Financial Statistics
-            try { 
+            try {
                 $stats["revenue_total_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('En trámite', 'Publicada')")->fetchColumn();
                 $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('Borrador', 'Por verificar')")->fetchColumn();
             } catch(Throwable $e){
                 error_log("Financial stats error: " . $e->getMessage());
             }
-            
+
             // Completed transactions
             try { $stats["transactions_completed"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_payments WHERE status='Aprobado'")->fetchColumn(); } catch(Throwable $e){}
-            
+
             // Recent activity
-            try { $stats["publications_recent_30d"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn(); } catch(Throwable $e){}
+            $recentDate = gmdate('Y-m-d H:i:s', time() - 30 * 86400);
+            try { $stats["publications_recent_30d"] = (int)$pdo->query("SELECT COUNT(*) FROM legal_requests WHERE deleted_at IS NULL AND created_at >= '{$recentDate}'")->fetchColumn(); } catch(Throwable $e){}
 
         } catch (Throwable $e) {
             error_log("Fatal error fetching stats: " . $e->getMessage());
         }
-        
+
         Response::json($stats);
     }
-    
+
     public function clearStats() {
         $this->requireAdmin();
         // Since stats are calculated on the fly, clearing them might just mean resetting something if cached.
@@ -93,7 +94,7 @@ class SystemController {
         $settings = (new SettingRepository($pdo))->getMany(SettingSchema::keys());
         Response::json(["settings"=>$settings]);
     }
-    
+
     public function getPublicSettings(){
         $pdo = Database::pdo();
         $publicKeys = SettingSchema::publicKeys();
@@ -104,7 +105,7 @@ class SystemController {
         while($row = $stmt->fetch(PDO::FETCH_ASSOC)) $settings[$row["key"]] = $row["value"];
         Response::json(["settings"=>$settings]);
     }
-    
+
     public function saveSettings(){
         $user = $this->requireAdmin();
         $in = json_decode(file_get_contents('php://input'), true);
@@ -186,7 +187,7 @@ class SystemController {
         $p = $stmt->fetch(PDO::FETCH_ASSOC);
         Response::json(["profile"=>$p ?: null]);
     }
-    
+
     // --- PAYMENTS ---
     public function listPayments(){
         $pdo = Database::pdo();
@@ -222,7 +223,7 @@ class SystemController {
         $stmt->execute([$id]);
         $page = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$page) Response::json(['error'=>'not_found'], 404);
-        
+
         // Mapear published a status para compatibilidad con frontend
         $page['status'] = $page['published'] ? 'published' : 'draft';
         Response::json(['item'=>$page]);
@@ -232,7 +233,7 @@ class SystemController {
         $this->requireAdmin();
         $in = $this->json();
         $pdo = Database::pdo();
-        
+
         $title = trim($in['title'] ?? '');
         $content = $in['content'] ?? '';
         $published = ($in['status'] ?? 'published') === 'published' ? 1 : 0;
@@ -263,7 +264,7 @@ class SystemController {
         $title = trim($in['title'] ?? '');
         $content = $in['content'] ?? '';
         $published = ($in['status'] ?? 'published') === 'published' ? 1 : 0;
-        
+
         $sql = "UPDATE pages SET content=?, published=?, updated_at=NOW()";
         $params = [$content, $published];
 

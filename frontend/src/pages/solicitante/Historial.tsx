@@ -1,8 +1,8 @@
+import PublishChoiceModal from '../../components/PublishChoiceModal'
 import PublicationStatus from '../../components/PublicationStatus'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listLegal, type LegalRequest, downloadLegal, me, deleteLegal } from '../../lib/api'
-import AdvertisingSlider from '../../components/AdvertisingSlider'
+import { listLegal, type LegalRequest, me, deleteLegal } from '../../lib/api'
 import { useDialog } from '../../contexts/DialogContext'
 import { formatCaracasDateTime } from '../../components/LegalRequestDetails'
 import { editionDownloadUrl } from '../../lib/editionDownload'
@@ -12,6 +12,7 @@ const STATUS_OPTS = ['Todos', 'Borrador', 'Por verificar', 'En trámite', 'Publi
 export default function Historial() {
   const { showAlert, confirmAction } = useDialog()
   const navigate = useNavigate()
+  const [showPublish, setShowPublish] = useState(false)
   const [rows, setRows] = useState<LegalRequest[]>([])
   const [allRows, setAllRows] = useState<LegalRequest[]>([])
   const [loading, setLoading] = useState(false)
@@ -42,7 +43,7 @@ export default function Historial() {
       setRows(allRows)
     } else {
       setRows(allRows.filter(r => {
-        const visual = (r.status === 'Pendiente' || r.status === 'Borrador') ? 'Borrador' 
+        const visual = (r.status === 'Pendiente' || r.status === 'Borrador') ? 'Borrador'
                         : (r.status === 'Publicado' ? 'Publicada' : r.status)
         return visual === status
       }))
@@ -54,21 +55,6 @@ export default function Historial() {
     load();
   }, [])
 
-  const [dismissedNotifs, setDismissedNotifs] = useState<number[]>(() => {
-    try { return JSON.parse(localStorage.getItem('dismissedNotifs') || '[]') } catch { return [] }
-  })
-  
-  const dismissNotif = (id: number) => {
-    const updated = [...dismissedNotifs, id]
-    setDismissedNotifs(updated)
-    localStorage.setItem('dismissedNotifs', JSON.stringify(updated))
-  }
-
-  // Determine notifications: recent published ones not dismissed
-  const notifications = allRows
-    .filter(r => r.status === 'Publicada' && !dismissedNotifs.includes(r.id))
-    .slice(0, 3)
-
   // Razón social from meta, fallback to r.name
   const razonSocial = (r: LegalRequest) => {
     const meta = typeof r.meta === 'string'
@@ -79,51 +65,11 @@ export default function Historial() {
 
   return (
     <section className="space-y-4">
-      <AdvertisingSlider className="mb-6 shadow-sm border border-slate-200" />
-
-      {notifications.length > 0 && (
-        <div className="space-y-2 mb-6">
-          {notifications.map(notif => (
-            <div key={notif.id} className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
-              <div className="flex items-center gap-3">
-                <div className="bg-emerald-100 p-2 rounded-full hidden sm:block">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-sm">¡Publicación Confirmada!</h4>
-                  <p className="text-sm">
-                    Tu publicación con CVE <span className="font-mono bg-emerald-100 px-1 rounded">{(notif.edition_cve || notif.edition_code)}</span> ha sido publicada {notif.edition_no ? <span>en la Edición N° <strong>{notif.edition_no}</strong></span> : 'con éxito'}.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  onClick={() => navigate(`/solicitante/publicaciones/${notif.id}`)}
-                  className="btn btn-sm bg-white border border-emerald-300 text-emerald-700 hover:bg-emerald-100 flex-1 sm:flex-none justify-center"
-                >
-                  Ver detalle
-                </button>
-                <button
-                  onClick={() => dismissNotif(notif.id)}
-                  className="p-1.5 text-emerald-600 hover:bg-emerald-100 rounded-md transition-colors"
-                  title="Ocultar"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+      <PublishChoiceModal open={showPublish} onClose={() => setShowPublish(false)} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-xl font-semibold">Mis Publicaciones</h1>
         <button
-          onClick={() => navigate('/solicitante/documento')}
+          onClick={() => setShowPublish(true)}
           className="btn btn-primary inline-flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,6 +138,7 @@ export default function Historial() {
                   <th className="text-left px-4 py-2">Razón social</th>
                   <th className="text-left px-4 py-2">Fecha de solicitud</th>
                   <th className="text-left px-4 py-2">Fecha de publicación</th>
+                  <th className="text-left px-4 py-2">Edición</th>
                   <th className="text-left px-4 py-2">Estado</th>
                   <th className="text-right px-4 py-2">Acciones</th>
                 </tr>
@@ -207,7 +154,10 @@ export default function Historial() {
                       {r.status === 'Publicada' && r.publish_date ? r.publish_date : '-'}
                     </td>
                     <td className="px-4 py-2">
-                      <PublicationStatus status={r.status} />
+                      {r.edition_code || '-'}
+                    </td>
+                    <td className="px-4 py-2">
+                      <PublicationStatus status={r.status} />{r.status === 'Borrador' && r.comment && <p className="text-amber-800 text-xs mt-1">Solicitud devuelta: {r.comment}</p>}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex items-center justify-end gap-3">
@@ -233,10 +183,10 @@ export default function Historial() {
                           </>
                         )}
                         <button className="text-brand-700 hover:underline" onClick={() => navigate(`/solicitante/publicaciones/${r.id}`)}>Ver detalles</button>
-                        <button className="text-blue-600 hover:underline" onClick={async () => { const b = await downloadLegal(r.id); const url = URL.createObjectURL(b); const a = document.createElement('a'); a.href = url; a.download = `orden-servicio-${r.id}.pdf`; a.click(); URL.revokeObjectURL(url) }}>Descargar orden</button>
                         {r.status === 'Publicada' && !editionDownloadUrl(r) && (
                           <span className="text-amber-600 text-xs italic" title="El archivo de esta edición aún no está disponible. Contacte al administrador si necesita asistencia.">PDF no disponible</span>
                         )}
+                        {editionDownloadUrl(r) && <a className="text-brand-700 underline" href={'/edicion/' + encodeURIComponent(r.edition_cve || r.edition_code || '')}>Ver en línea</a>}
                         {editionDownloadUrl(r) && (
                           <a href={editionDownloadUrl(r)!} target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
                             Descargar publicación

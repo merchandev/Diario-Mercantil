@@ -75,6 +75,7 @@ final class Database
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         $pdo->exec('PRAGMA foreign_keys = ON');
+        $pdo->sqliteCreateFunction('DM_UPPER', static fn($value) => mb_strtoupper((string)$value, 'UTF-8'), 1);
         return $pdo;
     }
 

@@ -71,6 +71,7 @@ const ForgotPassword = lazyImport(() => import('./pages/ForgotPassword'))
 const ResetPassword = lazyImport(() => import('./pages/ResetPassword'))
 
 // Solicitante pages - lazy loaded
+const InicioSolicitante = lazyImport(() => import('./pages/solicitante/Inicio'))
 const HistorialSolicitante = lazyImport(() => import('./pages/solicitante/Historial'))
 const CotizadorSolicitante = lazyImport(() => import('./pages/solicitante/Cotizador'))
 const ConvocatoriaSolicitante = lazyImport(() => import('./pages/solicitante/Convocatoria'))
@@ -112,10 +113,10 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // Auto-logout after 60 mins of inactivity
+  // Allow four hours of activity before the ordinary account inactivity logout.
   useEffect(() => {
     let timer: any // Use any to avoid NodeJS type issues if types aren't installed
-    const TIMEOUT = 60 * 60 * 1000 // 60 minutes
+    const TIMEOUT = 4 * 60 * 60 * 1000 // Four hours
 
     const resetTimer = () => {
       clearTimeout(timer)
@@ -187,7 +188,7 @@ export default function App() {
 
         {/* Solicitante area */}
         <Route path="/solicitante/*" element={<RequireSolicitante><ApplicantLayout /></RequireSolicitante>}>
-          <Route index element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
+          <Route index element={<LazyRoute><InicioSolicitante /></LazyRoute>} />
           <Route path="historial" element={<LazyRoute><HistorialSolicitante /></LazyRoute>} />
           <Route path="publicaciones/:id" element={<LazyRoute><PublicacionDetalleSolicitante /></LazyRoute>} />
           <Route path="documento" element={<LazyRoute><DocumentoSolicitante /></LazyRoute>} />
@@ -223,7 +224,7 @@ export default function App() {
                         <Route path="paginas" element={<RequireAdmin><LazyRoute><Paginas /></LazyRoute></RequireAdmin>} />
                         <Route path="seo" element={<RequireAdmin><LazyRoute><SeoManager /></LazyRoute></RequireAdmin>} />
                         <Route path="pagos" element={<RequireAdmin><LazyRoute><MediosPago /></LazyRoute></RequireAdmin>} />
-                        <Route path="directorio" element={<LazyRoute><DirectorioLegal /></LazyRoute>} />
+                        <Route path="directorio" element={<div className="card p-6">El Directorio Legal está temporalmente pausado.</div>} />
                         <Route path="perfil" element={<LazyRoute><PerfilSolicitante /></LazyRoute>} />
                         {/* Applicant (solicitante) routes */}
                         {/* Reemplazamos el formulario antiguo por el nuevo de solicitante */}

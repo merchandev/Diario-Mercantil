@@ -2,13 +2,13 @@
 use PHPUnit\Framework\TestCase;
 
 class AuthorizationIntegrationTest extends TestCase {
-    
+
     private static $process;
     private static $pipes = [];
     private static $port = 0;
     private static string $dbPath;
     private static string $uploadDir;
-    
+
     public static function setUpBeforeClass(): void {
         self::$port = random_int(18080, 18980);
         self::$dbPath = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dm_authorization_' . getmypid() . '.sqlite';
@@ -38,18 +38,32 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("CREATE TABLE payment_methods (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, bank TEXT, account TEXT, holder TEXT, rif TEXT, phone TEXT, qr_file_id INTEGER, qr_updated_at TEXT, created_at TEXT NOT NULL)");
         $pdo->exec("CREATE TABLE audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_user_id INTEGER, action TEXT, resource_type TEXT, resource_id INTEGER)");
         $pdo->exec("CREATE TABLE edition_archives (id INTEGER PRIMARY KEY AUTOINCREMENT, edition_id INTEGER NOT NULL, file_id INTEGER, snapshot_json TEXT NOT NULL, actor_user_id INTEGER, reason TEXT NOT NULL, created_at TEXT NOT NULL)");
+        $pdo->exec("ALTER TABLE audit_logs ADD COLUMN before_data TEXT");
+        $pdo->exec("ALTER TABLE audit_logs ADD COLUMN after_data TEXT");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN comment TEXT");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN submitted_at TEXT");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN verification_date TEXT");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN subtotal_usd NUMERIC");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN iva_usd NUMERIC");
+        $pdo->exec("ALTER TABLE sessions ADD COLUMN ip_hash TEXT");
+        $pdo->exec("ALTER TABLE sessions ADD COLUMN user_agent_hash TEXT");
+        $pdo->exec("CREATE TABLE pages(id INTEGER PRIMARY KEY AUTOINCREMENT,slug TEXT UNIQUE,title TEXT,header_html TEXT,body_json TEXT,footer_html TEXT,status TEXT,created_at TEXT,updated_at TEXT)");
+        $migration = require __DIR__.'/../database/migrations/20261012_000_terms_acceptance.php';
+        $migration($pdo);
+        (require __DIR__.'/../database/migrations/20261012_010_scheduled_maintenance.php')($pdo);
+        $pdo->exec('CREATE TABLE superadmins(id INTEGER PRIMARY KEY,password_hash TEXT)');
         $pdo->prepare("DELETE FROM sessions")->execute();
         $pdo->prepare("DELETE FROM users")->execute();
-        
+
         $now = time();
         $createdAt = date('Y-m-d H:i:s', $now);
         $expiresAt = date('Y-m-d H:i:s', strtotime('+1 day', $now));
-        
+
         // Admin
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at, updated_at) VALUES(1, 'admin', 'Admin', 'V123', 'admin@test.com', 'pwd', 'active', '$createdAt', '$createdAt')")->execute();
         $tokenHashAdmin = hash('sha256', 'admin_session_test');
         $pdo->prepare("INSERT INTO sessions(id, user_id, last_activity, token_hash, expires_at) VALUES('admin_session_test', 1, $now, '$tokenHashAdmin', '$expiresAt')")->execute();
-        
+
         // User
         $pdo->prepare("INSERT INTO users(id, role, name, document, email, password_hash, status, created_at, updated_at) VALUES(2, 'solicitante', 'User', 'V456', 'user@test.com', 'pwd', 'active', '$createdAt', '$createdAt')")->execute();
         $tokenHashUser = hash('sha256', 'user_session_test');
@@ -72,7 +86,7 @@ class AuthorizationIntegrationTest extends TestCase {
         ], self::$pipes);
         sleep(2);
     }
-    
+
     public static function tearDownAfterClass(): void {
         if (self::$process) {
             proc_terminate(self::$process);
@@ -96,8 +110,8 @@ class AuthorizationIntegrationTest extends TestCase {
         }
         putenv('UPLOAD_DIR');
     }
-    
-    private function request($method, $uri, $sessionId = null, $body = []) {
+
+    private function request($method, $uri, $sessionId = null, $body = [], $maintenanceToken = null) {
         $context = [
             'http' => [
                 'method' => $method,
@@ -105,26 +119,28 @@ class AuthorizationIntegrationTest extends TestCase {
                 'header' => "Content-Type: application/json\r\n"
             ]
         ];
-        
+
         if ($sessionId) {
-            $context['http']['header'] .= "Cookie: dm_session=$sessionId; dm_csrf=test_csrf\r\n";
+            $context['http']['header'] .= "Cookie: dm_session=$sessionId; dm_csrf=test_csrf; dm_maintenance=$maintenanceToken\r\n";
             $context['http']['header'] .= "X-CSRF-Token: test_csrf\r\n";
         }
-        
+
+        if (!$sessionId && $maintenanceToken) $context['http']['header'] .= "Cookie: dm_maintenance=$maintenanceToken\r\n";
+
         if (!empty($body)) {
             $context['http']['content'] = json_encode($body);
         }
-        
+
         $url = 'http://127.0.0.1:' . self::$port . $uri;
         $response = @file_get_contents($url, false, stream_context_create($context));
-        
+
         $code = 0;
         if (isset($http_response_header) && is_array($http_response_header) && count($http_response_header) > 0) {
             preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0], $matches);
             $code = (int)$matches[1];
         }
-        
-        return ['code' => $code, 'body' => json_decode((string)$response, true), 'raw' => (string)$response];
+
+        return ['code' => $code, 'body' => json_decode((string)$response, true), 'raw' => (string)$response, 'headers'=>$http_response_header ?? []];
     }
 
     private function requestMultipart(string $uri, string $sessionId, string $field, string $filename, string $mime, string $contents): array {
@@ -152,7 +168,7 @@ class AuthorizationIntegrationTest extends TestCase {
         }
         return ['code'=>$code, 'body'=>json_decode((string)$response, true)];
     }
-    
+
     public function testListUsersWithoutTokenIs401() {
         $res = $this->request('GET', '/api/users');
         $this->assertEquals(401, $res['code']);
@@ -171,23 +187,23 @@ class AuthorizationIntegrationTest extends TestCase {
     public function testUpdateRoleAsSolicitanteIsBlocked() {
         $res = $this->request('POST', '/api/admin/users/2/role', 'user_session_test', ['role' => 'admin']);
         $this->assertEquals(403, $res['code']); // Solicitantes can't update users
-        
+
         require_once __DIR__ . '/../src/Database.php';
         $pdo = Database::pdo();
         $role = $pdo->query("SELECT role FROM users WHERE id=2")->fetchColumn();
         $this->assertEquals('solicitante', $role);
     }
-    
+
     public function testCreateEditionAsSolicitanteIs403() {
         $res = $this->request('POST', '/api/editions', 'user_session_test', ['status' => 'Borrador']);
         $this->assertEquals(403, $res['code']);
     }
-    
+
     public function testUploadWithoutTokenIs401() {
         $res = $this->request('POST', '/api/files');
         $this->assertEquals(401, $res['code']);
     }
-    
+
     public function testStatsAsSolicitanteIs403() {
         $res = $this->request('GET', '/api/stats', 'user_session_test');
         $this->assertEquals(403, $res['code']);
@@ -433,7 +449,7 @@ class AuthorizationIntegrationTest extends TestCase {
 
     public function testAdminCannotReportMoreThanRemainingAndCanVerifyOnePayment() {
         $overpayment = $this->request('POST', '/api/legal/100/payments', 'admin_session_test', [
-            'ref' => '2222',
+            'ref' => '002222',
             'date' => '2026-08-29',
             'bank' => 'Banco de Venezuela',
             'type' => 'pago_movil',
@@ -445,7 +461,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertEquals(20, $overpayment['body']['remaining_bs'] ?? null);
 
         $accepted = $this->request('POST', '/api/legal/100/payments', 'admin_session_test', [
-            'ref' => '2222',
+            'ref' => '002222',
             'date' => '2026-08-29',
             'bank' => 'Banco de Venezuela',
             'type' => 'pago_movil',
@@ -466,7 +482,7 @@ class AuthorizationIntegrationTest extends TestCase {
 
     public function testApplicantPaymentAmountIsAlwaysTheCalculatedRemaining() {
         $accepted = $this->request('POST', '/api/legal/101/payments', 'user_session_test', [
-            'ref' => '3333',
+            'ref' => '003333',
             'date' => '2026-08-29',
             'bank' => 'Banco de Venezuela',
             'type' => 'pago_movil',
@@ -487,7 +503,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $sha = hash('sha256', $contents);
         $ids = [];
         foreach ([601,602] as $requestId) {
-            $pdo->prepare("INSERT INTO legal_requests(id,user_id,status,name,date,total_bs) VALUES(?,2,'En trámite','Solicitud V2','2026-09-01',100)")->execute([$requestId]);
+            $pdo->prepare("INSERT INTO legal_requests(id,user_id,status,name,date,total_bs,meta) VALUES(?,2,'En trámite','Solicitud V2','2026-09-01',100,?)")->execute([$requestId,json_encode(['razon_social'=>'INVERSIONES ÁVILA'])]);
             $created = $this->request('POST','/api/editions','admin_session_test',['date'=>'2026-09-01','orders'=>[$requestId]]);
             $this->assertSame(200,$created['code'],json_encode($created['body']));
             $id = $created['body']['id']; $ids[] = $id;
@@ -503,6 +519,13 @@ class AuthorizationIntegrationTest extends TestCase {
             $published = $this->request('POST',"/api/editions/{$id}/publish",'admin_session_test');
             $this->assertSame(200,$published['code'],json_encode($published['body']));
             $this->assertSame($filesBefore,$pdo->query('SELECT * FROM files ORDER BY id')->fetchAll(PDO::FETCH_ASSOC));
+            $this->assertMatchesRegularExpression('/^DMV-[A-Z0-9]{8}$/',$created['body']['cve']);
+            $this->assertSame($before['cve'],$pdo->query('SELECT cve FROM editions WHERE id='.$id)->fetchColumn());
+            foreach (['inversiones ávila','INVERSIONES ÁVILA','Inversiones Ávila'] as $query) {
+                $search=$this->request('GET','/api/e?q='.urlencode($query));
+                $this->assertSame(200,$search['code']);
+                $this->assertContains($id,array_column($search['body']['items'],'id'));
+            }
             $this->assertSame(409,$this->request('POST',"/api/editions/{$id}/publish",'admin_session_test')['code']);
             $this->assertSame(409,$this->request('DELETE',"/api/editions/{$id}/permanent",'admin_session_test')['code']);
             $detail = $this->request('GET',"/api/legal/{$requestId}",'user_session_test');
@@ -665,5 +688,126 @@ class AuthorizationIntegrationTest extends TestCase {
             $list=$this->request('GET','/api/e?q='.$e['cve']);
             $this->assertContains((int)$e['id'],array_map('intval',array_column($list['body']['items'],'id')));
         } finally { $pdo->prepare('UPDATE editions SET date=? WHERE id=?')->execute([$e['date'],$e['id']]); }
+    }
+
+    public function testReturnedDraftRequiresReasonAndPreservesMetaAndPayment(): void {
+        $pdo = Database::pdo();
+        $meta = json_encode(['fecha_registro'=>'2026-01-02','numero_expediente'=>'391-123','numero_planilla'=>'391.2026.1.123']);
+        $pdo->prepare("INSERT INTO legal_requests(id,user_id,status,total_bs,name,meta,date) VALUES(970,2,'Por verificar',100,'EMPRESA',?,'2026-01-02')")->execute([$meta]);
+        $pdo->exec("INSERT INTO legal_payments(legal_request_id,ref,date,bank,type,amount_bs,status,mobile_phone) VALUES(970,'1234','2026-01-02','Banco de Venezuela','pago_movil',100,'Por verificar','04121234567')");
+        $blocked = $this->request('POST','/api/legal/970/return-to-draft','admin_session_test',['reason'=>' ']);
+        $this->assertSame(400,$blocked['code']);
+        $returned = $this->request('POST','/api/legal/970/return-to-draft','admin_session_test',['reason'=>'El sello está cortado.']);
+        $this->assertSame(200,$returned['code'], $returned['raw']);
+        $request = $pdo->query('SELECT * FROM legal_requests WHERE id=970')->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame('Borrador',$request['status']);
+        $this->assertSame('El sello está cortado.',$request['comment']);
+        $audit=$pdo->query("SELECT after_data FROM audit_logs WHERE resource_id=970 AND action='returnToDraft' ORDER BY id DESC LIMIT 1")->fetchColumn();
+        $this->assertSame('El sello está cortado.',json_decode($audit,true)['comment']);
+        $this->assertSame($meta,$request['meta']);
+        $this->assertSame('1234',$pdo->query('SELECT ref FROM legal_payments WHERE legal_request_id=970')->fetchColumn());
+        $summary = $this->request('GET','/api/legal/summary','user_session_test');
+        $this->assertSame(200,$summary['code'],$summary['raw']);
+        $this->assertContains(970,array_column($summary['body']['notices'],'id'));
+    }
+
+    public function testOwnProfileLocksNameAndAllowsClearingAddress(): void {
+        $pdo=Database::pdo();
+        $blocked=$this->request('PUT','/api/user/profile','user_session_test',['name'=>'CAMBIADO']);
+        $this->assertSame(403,$blocked['code'],$blocked['raw']);
+        $this->assertSame('User',$pdo->query('SELECT name FROM users WHERE id=2')->fetchColumn());
+        $saved=$this->request('PUT','/api/user/profile','user_session_test',['address'=>'CARACAS']);
+        $this->assertSame(200,$saved['code'],$saved['raw']);
+        $cleared=$this->request('PUT','/api/user/profile','user_session_test',['address'=>'']);
+        $this->assertSame(200,$cleared['code']);
+        $this->assertSame('',$pdo->query('SELECT address FROM users WHERE id=2')->fetchColumn());
+    }
+
+    public function testNewPaymentRequiresSixDigitsAndPreservesLeadingZeros(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date) VALUES(971,2,'Borrador',100,'PAGO','2026-01-02')");
+        $body=['ref'=>'1234','date'=>'2026-01-02','bank'=>'Banco de Venezuela','type'=>'pago_movil','mobile_phone'=>'04121234567'];
+        $this->assertSame(400,$this->request('POST','/api/legal/971/payments','user_session_test',$body)['code']);
+        $body['ref']='001234';
+        $saved=$this->request('POST','/api/legal/971/payments','user_session_test',$body);
+        $this->assertSame(200,$saved['code'],$saved['raw']);
+        $this->assertSame('001234',$pdo->query('SELECT ref FROM legal_payments WHERE legal_request_id=971')->fetchColumn());
+    }
+
+    public function testStatisticsIgnoreSoftDeletedEditionsAndPublications(): void {
+        $pdo=Database::pdo();
+        $before=$this->request('GET','/api/stats','admin_session_test')['body'];
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,deleted_at,pub_type) VALUES(972,2,'Publicada',100,'ELIMINADA','2026-01-02','2026-01-03','Documento')");
+        $pdo->exec("INSERT INTO editions(id,code,cve,status,date,edition_no,created_at,publication_year,deleted_at) VALUES(972,'MMXXVI-0972','DMV-OLD0972X','Publicada','2026-01-02',972,'2026-01-02',2026,'2026-01-03')");
+        $after=$this->request('GET','/api/stats','admin_session_test')['body'];
+        $this->assertSame($before['editions'],$after['editions']);
+        $this->assertSame($before['editions_published'],$after['editions_published']);
+        $this->assertSame($before['publications'],$after['publications']);
+    }
+
+    public function testRegistrationRequiresCurrentTermsAndNineCharacters(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT OR REPLACE INTO settings VALUES('registration_enabled','1','2026-01-01','2026-01-01')");
+        $pdo->exec("INSERT INTO pages(slug,title,header_html,body_json,footer_html,status) VALUES('terminos-y-condiciones','Términos','Condiciones de prueba exclusivamente para el entorno de tests.','[]','','published')");
+        $version=$this->request('GET','/api/page/terminos-y-condiciones')['body']['page']['version'];
+        $body=['document'=>'V987654','name'=>'josé pérez','person_type'=>'natural','password'=>'123456789','phone'=>'04121234567','terms_version'=>$version];
+        $this->assertSame(422,$this->request('POST','/api/auth/register',null,$body)['code']);
+        $body['terms_accepted']=true; $body['document']='J987654';
+        $this->assertSame(422,$this->request('POST','/api/auth/register',null,$body)['code']);
+        $body['document']='V987654';$body['password']='12345678';
+        $this->assertSame(400,$this->request('POST','/api/auth/register',null,$body)['code']);
+        $body['password']='123456789'; $body['terms_version']='stale';
+        $this->assertSame(409,$this->request('POST','/api/auth/register',null,$body)['code']);
+        $body['terms_version']=$version;
+        $registered=$this->request('POST','/api/auth/register',null,$body);
+        $this->assertSame(200,$registered['code'],$registered['raw']);
+        $this->assertSame('JOSÉ PÉREZ',$registered['body']['user']['name']);
+        $record=$pdo->query('SELECT * FROM user_legal_acceptances WHERE user_id='.$registered['body']['user']['id'])->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame($version,$record['terms_version']);
+        $this->assertNotEmpty($record['terms_snapshot']);
+        $pdo->exec("UPDATE settings SET value='0' WHERE key='registration_enabled'");
+    }
+
+    public function testMaintenanceBlocksAllContentAndAllowsBothAccountTypesOnlyWithGrant(): void {
+        $pdo = Database::pdo();
+        $originalHash = $pdo->query('SELECT password_hash FROM users WHERE id=1')->fetchColumn();
+        $pdo->prepare('UPDATE users SET password_hash=? WHERE id=1')->execute([password_hash('MaintenanceAdmin123',PASSWORD_DEFAULT)]);
+        try {
+            $client = $this->request('POST','/api/admin/maintenance','user_session_test',['enabled'=>true]);
+            $this->assertSame(403,$client['code']);
+            $enabled = $this->request('POST','/api/admin/maintenance','admin_session_test',['enabled'=>true]);
+            $this->assertSame(200,$enabled['code']);
+            $this->assertTrue($enabled['body']['enabled']);
+            $headers = implode("\n",$enabled['headers']);
+            $this->assertStringContainsString('HttpOnly',$headers);
+            $this->assertStringContainsString('SameSite=Strict',$headers);
+            preg_match('/dm_maintenance=([a-f0-9]{64})/',$headers,$match);
+            $grant = $match[1];
+            foreach (['/api/settings','/api/e','/api/e/code/MMXXVI-0001/download','/api/uploads/200','/api/users','/api/auth/me','/api/page/terminos-y-condiciones'] as $path) {
+                $locked = $this->request('GET',$path,'admin_session_test');
+                $this->assertSame(503,$locked['code'],$path);
+                $this->assertSame('maintenance_required',$locked['body']['error']);
+            }
+            $this->assertSame(503,$this->request('POST','/api/auth/login',null,['document'=>'V123','password'=>'MaintenanceAdmin123'])['code']);
+            $status = $this->request('GET','/api/maintenance/status');
+            $this->assertTrue($status['body']['enabled']);
+            $this->assertFalse($status['body']['unlocked']);
+            $this->assertSame(14400,$status['body']['duration_seconds']);
+            $this->assertSame(401,$this->request('GET','/api/auth/me',null,[],$grant)['code']);
+            $this->assertSame('admin',$this->request('GET','/api/auth/me','admin_session_test',[],$grant)['body']['user']['role']);
+            $this->assertSame('solicitante',$this->request('GET','/api/auth/me','user_session_test',[],$grant)['body']['user']['role']);
+            $this->assertSame(401,$this->request('POST','/api/maintenance/unlock',null,['password'=>'wrong'])['code']);
+            $unlocked = $this->request('POST','/api/maintenance/unlock',null,['password'=>'MaintenanceAdmin123']);
+            $this->assertSame(200,$unlocked['code']);
+            $this->assertEqualsWithDelta(time()+14400,$unlocked['body']['expires_at'],5);
+            $disabled = $this->request('POST','/api/admin/maintenance','admin_session_test',['enabled'=>false],$grant);
+            $this->assertSame(200,$disabled['code']);
+            $this->assertFalse($disabled['body']['enabled']);
+            $this->assertSame(200,$this->request('GET','/api/settings')['code']);
+            $this->assertSame(0,(int)$pdo->query('SELECT COUNT(*) FROM maintenance_sessions')->fetchColumn());
+        } finally {
+            (new MaintenanceService($pdo))->toggle(false,['id'=>1,'document'=>'V123']);
+            $pdo->prepare('UPDATE users SET password_hash=? WHERE id=1')->execute([$originalHash]);
+        }
     }
 }

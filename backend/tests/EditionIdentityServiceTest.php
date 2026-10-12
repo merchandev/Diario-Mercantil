@@ -34,8 +34,28 @@ final class EditionIdentityServiceTest extends TestCase {
     }
     public function testCveDoesNotEncodeEditionNumber(): void {
         $a=EditionIdentityService::cve(); $b=EditionIdentityService::cve();
-        $this->assertMatchesRegularExpression('/^DM-[A-F0-9]{24}$/',$a);
+        $this->assertMatchesRegularExpression('/^DMV-[A-Z0-9]{8}$/',$a);
         $this->assertNotSame($a,$b);
         $this->assertSame('MMXXVI-0002',EditionIdentityService::code(2026,2));
+    }
+
+    public function testCveCollisionRetriesOnlyTheIdentityConstraint(): void {
+        $statement=$this->createMock(PDOStatement::class);
+        $calls=0; $codes=[];
+        $statement->method('execute')->willReturnCallback(function($params) use (&$calls,&$codes) {
+            $codes[]=$params[1]; $calls++;
+            if ($calls===1) throw new PDOException('UNIQUE constraint failed: editions.cve');
+            return true;
+        });
+        $code=EditionIdentityService::insertWithCve($statement,['edition',null],1);
+        $this->assertSame(2,$calls);
+        $this->assertSame($codes[1],$code);
+        $this->assertNotSame($codes[0],$codes[1]);
+    }
+    public function testNumberConflictIsNotSilentlyRetried(): void {
+        $statement=$this->createMock(PDOStatement::class);
+        $statement->expects($this->once())->method('execute')->willThrowException(new PDOException('UNIQUE constraint failed: editions.code'));
+        $this->expectException(PDOException::class);
+        EditionIdentityService::insertWithCve($statement,[null],0);
     }
 }
