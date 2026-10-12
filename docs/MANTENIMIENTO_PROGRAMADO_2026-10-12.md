@@ -41,6 +41,6 @@ Respaldo previo en el servidor:
 - /docker/backups/diario-mercantil/v1026-20261012/storage.tar.gz
 - Revisión anterior y copia protegida de la configuración de entorno en esa misma carpeta.
 
-El despliegue actualiza backend y frontend, ejecuta las nuevas migraciones y conserva el servicio de correo y los volúmenes.
+El despliegue actualiza backend y frontend, verifica las migraciones y conserva el servicio de correo y los volúmenes. Backend y frontend están saludables. Se comprobaron nueve rutas de navegador, seis API bloqueadas, acceso de administrador y cliente y aislamiento por IP real. El respaldo adicional del cierre está en /docker/backups/diario-mercantil/cierre-v1026-20261012.
 
 El contraste y la resolución de todos los hallazgos están en [CIERRE_V1026_2026-10-12.md](CIERRE_V1026_2026-10-12.md). Los datos institucionales y el QR oficial del banco se completan manualmente en sus campos administrativos.
