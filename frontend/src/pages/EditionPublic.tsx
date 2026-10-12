@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 import PublicEditionPanel from '../components/PublicEditionPanel'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
@@ -25,7 +26,7 @@ export default function EditionPublic() {
   useEffect(() => {
     if (!activeCode) return
     setErr(''); setEdition(null)
-    fetch(`/api/dm/e-${encodeURIComponent(activeCode)}`)
+    fetchApi(`/api/dm/e-${encodeURIComponent(activeCode)}`)
       .then(async r => { if (!r.ok) throw new Error(await r.text()); return r.json() })
       .then(d => { setEdition(d.edition); setOrders(d.orders || []) })
       .catch(e => setErr(typeof e === 'string' ? e : (e?.message || 'Error')))

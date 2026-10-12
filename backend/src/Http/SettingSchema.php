@@ -9,6 +9,16 @@ final class SettingSchema
         'bcv_rate' => ['type' => 'float', 'min' => 0.0001],
         'bcv_rate_date' => ['type' => 'string'],
         'app_name' => ['type' => 'string'],
+        'operator_legal_name' => ['type' => 'string'],
+        'operator_rif' => ['type' => 'string'],
+        'operator_address' => ['type' => 'string'],
+        'contact_email' => ['type' => 'string'],
+        'contact_whatsapp' => ['type' => 'string'],
+        'social_instagram' => ['type' => 'string'],
+        'social_facebook' => ['type' => 'string'],
+        'social_x' => ['type' => 'string'],
+        'social_linkedin' => ['type' => 'string'],
+
         'convocatoria_usd' => ['type' => 'float', 'min' => 0.0],
         'unit_tax_bs' => ['type' => 'float', 'min' => 0.0],
         'banner_header_global' => ['type' => 'string'],
@@ -50,6 +60,15 @@ final class SettingSchema
     public static function publicKeys(): array
     {
         return [
+            'operator_legal_name',
+            'operator_rif',
+            'operator_address',
+            'contact_email',
+            'contact_whatsapp',
+            'social_instagram',
+            'social_facebook',
+            'social_x',
+            'social_linkedin',
             'registration_enabled',
             'bcv_rate',
             'price_per_folio_usd',
@@ -93,6 +112,15 @@ final class SettingSchema
         if ($rules['type'] === 'string') {
             if (!is_string($value)) {
                 throw new HttpException(400, 'invalid_setting_type', "Setting $key must be a string.");
+            }
+            if (in_array($key, ['operator_legal_name','operator_rif','operator_address','contact_email','contact_whatsapp','social_instagram','social_facebook','social_x','social_linkedin'], true)) {
+                $value = trim($value);
+                if (mb_strlen($value) > 256) throw new HttpException(422, 'invalid_setting_value', 'El dato institucional admite hasta 256 caracteres.');
+                if ($value !== '' && $key === 'operator_rif' && !preg_match('/^[VEJPG]-?\d{6,10}$/iD', $value)) throw new HttpException(422, 'invalid_setting_value', 'Indique un RIF válido con su prefijo.');
+                if ($value !== '' && $key === 'contact_email' && !filter_var($value, FILTER_VALIDATE_EMAIL)) throw new HttpException(422, 'invalid_setting_value', 'Indique un correo de atención válido.');
+                if ($value !== '' && $key === 'contact_whatsapp' && !preg_match('/^[1-9]\d{9,14}$/D', $value)) throw new HttpException(422, 'invalid_setting_value', 'WhatsApp requiere código de país y de 10 a 15 dígitos, sin signos ni espacios.');
+                if ($value !== '' && str_starts_with($key, 'social_') && (!filter_var($value, FILTER_VALIDATE_URL) || parse_url($value, PHP_URL_SCHEME) !== 'https')) throw new HttpException(422, 'invalid_setting_value', 'Las redes sociales requieren una URL HTTPS válida.');
+                if ($key === 'operator_rif') $value = strtoupper($value);
             }
             return $value;
         }

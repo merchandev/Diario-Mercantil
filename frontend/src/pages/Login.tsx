@@ -46,7 +46,7 @@ export default function Login() {
 
       // Redirect based on role
       if (isSolicitanteRole(user.role)) {
-        navigate('/solicitante/historial')
+        navigate('/solicitante')
       } else {
         navigate('/dashboard')
       }

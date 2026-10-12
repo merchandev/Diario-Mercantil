@@ -83,8 +83,8 @@ export default function Convocatoria() {
   }
 
   const totals = useMemo(() => {
-    const usd = Number(settings.convocatoria_usd || 0)
-    const unitBs = usd * (bcv || Number(settings.bcv_rate || 0))
+    const usd = Number(req?.subtotal_usd ?? settings.convocatoria_usd ?? 0)
+    const unitBs = usd * (Number(req?.tasa_bcv) || bcv || Number(settings.bcv_rate || 0))
     const { sub, iva, total } = includedVat(Number(req?.total_bs) || unitBs, Number(req?.porcentaje_iva ?? settings.iva_percent ?? 16))
     return { unitBs, sub, iva, total }
   }, [req, settings, bcv])
@@ -195,45 +195,32 @@ export default function Convocatoria() {
       <div className="card p-4 space-y-6">
         <h2 className="font-semibold text-lg border-b pb-2">Paso 3. Reportar el pago de la publicación</h2>
 
-        {/* Resumen de la Orden */}
+        {/* Resumen de la orden */}
         <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
-          <h3 className="font-bold text-base mb-3 text-slate-800">Resumen de la Orden</h3>
+          <h3 className="font-bold text-base mb-3 text-slate-800">Resumen de la orden</h3>
 
-          {/* Datos del Solicitante */}
+          {/* Datos del solicitante */}
           <div className="mb-4 bg-white rounded p-3 border border-slate-200">
-            <h4 className="font-semibold text-slate-700 mb-2 text-xs uppercase tracking-wide border-b pb-1">Datos del Solicitante</h4>
-            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <div className="flex flex-col"><span className="text-slate-500 text-xs">Nombre:</span> <span className="font-medium">{user.name}</span></div>
-              <div className="flex flex-col"><span className="text-slate-500 text-xs">Documento:</span> <span className="font-medium">{user.document}</span></div>
-              <div className="flex flex-col"><span className="text-slate-500 text-xs">Email:</span> <span>{user.email}</span></div>
-              <div className="flex flex-col"><span className="text-slate-500 text-xs">Teléfono:</span> <span>{user.phone}</span></div>
-              <div className="sm:col-span-2 flex flex-col"><span className="text-slate-500 text-xs">Dirección:</span> <span>{user.address || <span className="text-slate-400 italic">No registrada</span>}</span></div>
+            <h4 className="font-semibold text-slate-700 mb-2 text-base uppercase tracking-wide border-b pb-1">Datos del solicitante</h4>
+            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-base">
+              <div className="flex flex-col"><span className="text-slate-500 text-base">Nombre:</span> <span className="font-medium">{user.name}</span></div>
+              <div className="flex flex-col"><span className="text-slate-500 text-base">Documento:</span> <span className="font-medium">{user.document}</span></div>
+              <div className="flex flex-col"><span className="text-slate-500 text-base">Email:</span> <span>{user.email}</span></div>
+              <div className="flex flex-col"><span className="text-slate-500 text-base">Teléfono:</span> <span>{user.phone}</span></div>
+              <div className="sm:col-span-2 flex flex-col"><span className="text-slate-500 text-base">Dirección:</span> <span>{user.address || <span className="text-slate-400 italic">No registrada</span>}</span></div>
             </div>
           </div>
 
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-base">
             <div className="p-2 bg-white rounded border border-slate-200 text-slate-600">
               Servicio de publicación - {meta.tipo_convocatoria || 'Convocatoria'} ({meta.razon_social})
             </div>
 
-            <div className="flex justify-between items-center border-t border-slate-300 pt-2">
-              <span className="text-slate-600">Precio USD:</span>
-              <span className="font-medium">${Number(settings.convocatoria_usd || 0).toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-slate-600">Tasa BCV:</span>
-              <span className="font-medium">Bs. {bcv?.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between items-center border-t border-slate-300 pt-2">
-              <span className="text-slate-600">Precio USD:</span>
-              <span className="font-medium">${Number(settings.convocatoria_usd || 0).toFixed(2)}</span>
-            </div>
-            <div>Subtotal sin IVA: Bs. {totals.sub.toFixed(2)}</div><div>IVA ({settings.iva_percent ?? 16}%): Bs. {totals.iva.toFixed(2)}</div>
             <div className="flex justify-between items-center border-t-2 border-brand-600 pt-2 mt-2">
               <span className="text-base font-bold text-brand-900">TOTAL A PAGAR:</span>
               <div className="text-right">
                 <span className="text-xl font-bold text-brand-600 block">Bs. {totals.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                <span className="text-[10px] text-slate-400">Tasa: Bs. {bcv?.toFixed(2)}</span>
+                <span className="text-base text-slate-400">Tasa: Bs. {(Number(req?.tasa_bcv) || bcv)?.toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -243,34 +230,16 @@ export default function Convocatoria() {
 
         {/* Formulario de Pago */}
         <div className="space-y-4 pt-2">
-          <h3 className="font-semibold text-slate-800">Registrar Pago</h3>
+          <h3 className="font-semibold text-slate-800">Información del pago realizado</h3>
           <div className="grid md:grid-cols-2 gap-3">
             <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Tipo de operación</span>
-              <input className="input w-full bg-slate-50" value="Pago Móvil" readOnly />
-            </label>
-            <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Banco Origen</span>
+              <span className="block text-slate-600 mb-1">Banco emisor del pago</span>
               <select className="input w-full" value={pay.bank} onChange={e => setPay({ ...pay, bank: e.target.value })} required>
-                <option value="">Banco desde donde pagó</option>
+                <option value="">Seleccione un banco</option>
                 {BANCOS_VENEZUELA.map(bank => <option key={bank} value={bank}>{bank}</option>)}
               </select>
             </label>
             <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Últimos 6 dígitos Referencia *</span>
-              <input
-                className="input w-full"
-                maxLength={6}
-                value={pay.ref}
-                onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })}
-                placeholder="0000"
-              />
-            </label>
-            <label className="text-sm block">
-              <span className="block text-slate-600 mb-1">Fecha</span>
-              <input className="input w-full" type="date" max={editorialToday()} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
-            </label>
-            <label className="text-sm md:col-span-2 block">
                 <span className="block text-slate-600 mb-1">Teléfono origen (Pago Móvil) *</span>
                 <div className="flex gap-2">
                    <select className="input w-28 text-xs" value={pay.mobile_phone_prefix} onChange={e => setPay({ ...pay, mobile_phone_prefix: e.target.value })}>
@@ -283,21 +252,35 @@ export default function Convocatoria() {
                      <option>0426</option>
                    </select>
                    <input
-                    className="input flex-1"
+                    className="input flex-1 min-w-0"
                     maxLength={7}
                     value={pay.mobile_phone}
                     onChange={e => setPay({ ...pay, mobile_phone: e.target.value.replace(/\D/g, '') })}
                     placeholder="1234567"
                    />
                 </div>
-                <p className="text-[10px] text-brand-600 mt-1">* Debe admitir solo 7 dígitos numéricos</p>
+                <p className="text-sm text-brand-600 mt-1">Ingrese los 7 dígitos después del prefijo.</p>
               </label>
+            <label className="text-sm block">
+              <span className="block text-slate-600 mb-1">Fecha del pago</span>
+              <input className="input w-full" type="date" max={editorialToday()} value={pay.date} onChange={e => setPay({ ...pay, date: e.target.value })} />
+            </label>
+            <label className="text-sm block">
+              <span className="block text-slate-600 mb-1">Últimos 6 dígitos de la referencia *</span>
+              <input
+                className="input w-full"
+                maxLength={6}
+                value={pay.ref}
+                onChange={e => setPay({ ...pay, ref: e.target.value.replace(/\D/g, '') })}
+                placeholder="000000"
+              />
+            </label>
           </div>
 
           <div className="pt-4">
             <label className="flex items-start gap-2 text-sm cursor-pointer p-3 bg-slate-50 rounded border border-slate-200">
               <input type="checkbox" className="mt-1" checked={accept} onChange={e => setAccept(e.target.checked)} />
-              <span>Al hacer clic en “REPORTAR Y PUBLICAR”, confirmo que he realizado el pago por el monto exacto y acepto los Términos y Condiciones.</span>
+              <span>Al reportar la solicitud, confirmo que he realizado el pago por el monto exacto y acepto los <a href="/p/terminos-y-condiciones" target="_blank" rel="noopener noreferrer" className="text-brand-700 underline">Términos y condiciones</a>.</span>
             </label>
           </div>
 

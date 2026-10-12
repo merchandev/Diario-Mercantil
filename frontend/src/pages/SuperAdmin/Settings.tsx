@@ -1,3 +1,4 @@
+import InstitutionalFields from '../../components/InstitutionalFields'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Save, DollarSign, FileText, Settings as SettingsIcon, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -101,6 +102,7 @@ export default function Settings() {
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <InstitutionalFields value={settings} onChange={setSettings} dark />
                     <RegistrationControl dark />
       <MaintenanceControl dark />
                     {/* Precios y Tasas */}

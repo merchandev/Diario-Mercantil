@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__.'/../Repositories/SettingRepository.php';
+
 final class TermsAcceptanceService
 {
     public static function current(PDO $pdo): ?array
@@ -13,7 +15,11 @@ final class TermsAcceptanceService
         $text = strip_tags(($page['header_html'] ?? '') . ($page['footer_html'] ?? ''));
         foreach ($blocks as $block) $text .= (string)($block['props']['text'] ?? '');
         if (trim($text) === '') return null;
-        $snapshot = json_encode([$page['header_html'] ?? '', json_decode($page['body_json'] ?? '[]', true), $page['footer_html'] ?? ''], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $content = [$page['header_html'] ?? '', json_decode($page['body_json'] ?? '[]', true), $page['footer_html'] ?? ''];
+        $identity = (new SettingRepository($pdo))->getMany(['operator_legal_name','operator_rif','operator_address','contact_email']);
+        $identity = array_filter($identity, static fn(string $value): bool => trim($value) !== '');
+        if ($identity !== []) { ksort($identity); $content[] = ['operator'=>$identity]; }
+        $snapshot = json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         return ['id'=>(int)$page['id'], 'version'=>hash('sha256', $snapshot), 'snapshot'=>$snapshot];
     }
 

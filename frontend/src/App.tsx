@@ -41,6 +41,7 @@ function lazyImport(factory: () => Promise<{ default: React.ComponentType<any> }
 }
 
 // Heavy pages - lazy loaded
+const ApiDocumentation = lazyImport(() => import('./pages/ApiDocumentation'))
 const PanelHome = lazyImport(() => import('./pages/PanelHome'))
 const Ediciones = lazyImport(() => import('./pages/Ediciones'))
 const Publicaciones = lazyImport(() => import('./pages/Publicaciones'))
@@ -181,6 +182,7 @@ export default function App() {
         <Route path="/lotus/seo" element={<LazyRoute><SuperAdminSeo /></LazyRoute>} />
         <Route path="/lotus/paginas" element={<LazyRoute><SuperAdminPaginas /></LazyRoute>} />
 
+        <Route path="/docs/*" element={<RequireAdmin><LazyRoute><ApiDocumentation /></LazyRoute></RequireAdmin>} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/olvide-password" element={<LazyRoute><ForgotPassword /></LazyRoute>} />

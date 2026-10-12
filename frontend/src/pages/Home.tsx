@@ -85,7 +85,7 @@ export default function Home() {
     <div className="bg-slate-50/60 flex flex-1 flex-col">
       <SEO
         title="Diario Mercantil Venezuela | Avisos Legales y Edictos"
-        description="Publica avisos legales, edictos, actas y balances en el Diario Mercantil digital líder en Venezuela. Válido para Registros Mercantiles."
+        description="Gestiona tus solicitudes de publicación de documentos y convocatorias. Consulta ediciones digitales del Diario Mercantil de Venezuela."
       />
       <PromoPopup />
 

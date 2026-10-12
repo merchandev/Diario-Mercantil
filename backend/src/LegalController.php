@@ -296,6 +296,15 @@ class LegalController {
         if (!empty($m['numero_planilla']) && !preg_match('/^\d{3}\.\d{4}\.\d\.\d{1,6}$/', $m['numero_planilla'])) {
             return Response::json(['error'=>'La planilla debe tener formato 000.0000.0.000000'], 400);
         }
+        if (isset($m['reference_type']) && !in_array($m['reference_type'], ['pub','tramite'], true)) {
+            return Response::json(['error'=>'Seleccione planilla PUB o número de trámite.'],422);
+        }
+        if (!empty($m['numero_tramite'])) {
+            $m['numero_tramite'] = strtoupper(trim((string)$m['numero_tramite']));
+            if (!preg_match('~^[A-Z0-9][A-Z0-9._/ -]{0,63}$~D', $m['numero_tramite'])) {
+                return Response::json(['error'=>'El número de trámite admite hasta 64 letras, números, espacios y separadores . _ / -.'],422);
+            }
+        }
         if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
             return Response::json(['error'=>'El tomo debe ser solo números (máx 3)'], 400);
         }

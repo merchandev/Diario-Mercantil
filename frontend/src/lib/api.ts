@@ -1,3 +1,4 @@
+import { fetchApi } from './transport'
 const API_BASE = import.meta.env.VITE_BACKEND_URL || '';
 
 function getUrl(path: string) {
@@ -32,7 +33,7 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
   const url = typeof input === 'string' ? getUrl(input) : input;
   const reqInit = { ...init, headers, credentials: 'include' as RequestCredentials };
 
-  const res = await fetch(url, reqInit)
+  const res = await fetchApi(url, reqInit)
   if (res.status === 401 && !noRedirect) {
       if (typeof window !== 'undefined') {
         window.location.href = window.location.pathname.startsWith('/lotus/') ? '/lotus/' : '/login'
@@ -51,7 +52,6 @@ export async function fetchAuth(input: RequestInfo | URL, init?: RequestInit, no
         errorMsg = await res.text() || errorMsg;
       }
     } catch { }
-    if (data?.error === 'maintenance_required' && typeof window !== 'undefined') window.dispatchEvent(new Event('dm-maintenance-required'));
     throw new ApiError(errorMsg, res.status, data);
   }
   return res
@@ -65,7 +65,7 @@ export const api = {
 }
 
 export async function login(body: { document: string; password: string; administrative?: boolean }) {
-  const res = await fetch(getUrl('/api/auth/login'), {
+  const res = await fetchApi(getUrl('/api/auth/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -93,7 +93,7 @@ export async function login(body: { document: string; password: string; administ
 // ========== SUPERADMIN API ==========
 
 export async function superadminLogin(body: { username: string; password: string }) {
-  const res = await fetch(getUrl('/api/superadmin/login'), {
+  const res = await fetchApi(getUrl('/api/superadmin/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -107,7 +107,7 @@ export async function superadminLogin(body: { username: string; password: string
 }
 
 export async function verifySuperAdmin() {
-  const res = await fetch(getUrl('/api/superadmin/verify'), { credentials: 'include' })
+  const res = await fetchApi(getUrl('/api/superadmin/verify'), { credentials: 'include' })
   if (!res.ok) throw new Error('Unauthorized')
   return res.json() as Promise<{ ok: boolean; superadmin: { id: number; username: string } }>
 }
@@ -131,7 +131,7 @@ export async function logout() {
 // Live BCV rate (public endpoint, always cache-aware)
 export async function getBcvRate() {
   const url = new URL('/api/rate/bcv', API_BASE || window.location.origin)
-  const res = await fetch(url.toString())
+  const res = await fetchApi(url.toString())
   if (!res.ok) throw new Error(await res.text())
   // Backward compatible shape, extended with usd/eur/date fields
   return res.json() as Promise<{
@@ -219,7 +219,7 @@ export async function deletePublication(id: number) {
   return res.json()
 }
 export async function getPublicationPublic(slug: string) {
-  const res = await fetch(getUrl(`/api/p/${encodeURIComponent(slug)}`))
+  const res = await fetchApi(getUrl(`/api/p/${encodeURIComponent(slug)}`))
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ publication: { slug: string; title: string; content: string; status: string; created_at: string; updated_at: string } }>
 }
@@ -285,7 +285,7 @@ export async function listPublicEditions(params?: { q?: string; from?: string; t
   if (params?.from) qs.set('from', params.from);
   if (params?.to) qs.set('to', params.to);
   const suffix = qs.toString() ? '?' + qs.toString() : '';
-  const res = await fetch(`/api/public/editions${suffix}`);
+  const res = await fetchApi(`/api/public/editions${suffix}`);
   if (!res.ok) throw new Error('No se pudieron cargar las ediciones');
   return res.json() as Promise<{ items: Edition[] }>;
 }
@@ -472,7 +472,7 @@ export async function getLegal(id: number) {
   return res.json() as Promise<{ item: LegalRequest; payments: LegalPayment[] }>
 }
 export async function getPublicLegalByOrder(orderNo: string) {
-  const res = await fetch(getUrl(`/api/legal/public/${encodeURIComponent(orderNo)}`), { credentials: 'include' })
+  const res = await fetchApi(getUrl(`/api/legal/public/${encodeURIComponent(orderNo)}`), { credentials: 'include' })
   if (!res.ok) {
     throw new ApiError('Publicación no disponible.', res.status)
   }
@@ -633,6 +633,16 @@ export async function changeUserRole(id: number, role: string) {
 
 // Settings
 export type Settings = {
+  operator_legal_name?: string;
+  operator_rif?: string;
+  operator_address?: string;
+  contact_email?: string;
+  contact_whatsapp?: string;
+  social_instagram?: string;
+  social_facebook?: string;
+  social_x?: string;
+  social_linkedin?: string;
+
   registration_enabled?: boolean | number | string;
   bcv_rate: number;
   price_per_folio_usd: number;
@@ -774,14 +784,14 @@ export async function deletePage(id: number) {
   return res.json() as Promise<{ ok: true }>
 }
 export async function getPagePublic(slug: string) {
-  const res = await fetch(getUrl(`/api/page/${encodeURIComponent(slug)}`))
+  const res = await fetchApi(getUrl(`/api/page/${encodeURIComponent(slug)}`))
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ page: { slug: string; title: string; header_html?: string; footer_html?: string; body_blocks: PageBlock[]; status: string; updated_at: string; version?: string } }>
 }
 
 // Public list of published pages (for navigation)
 export async function listPagesPublic() {
-  const res = await fetch(getUrl('/api/public/pages'))
+  const res = await fetchApi(getUrl('/api/public/pages'))
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ items: { slug: string; title: string }[] }>
 }
@@ -796,7 +806,7 @@ export type SeoMetadata = {
 }
 
 export async function getPublicSeo() {
-  const res = await fetch(getUrl('/api/seo/all'))
+  const res = await fetchApi(getUrl('/api/seo/all'))
   if (!res.ok) throw new Error(await res.text())
   return res.json() as Promise<{ seo: Record<string, SeoMetadata> }>
 }

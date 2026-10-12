@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { getSettings, type Settings } from '../lib/api'
+import { useEffect, useState } from 'react'
 import { SEO } from '../components/SEO'
 import { IconBuilding, IconIdCard, IconMail, IconPhone, IconUser } from '../components/icons'
 
@@ -40,6 +41,9 @@ const EMPTY_FORM: ContactForm = {
 }
 
 export default function Contacto() {
+  const [channels, setChannels] = useState<Partial<Settings>>({})
+  useEffect(() => { getSettings().then(r => setChannels(r.settings)).catch(() => {}) }, [])
+  const whatsapp = String(channels.contact_whatsapp || '')
   const [form, setForm] = useState<ContactForm>(EMPTY_FORM)
 
   const update = (field: keyof ContactForm, value: string) => {
@@ -48,9 +52,9 @@ export default function Contacto() {
 
   const onSubmit = (event: React.FormEvent) => {
     event.preventDefault()
-    if (Object.values(form).some(value => !value.trim())) return
+    if (!whatsapp || Object.values(form).some(value => !value.trim())) return
 
-    const url = 'https://wa.me/584120000000?text=' + encodeURIComponent(buildContactMessage(form))
+    const url = 'https://wa.me/' + whatsapp + '?text=' + encodeURIComponent(buildContactMessage(form))
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -73,6 +77,12 @@ export default function Contacto() {
           </p>
         </header>
 
+        <div className="mx-auto max-w-2xl mb-5 space-y-2 text-slate-600">
+          {channels.operator_legal_name && <p>{channels.operator_legal_name}{channels.operator_rif ? ' · ' + channels.operator_rif : ''}</p>}
+          {channels.operator_address && <p>{channels.operator_address}</p>}
+          {channels.contact_email && <p><a className="text-brand-700 underline" href={'mailto:' + channels.contact_email}>{channels.contact_email}</a></p>}
+          {!whatsapp && <p role="status">La atención por WhatsApp estará disponible cuando administración configure el número de contacto.</p>}
+        </div>
         <form onSubmit={onSubmit} className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="h-1.5 bg-brand-700" aria-hidden="true" />
           <div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-7">
@@ -167,7 +177,7 @@ export default function Contacto() {
             </label>
 
             <div className="sm:col-span-2">
-              <button type="submit" className="btn btn-primary flex h-12 w-full items-center justify-center gap-2 text-base">
+              <button type="submit" disabled={!whatsapp} className="btn btn-primary flex h-12 w-full items-center justify-center gap-2 text-base">
                 <IconPhone className="h-5 w-5" />
                 Enviar consulta por WhatsApp
               </button>

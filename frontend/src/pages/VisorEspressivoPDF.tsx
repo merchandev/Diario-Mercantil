@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import FlipbookViewer from '../components/FlipbookViewer'
@@ -26,7 +27,7 @@ export default function VisorEspressivoPDF() {
     }
     setLoading(true)
     setError('')
-    fetch(`/api/dm/e-${encodeURIComponent(code)}`)
+    fetchApi(`/api/dm/e-${encodeURIComponent(code)}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(await res.text())
         return res.json()

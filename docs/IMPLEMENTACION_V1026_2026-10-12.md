@@ -1,13 +1,13 @@
 # Implementación de la revisión v1026 - Versión 2
 
 Fecha: 12 de octubre de 2026.\\
-Estado: cambios aplicados y validados localmente; no desplegados en producción.
+Estado del informe inicial: validado localmente. Este informe es histórico; el estado vigente y el despliegue se documentan en [Cierre v1026](CIERRE_V1026_2026-10-12.md).
 
 ## Resultado
 
 Se implementaron los ajustes de código de la versión 2 sobre el proyecto existente, preservando los cambios previos del árbol de trabajo. La prioridad editorial está resuelta: el borrador reserva un CVE DMV-XXXXXXXX y muestra inmediatamente enlace estable y QR descargable de 1000 x 1000 píxeles. El PDF continúa privado hasta publicar, y los controles de integridad/publicación permanecen activos.
 
-El plan de referencia es [Plan comparado v2](<E:/08 - PROYECTOS AGOSTO 2026/DIARIO MERCANTIL/PLAN_ACCION_COMPARADO_V2_2026-10-12.md>). La matriz inferior distingue aplicación de código, conservación y contenido pendiente. No se declara realizada una configuración de producción ni revisión de textos no suministrados.
+El plan de referencia es [Plan comparado v2](<E:/08 - PROYECTOS AGOSTO 2026/DIARIO MERCANTIL/PLAN_ACCION_COMPARADO_V2_2026-10-12.md>). La matriz inferior distingue aplicación de código, conservación y contenido pendiente. La configuración editorial, las correcciones posteriores y los datos reservados para carga manual se detallan en el informe de cierre.
 
 ## Cambios aplicados
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PageBlock, getPagePublic } from '../lib/api'
+import { PageBlock, getPagePublic, getSettings, type Settings } from '../lib/api'
 import { useParams } from 'react-router-dom'
 
 function RenderBlocks({blocks}:{blocks:PageBlock[]}){
@@ -8,10 +8,10 @@ function RenderBlocks({blocks}:{blocks:PageBlock[]}){
       {blocks.map(b=>{
         if (b.type==='heading'){
           const Tag = `h${b.props.level}` as any
-          return <Tag key={b.id} className={{left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</Tag>
+          return <Tag key={b.id} className={'font-semibold text-slate-900 pt-3 ' + (b.props.level <= 2 ? 'text-xl ' : 'text-lg ') + {left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</Tag>
         }
         if (b.type==='paragraph'){
-          return <p key={b.id} style={{ whiteSpace: 'pre-wrap' }} className={{left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</p>
+          return <p key={b.id} style={{ whiteSpace: 'pre-wrap' }} className={'text-slate-700 leading-7 ' + {left:'text-left',center:'text-center',right:'text-right'}[b.props.align]}>{b.props.text}</p>
         }
         return <img key={b.id} src={(b as any).props.url} alt={(b as any).props.alt||''} className="max-w-full rounded"/>
       })}
@@ -21,10 +21,13 @@ function RenderBlocks({blocks}:{blocks:PageBlock[]}){
 
 export default function PagePublic(){
   const { slug } = useParams()
+  const [identity, setIdentity] = useState<Partial<Settings>>({})
+  useEffect(() => { getSettings().then(r => setIdentity(r.settings)).catch(() => {}) }, [])
   const [page, setPage] = useState<{ title:string; header_html?:string; footer_html?:string; body_blocks:PageBlock[] }|null>(null)
   const [notFound, setNotFound] = useState(false)
   useEffect(()=>{
     if (!slug) return
+    setNotFound(false); setPage(null)
     getPagePublic(slug).then(r=> setPage({ title:r.page.title, header_html:r.page.header_html, footer_html:r.page.footer_html, body_blocks:r.page.body_blocks||[] })).catch(()=> setNotFound(true))
   }, [slug])
 
@@ -41,6 +44,11 @@ export default function PagePublic(){
             <article className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
               {page.header_html ? <div dangerouslySetInnerHTML={{__html:page.header_html}}/> : null}
               <RenderBlocks blocks={page.body_blocks||[]}/>
+              {identity.operator_legal_name && <div className="border-t pt-4 text-sm text-slate-600">
+                <p>{identity.operator_legal_name}{identity.operator_rif ? ' · RIF: ' + identity.operator_rif : ''}</p>
+                {identity.operator_address && <p>{identity.operator_address}</p>}
+                {identity.contact_email && <a href={'mailto:' + identity.contact_email}>{identity.contact_email}</a>}
+              </div>}
               {page.footer_html ? <div dangerouslySetInnerHTML={{__html:page.footer_html}}/> : null}
             </article>
           </>

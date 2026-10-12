@@ -1,3 +1,4 @@
+import InstitutionalFields from '../components/InstitutionalFields'
 import EditorialContentEditor from '../components/EditorialContentEditor'
 import { useEffect, useState } from 'react'
 import { getAdminSettings, saveSettings, type Settings, listDirAreas, listDirColleges, createDirArea, updateDirArea, deleteDirArea, createDirCollege, updateDirCollege, deleteDirCollege } from '../lib/api'
@@ -55,6 +56,7 @@ export default function Configuracion() {
         {tab === 'Políticas de privacidad' && <EditorialContentEditor key="privacy" slug="politicas-de-privacidad" title="Políticas de privacidad" />}
         {tab === 'General' && (
           <div className="space-y-6">
+            <InstitutionalFields value={s} onChange={setS} />
             <div className="bg-brand-50 border border-brand-200 rounded-lg p-4">
               <h3 className="font-bold text-brand-900 mb-3">💰 Precios y Tasas</h3>
               <div className="grid md:grid-cols-2 gap-4">

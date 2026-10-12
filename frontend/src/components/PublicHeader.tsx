@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 import React, { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getBcvRate, getSettings, listPagesPublic, logout } from '../lib/api'
@@ -21,8 +22,8 @@ function HeroSlider() {
   if (!banner) return null;
 
   return (
-    <div className="relative w-full h-28 md:h-32 bg-slate-100 overflow-hidden">
-      <img src={banner} className="w-full h-full object-cover" alt="Publicidad del Diario Mercantil" />
+    <div className="relative w-full aspect-[20/3] bg-[#faf6f0] overflow-hidden">
+      <img src={banner} className="w-full h-full object-contain" alt="Publicidad del Diario Mercantil" />
     </div>
   )
 }
@@ -31,7 +32,7 @@ function TopBannerRow() {
   const [priceUsd, setPriceUsd] = useState<number | undefined>(undefined)
   const [rate, setRate] = useState<number | undefined>(undefined)
   useEffect(() => {
-    fetch('/api/settings')
+    fetchApi('/api/settings')
       .then(async res => res.ok ? res.json() : Promise.reject(res.status))
       .then((r: any) => setPriceUsd(Number(r.settings?.price_per_folio_usd || 0)))
       .catch(() => { })
@@ -82,7 +83,7 @@ export default function PublicHeader() {
       setEur(f(r.eur?.value ?? undefined))
     }).catch(() => { })
     // Fetch UT from settings (default to 43 if absent)
-    fetch('/api/settings')
+    fetchApi('/api/settings')
       .then(async res => res.ok ? res.json() : Promise.reject(res.status))
       .then((r: any) => {
         const ut = Number((r as any).settings?.unit_tax_bs ?? 43)

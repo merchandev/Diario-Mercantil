@@ -802,7 +802,7 @@ export default function Documento() {
               <option value="COMPAÑÍA DE RESPONSABILIDAD LIMITADA (C.R.L.)">Compañía de Responsabilidad Limitada (C.R.L.)</option>
               <option value="COMPAÑÍA EN COMANDITA SIMPLE (C.C.S.)">Compañía en Comandita Simple (C.C.S.)</option>
               <option value="COMPAÑÍA EN COMANDITA POR ACCIONES (C.C.A.)">Compañía en Comandita por Acciones (C.C.A.)</option>
-              <option value="Consorcio">Consorcio</option>
+              <option value="CONSORCIO">Consorcio</option>
               <option value="SOCIEDADES ANÓNIMAS (S.A.)">Sociedades Anónimas (S.A.)</option>
               <option value="SOCIEDAD EN COMANDITA SIMPLE (S.C.S.)">Sociedad en Comandita Simple (S.C.S.)</option>
               <option value="SOCIEDAD EN COMANDITA POR ACCIONES (S.C.A.)">Sociedad en Comandita por Acciones (S.C.A.)</option>
@@ -819,7 +819,7 @@ export default function Documento() {
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="registral-tipo_acto">Tipo de acto inscrito</label>
             <select id="registral-tipo_acto" className="input w-full" value={meta.tipo_acto || ''} onChange={e => setMeta({ ...meta, tipo_acto: e.target.value })} disabled={!meta.tipo_sociedad}>
               <option value="">Seleccione tipo de trámite</option>
-              {meta.tipo_sociedad && Object.entries(TRAMITES_POR_TIPO).find(([key]) => key.toUpperCase() === meta.tipo_sociedad)?.[1]?.map((t: string) => (
+              {meta.tipo_sociedad && Object.entries(TRAMITES_POR_TIPO).find(([key]) => key.toLocaleUpperCase('es-VE') === String(meta.tipo_sociedad).toLocaleUpperCase('es-VE'))?.[1]?.map((t: string) => (
                 <option key={t} value={t.toUpperCase()}>{t}</option>
               ))}
             </select>
@@ -931,15 +931,18 @@ export default function Documento() {
             />
 
           </label>
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700 mb-1 block">Número de planilla (PUB) o número de trámite</span>
-            <input className="input w-full" placeholder="391.2024.4.4388"
-                   maxLength={17}
-                   pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$"
-                   title="Formato: 000.0000.0.000000"
-                   value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: formatPlanilla(e.target.value) })} />
-
-          </label>
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700" htmlFor="registral-reference-type">Número de planilla (PUB) o número de trámite</label>
+            <select id="registral-reference-type" className="input w-full" value={meta.reference_type || 'pub'} onChange={e => setMeta({ ...meta, reference_type: e.target.value })}>
+              <option value="pub">Planilla PUB</option><option value="tramite">Número de trámite</option>
+            </select>
+            {meta.reference_type === 'tramite' ? <input aria-label="Número de trámite" className="input w-full" maxLength={64}
+              pattern="[A-Za-z0-9][A-Za-z0-9._\/ \-]{0,63}" placeholder="Identificador tal como aparece en el documento"
+              value={meta.numero_tramite || ''} onChange={e => setMeta({ ...meta, numero_tramite: e.target.value.toUpperCase() })} />
+              : <input aria-label="Número de planilla PUB" className="input w-full" placeholder="391.2024.4.4388" maxLength={17}
+              pattern="^\d{3}\.\d{4}\.\d\.\d{1,6}$" title="Formato: 000.0000.0.000000"
+              value={meta.planilla || ''} onChange={e => setMeta({ ...meta, planilla: formatPlanilla(e.target.value) })} />}
+          </div>
           </div>
           <div className="md:col-span-2 flex gap-3 pt-4">
             <button type="submit" className="btn btn-primary flex-1" disabled={loading}>
@@ -1179,26 +1182,26 @@ export default function Documento() {
 
                 {/* Datos del Solicitante (Integrados) */}
                 <div className="mb-6 bg-white rounded-lg p-4 border border-slate-200">
-                  <h4 className="font-semibold text-brand-800 mb-3 text-sm uppercase tracking-wide border-b pb-2">Datos del Solicitante</h4>
-                  <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <h4 className="font-semibold text-brand-800 mb-3 text-base uppercase tracking-wide border-b pb-2">Datos del Solicitante</h4>
+                  <div className="grid sm:grid-cols-2 gap-x-4 gap-y-2 text-base">
                     <div>
-                      <span className="block text-slate-500 text-xs">Nombre / Razón Social</span>
+                      <span className="block text-slate-500 text-base">Nombre / Razón Social</span>
                       <strong className="text-slate-800">{pay.name}</strong>
                     </div>
                     <div>
-                      <span className="block text-slate-500 text-xs">Documento (RIF/CI)</span>
+                      <span className="block text-slate-500 text-base">Documento (RIF/CI)</span>
                       <strong className="text-slate-800">{pay.document}</strong>
                     </div>
                     <div>
-                      <span className="block text-slate-500 text-xs">Correo Electrónico</span>
+                      <span className="block text-slate-500 text-base">Correo Electrónico</span>
                       <span className="text-slate-800">{pay.email}</span>
                     </div>
                     <div>
-                      <span className="block text-slate-500 text-xs">Teléfono</span>
+                      <span className="block text-slate-500 text-base">Teléfono</span>
                       <span className="text-slate-800">{pay.phone}</span>
                     </div>
                     <div className="sm:col-span-2">
-                      <span className="block text-slate-500 text-xs">Dirección</span>
+                      <span className="block text-slate-500 text-base">Dirección</span>
                       <span className="text-slate-800">{pay.address || <span className="text-slate-400 italic">No registrada</span>}</span>
                     </div>
                   </div>
@@ -1207,18 +1210,18 @@ export default function Documento() {
                 {/* Totales */}
                 <div className="space-y-3">
                   <h4 className="font-semibold text-slate-800">Descripción y costo</h4>
-                  <div className="p-4 bg-white rounded-lg border border-slate-200 text-slate-800 text-sm leading-relaxed mb-4">
-                    <p className="text-slate-700 text-sm mb-2">Servicio de publicación electrónica en el Diario Mercantil de Venezuela de un documento protocolizado que corresponde a la razón social:</p>
+                  <div className="p-4 bg-white rounded-lg border border-slate-200 text-slate-800 text-base leading-relaxed mb-4">
+                    <p className="text-slate-700 text-base mb-2">Servicio de publicación electrónica en el Diario Mercantil de Venezuela de un documento protocolizado que corresponde a la razón social:</p>
                     <div className="font-bold border-b pb-2 mb-2 text-slate-800 uppercase">{meta.razon_social || 'REVISAR'}</div>
 
-                    <div className="text-sm space-y-1 text-slate-700">
+                    <div className="text-base space-y-1 text-slate-700">
                       <p>Datos de registro mercantil:</p>
                       <p>Oficina de registro mercantil: <span className="font-semibold">{meta.oficina || 'REVISAR'}</span></p>
                       <p>Tomo: <span className="font-semibold">{meta.tomo || 'REVISAR'}</span> Letra: <span className="font-semibold">{meta.letra || '-'}</span></p>
                       <p>Número: <span className="font-semibold">{meta.numero || 'REVISAR'}</span></p>
                       <p>Año: <span className="font-semibold">{meta.anio || 'REVISAR'}</span></p>
                       <p>Número de expediente: <span className="font-semibold">{meta.expediente || 'REVISAR'}</span></p>
-                      <p>Número de planilla: <span className="font-semibold">{meta.planilla || 'REVISAR'}</span></p>
+                      <p>{meta.reference_type === 'tramite' ? 'Número de trámite' : 'Número de planilla PUB'}: <span className="font-semibold">{(meta.reference_type === 'tramite' ? meta.numero_tramite : meta.planilla) || 'REVISAR'}</span></p>
                       <p>Registrador: <span className="font-semibold">{meta.registrador || '-'} ({meta.tipo_registrador ? meta.tipo_registrador.charAt(0) + meta.tipo_registrador.slice(1).toLowerCase() : '-'})</span></p>
                     </div>
                   </div>
@@ -1231,7 +1234,7 @@ export default function Documento() {
                     <span className="text-slate-600">Precio por folio:</span>
                     <div className="text-right">
                       <div className="font-semibold text-slate-800">Bs. {(((pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)) * (Number(req?.tasa_bcv) || bcv)) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                      <div className="text-[10px] text-slate-400">Equivalente a ${(pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)).toFixed(2)} USD / folio</div>
+                      <div className="text-base text-slate-400">Equivalente a ${(pdfAnalysis.price_usd / Math.max(pdfAnalysis.folios, 1)).toFixed(2)} USD / folio</div>
                     </div>
                   </div>
                   {/* Detalles ocultos a petición del cliente:

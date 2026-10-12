@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { IconHome, IconEditions, IconDocs, IconPayments, IconLegal, IconUsers, IconSettings, IconUserCircle, IconTrash, IconUser, IconImage, IconMegaphone } from './icons'
@@ -35,7 +36,7 @@ export default function Sidebar({
   const { user } = useAuth()
   const [sysVersion, setSysVersion] = useState<string>('- - -')
   useEffect(() => {
-    fetch('/api/version').then(r=>r.json()).then(d=>setSysVersion(d.git_sha?.slice(0, 7) || 'unknown')).catch(()=>setSysVersion('unknown'))
+    fetchApi('/api/version').then(r=>r.json()).then(d=>setSysVersion(d.git_sha?.slice(0, 7) || 'unknown')).catch(()=>setSysVersion('unknown'))
   }, [])
   const [collapsed, setCollapsed] = useState(false)
 

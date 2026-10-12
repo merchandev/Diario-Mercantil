@@ -723,6 +723,47 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame('',$pdo->query('SELECT address FROM users WHERE id=2')->fetchColumn());
     }
 
+    public function testChangingOperatorIdentityChangesTermsVersionAndRetainsPriorSnapshots(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT OR REPLACE INTO pages(slug,title,body_json,status) VALUES('terminos-y-condiciones','Términos','[{\"type\":\"paragraph\",\"props\":{\"text\":\"Condiciones\"}}]','published')");
+        $before=TermsAcceptanceService::current($pdo);
+        $this->request('POST','/api/admin/settings','admin_session_test',['operator_legal_name'=>'NUEVO OPERADOR DE PRUEBA']);
+        $after=TermsAcceptanceService::current($pdo);
+        $this->assertNotSame($before['version'],$after['version']);
+        $this->assertStringContainsString('NUEVO OPERADOR DE PRUEBA',$after['snapshot']);
+        $this->assertNotSame($before['snapshot'],$after['snapshot']);
+        $pdo->prepare('DELETE FROM pages WHERE id=?')->execute([$before['id']]);
+    }
+
+    public function testSeparateProcedureReferenceRoundTripsAndPubValidationRemainsStrict(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date) VALUES(974,2,'Borrador',100,'CONSORCIO','2026-01-02')");
+        $meta=['tipo_sociedad'=>'Consorcio','reference_type'=>'tramite','numero_tramite'=>'rm-2026/0000123'];
+        $saved=$this->request('PUT','/api/legal/974','user_session_test',['meta'=>$meta]);
+        $this->assertSame(200,$saved['code'],$saved['raw']);
+        $stored=json_decode($pdo->query('SELECT meta FROM legal_requests WHERE id=974')->fetchColumn(),true);
+        $this->assertSame('CONSORCIO',$stored['tipo_sociedad']);
+        $this->assertSame('RM-2026/0000123',$stored['numero_tramite']);
+        $meta['numero_tramite']=str_repeat('A',65);
+        $this->assertSame(422,$this->request('PUT','/api/legal/974','user_session_test',['meta'=>$meta])['code']);
+        $meta['numero_tramite']='<script>';
+        $this->assertSame(422,$this->request('PUT','/api/legal/974','user_session_test',['meta'=>$meta])['code']);
+        $this->assertSame(400,$this->request('PUT','/api/legal/974','user_session_test',['meta'=>['reference_type'=>'pub','numero_planilla'=>'RM-123']])['code']);
+        $valid=$this->request('PUT','/api/legal/974','user_session_test',['meta'=>['reference_type'=>'pub','numero_planilla'=>'391.2026.1.000123']]);
+        $this->assertSame(200,$valid['code'],$valid['raw']);
+    }
+
+    public function testInstitutionalFieldsAreValidatedAndPublishedWithoutFakeDefaults(): void {
+        $this->assertSame(422,$this->request('POST','/api/admin/settings','admin_session_test',['contact_whatsapp'=>'inventado'])['code']);
+        $this->assertSame(422,$this->request('POST','/api/admin/settings','admin_session_test',['social_instagram'=>'javascript:alert(1)'])['code']);
+        $saved=$this->request('POST','/api/admin/settings','admin_session_test',['operator_legal_name'=>'OPERADOR DE PRUEBA','operator_rif'=>'J-123456789','contact_whatsapp'=>'584121234567']);
+        $this->assertSame(200,$saved['code'],$saved['raw']);
+        $public=$this->request('GET','/api/settings')['body']['settings'];
+        $this->assertSame('OPERADOR DE PRUEBA',$public['operator_legal_name']);
+        $this->assertSame('584121234567',(string)$public['contact_whatsapp']);
+        $this->assertArrayNotHasKey('maintenance_generation',$public);
+    }
+
     public function testNewPaymentRequiresSixDigitsAndPreservesLeadingZeros(): void {
         $pdo=Database::pdo();
         $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date) VALUES(971,2,'Borrador',100,'PAGO','2026-01-02')");

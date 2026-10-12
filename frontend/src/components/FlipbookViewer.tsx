@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 /**
  * FlipbookViewer — Magazine PDF viewer
  * • Drag right half → next page  |  Drag left half → prev page
@@ -1499,7 +1500,7 @@ export default function FlipbookViewer({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         buf = await res.arrayBuffer();
       } else {
-        const res = await fetch(src);
+        const res = await (new URL(src, window.location.origin).pathname.startsWith('/api/') ? fetchApi(src) : fetch(src));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         buf = await res.arrayBuffer();
       }

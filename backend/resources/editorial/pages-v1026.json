@@ -1,0 +1,700 @@
+[
+  {
+    "slug": "sobre-el-diario",
+    "title": "Sobre el Diario Mercantil",
+    "body_blocks": [
+      {
+        "id": "sobre-el-diario-h0",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Publicaciones y ediciones digitales"
+        }
+      },
+      {
+        "id": "sobre-el-diario-p0",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Diario Mercantil de Venezuela ofrece una plataforma para solicitar la publicación de documentos protocolizados y convocatorias, consultar el seguimiento de cada solicitud y acceder a las ediciones digitales publicadas."
+        }
+      },
+      {
+        "id": "sobre-el-diario-h1",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Un proceso con seguimiento"
+        }
+      },
+      {
+        "id": "sobre-el-diario-p1",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El solicitante carga sus documentos, completa los datos y reporta el pago. Administración revisa la solicitud y el pago antes de incorporarla a una edición. Cuando se requiere una corrección, el motivo aparece en la cuenta del solicitante."
+        }
+      },
+      {
+        "id": "sobre-el-diario-h2",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Consulta de las ediciones"
+        }
+      },
+      {
+        "id": "sobre-el-diario-p2",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Cada edición cuenta con un Código de Verificación Electrónica (CVE) y un enlace de consulta. El documento final y su descarga están disponibles una vez publicada la edición."
+        }
+      },
+      {
+        "id": "sobre-el-diario-h3",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Atención y datos institucionales"
+        }
+      },
+      {
+        "id": "sobre-el-diario-p3",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Los canales de atención y los datos del operador se muestran en Contacto cuando administración los configura. Para consultas sobre una solicitud, conserve su número de orden y seleccione el departamento correspondiente."
+        }
+      }
+    ],
+    "footer_html": "<p><a href=\"/contacto\">Contactar al Diario</a> · <a href=\"/p/como-publicar\">Cómo publicar</a></p>"
+  },
+  {
+    "slug": "como-publicar",
+    "title": "Cómo publicar",
+    "body_blocks": [
+      {
+        "id": "como-publicar-h0",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "1. Ingrese a su cuenta"
+        }
+      },
+      {
+        "id": "como-publicar-p0",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Inicie sesión con su documento de identidad y contraseña. Si el registro de nuevas cuentas está habilitado, cree su cuenta y consulte y acepte los Términos y condiciones vigentes. Si el sitio está en mantenimiento, el acceso requiere primero la autorización administrativa."
+        }
+      },
+      {
+        "id": "como-publicar-h1",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "2. Complete los datos de la solicitud"
+        }
+      },
+      {
+        "id": "como-publicar-p1",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Seleccione Documento o Convocatoria. En documentos, indique la sociedad, el acto, la razón social y los datos registrales tal como aparecen en el documento. Distinga la planilla PUB del número de trámite. Revise la oficina, tomo, letra, número, año, expediente y fecha antes de continuar."
+        }
+      },
+      {
+        "id": "como-publicar-h2",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "3. Adjunte y revise los archivos"
+        }
+      },
+      {
+        "id": "como-publicar-p2",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Para documentos, adjunte el PDF legible con todas sus páginas. El sistema cuenta los folios y permite revisar el archivo y la cotización. Para convocatorias, adjunte la imagen y el texto solicitado; el logo de la sociedad es opcional."
+        }
+      },
+      {
+        "id": "como-publicar-h3",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "4. Realice el pago"
+        }
+      },
+      {
+        "id": "como-publicar-p3",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Revise el total en bolívares y los datos bancarios vigentes. El importe mostrado incluye el IVA configurado. Haga el Pago Móvil por el importe indicado, sin enviar claves bancarias ni códigos de seguridad. El QR bancario se muestra únicamente cuando administración ha cargado la imagen oficial."
+        }
+      },
+      {
+        "id": "como-publicar-h4",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "5. Reporte la solicitud"
+        }
+      },
+      {
+        "id": "como-publicar-p4",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Complete banco emisor, teléfono con prefijo, fecha del pago y últimos seis dígitos de la referencia. Consulte los Términos y condiciones, marque la aceptación y pulse Reportar solicitud. Reportar el pago no equivale a su aprobación ni a la publicación inmediata."
+        }
+      },
+      {
+        "id": "como-publicar-h5",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "6. Consulte su historial"
+        }
+      },
+      {
+        "id": "como-publicar-p5",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "En Mis publicaciones puede revisar el estado y los motivos de devolución. Si recibe una devolución, corrija el borrador y repórtelo nuevamente. Cuando la edición esté publicada, use Ver edición para consultar el documento final. La programación editorial la administra el Diario."
+        }
+      }
+    ],
+    "footer_html": "<p><a href=\"/login\">Iniciar sesión</a> · <a href=\"/p/preguntas-frecuentes\">Preguntas frecuentes</a></p>"
+  },
+  {
+    "slug": "preguntas-frecuentes",
+    "title": "Preguntas frecuentes",
+    "body_blocks": [
+      {
+        "id": "preguntas-frecuentes-h0",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Qué documentos puedo enviar?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p0",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La plataforma dispone de solicitudes de documentos protocolizados y de convocatorias. Seleccione la categoría y el acto que correspondan al documento. Para confirmar un caso particular, consulte al departamento de Ediciones y Publicaciones."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h1",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Cuántos folios se cobran?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p1",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "En documentos, cada página del PDF cargado se cuenta como un folio. Revise la cantidad detectada y el total del resumen antes de pagar."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h2",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿El total incluye IVA?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p2",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El total de la orden utiliza los precios finales configurados con IVA incluido. La tasa y los importes aplicados quedan registrados en la solicitud."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h3",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Qué referencia de pago debo indicar?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p3",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Para un nuevo reporte de Pago Móvil, introduzca los últimos seis dígitos de la referencia, incluidos los ceros iniciales. Indique también banco emisor, fecha y teléfono desde el que pagó."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h4",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Qué diferencia hay entre PUB y número de trámite?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p4",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La planilla PUB sigue el formato presentado en el formulario. Si su documento identifica el trámite de otra forma, seleccione Número de trámite y transcriba ese identificador."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h5",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Reportar la solicitud publica el documento?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p5",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "No. Administración debe revisar los datos y verificar el pago. La publicación se completa cuando la solicitud se incorpora a una edición y se publica su documento final."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h6",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Cómo corrijo una solicitud devuelta?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p6",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Revise el motivo en Inicio o Mis publicaciones. Abra el borrador, corrija los datos o archivos y repórtelo nuevamente. Un pago anterior que sigue aprobado o por verificar y no ha cambiado se conserva."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h7",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Dónde veo mi publicación?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p7",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "En Mis publicaciones aparece la edición correspondiente. Cuando esté publicada, use Ver edición. También puede consultar las ediciones desde el sitio público."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h8",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Qué sucede si el CVE corresponde a un borrador?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p8",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El CVE y el QR existen desde la creación del borrador para incorporarlos a la diagramación. El enlace no ofrece el PDF ni publicaciones privadas antes de que administración publique la edición."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h9",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Cómo actualizo mis datos?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p9",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "En Perfil puede actualizar los campos habilitados, como la dirección. El nombre o razón social de la cuenta no se modifica desde el perfil del solicitante; consulte a administración para resolver errores de identidad."
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-h10",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "¿Cómo solicito ayuda?"
+        }
+      },
+      {
+        "id": "preguntas-frecuentes-p10",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Use Contacto, seleccione el departamento y facilite su número de orden cuando corresponda. Nunca comparta su contraseña ni claves de su banco."
+        }
+      }
+    ],
+    "footer_html": ""
+  },
+  {
+    "slug": "terminos-y-condiciones",
+    "title": "Términos y condiciones",
+    "body_blocks": [
+      {
+        "id": "terminos-y-condiciones-h0",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Objeto y aceptación"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p0",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Estas condiciones regulan el uso de la plataforma Diario Mercantil de Venezuela y la gestión de solicitudes de publicación. Al crear una cuenta, el solicitante debe consultar y aceptar la versión publicada. La plataforma registra la versión y la fecha de esa aceptación. Los datos institucionales y canales oficiales se muestran en Contacto una vez configurados por administración."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h1",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Cuenta y acceso"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p1",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El usuario debe proporcionar datos correctos y mantener la confidencialidad de su contraseña. Debe utilizar su propia cuenta o actuar con autorización para representar a la persona o sociedad indicada. Si detecta un acceso no reconocido, debe cambiar su contraseña y comunicarlo a administración. El acceso autorizado durante mantenimiento no sustituye el inicio de sesión ni modifica los permisos de la cuenta."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h2",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Documentos y responsabilidad del solicitante"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p2",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El solicitante debe verificar la legibilidad, integridad, exactitud y correspondencia de los archivos y datos remitidos. Debe contar con autorización para solicitar la publicación y aportar la información de terceros que resulte necesaria para esa finalidad. No debe incluir contraseñas, claves bancarias u otros datos ajenos al documento que se publicará. La plataforma no reemplaza el trámite registral ni el asesoramiento jurídico sobre el documento."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h3",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Cotización y pago"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p3",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Antes de pagar, revise los folios, el precio final, la tasa y el total en bolívares de la orden. El precio mostrado utiliza el IVA configurado como incluido. Realice el pago con los datos bancarios mostrados y reporte banco emisor, teléfono, fecha y referencia. El reporte está sujeto a verificación administrativa; no constituye confirmación automática de fondos recibidos."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h4",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Revisión y publicación"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p4",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Una solicitud reportada puede ser revisada, verificada o devuelta para corrección. El motivo de devolución se muestra en la cuenta. La publicación no es inmediata: requiere revisión y la incorporación a una edición cuya versión final debe publicarse por administración. Un CVE generado para un borrador no certifica que la edición ya haya sido publicada."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h5",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Carácter público del documento final"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p5",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El solicitante entiende que los documentos incorporados a una edición publicada podrán ser consultados y descargados desde su enlace público. Antes de reportar la solicitud, debe revisar los datos y archivos que propone publicar. Los borradores y archivos de gestión de la cuenta están sujetos a los controles de acceso del sistema."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h6",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Correcciones, pagos y consultas"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p6",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Si necesita corregir un error antes de publicar, solicite la revisión indicando el número de orden. Cuando corresponda, administración devolverá el borrador para su corrección. Para aclaraciones de pagos, diferencias de importe, anulaciones o correcciones posteriores a la publicación, contacte al departamento correspondiente. Estas consultas requieren revisión del caso; no se prometen plazos, reembolsos ni resultados automáticos desde la interfaz."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h7",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Disponibilidad y cambios"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p7",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El servicio puede restringirse temporalmente por mantenimiento. Administración puede suspender accesos y gestionar solicitudes conforme a sus atribuciones. Las condiciones publicadas pueden actualizarse desde Configuración; cada aceptación registrada conserva su versión. Los cambios de estas condiciones no eliminan derechos reconocidos por la normativa aplicable."
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-h8",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Atención"
+        }
+      },
+      {
+        "id": "terminos-y-condiciones-p8",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Para dudas sobre estas condiciones o una solicitud, use los canales configurados en Contacto y seleccione Administración o Departamento Legal. Conserve su número de orden y los comprobantes de pago."
+        }
+      }
+    ],
+    "footer_html": "<p><a href=\"/p/politicas-de-privacidad\">Políticas de privacidad</a> · <a href=\"/contacto\">Contacto</a></p>"
+  },
+  {
+    "slug": "politicas-de-privacidad",
+    "title": "Políticas de privacidad",
+    "body_blocks": [
+      {
+        "id": "politicas-de-privacidad-h0",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Alcance"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p0",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Esta política describe el tratamiento de la información necesaria para utilizar la plataforma Diario Mercantil de Venezuela, gestionar solicitudes y consultar ediciones. Los datos del operador y los canales de atención se muestran en Contacto cuando administración los configura."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h1",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Información que se utiliza"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p1",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La plataforma utiliza datos de identidad y contacto de la cuenta, documentos y metadatos aportados en las solicitudes, información del pago reportado, aceptación de condiciones y registros de actividad necesarios para administrar y proteger el servicio. Los controles de seguridad pueden registrar direcciones IP e intentos de acceso. No se requieren contraseñas bancarias, códigos de tarjetas ni claves de autenticación del banco."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h2",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Finalidad"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p2",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Los datos se utilizan para autenticar la cuenta, tramitar y revisar solicitudes, verificar pagos, preparar y publicar ediciones, atender consultas y mantener controles de acceso y trazabilidad. Los archivos aportados deben limitarse a la información necesaria para el trámite y la publicación solicitada."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h3",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Acceso y publicación"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p3",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El solicitante accede a los datos de su propia cuenta y solicitudes. El personal autorizado gestiona la información conforme a sus permisos. Los documentos que se incorporan a una edición publicada pasan a estar disponibles mediante el enlace público de esa edición. Antes de enviar su solicitud, revise cualquier dato personal que figure en el documento final."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h4",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Sesiones y seguridad"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p4",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "El sistema utiliza cookies para la sesión, protección de formularios y autorización temporal de mantenimiento. La cookie de mantenimiento autoriza un navegador durante cuatro horas desde su validación y no se amplía por navegación. Las preferencias de interfaz pueden almacenarse en el navegador. Los controles de acceso reducen el acceso indebido, sin constituir una garantía absoluta frente a cualquier incidente."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h5",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Servicios necesarios y contacto"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p5",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La infraestructura de alojamiento, almacenamiento y comunicaciones permite operar el servicio. Al abrir WhatsApp desde Contacto, el mensaje y los datos que decida enviar se procesan también por ese servicio externo. Consulte sus condiciones antes de enviar información sensible."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h6",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Conservación y corrección"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p6",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La suspensión o eliminación administrativa de una cuenta no borra automáticamente las solicitudes, publicaciones, pagos ni registros asociados. Estos registros permiten mantener el historial de la operación y atender las obligaciones aplicables. Las solicitudes de acceso, actualización, rectificación o eliminación deben presentarse por los canales de Contacto para su revisión; una edición ya publicada requiere tratamiento editorial específico."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h7",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Derechos y consultas"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p7",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "Puede solicitar información sobre el uso de sus datos y comunicar errores o inquietudes de privacidad a Administración o Departamento Legal, mediante Contacto. La atención de esas solicitudes se realiza conforme a la normativa aplicable y a la naturaleza de los documentos y registros involucrados."
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-h8",
+        "type": "heading",
+        "props": {
+          "level": 2,
+          "align": "left",
+          "text": "Actualización"
+        }
+      },
+      {
+        "id": "politicas-de-privacidad-p8",
+        "type": "paragraph",
+        "props": {
+          "align": "left",
+          "text": "La versión vigente de esta política se publica en esta página y puede ser editada por administración. Revísela cuando cambie su uso del servicio o vaya a publicar información personal."
+        }
+      }
+    ],
+    "footer_html": "<p><a href=\"/contacto\">Contacto</a> · <a href=\"https://www.oas.org/juridico/PDFs/mesicic4_ven_const_vene.pdf\" target=\"_blank\" rel=\"noopener noreferrer\">Constitución venezolana: artículos 28 y 60</a></p>"
+  }
+]

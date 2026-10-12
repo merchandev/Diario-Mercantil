@@ -1,3 +1,4 @@
+import { fetchApi } from '../lib/transport'
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { IconUser, IconIdCard, IconKey, IconEye, IconEyeOff, IconMail, IconPhone, IconMap } from '../components/icons'
@@ -79,7 +80,7 @@ export default function Register() {
     }
 
     try {
-      const res = await fetch('/api/auth/register', {
+      const res = await fetchApi('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,7 +112,7 @@ export default function Register() {
         localStorage.setItem('user_role', data.user.role || '')
         localStorage.setItem('user_doc', data.user.document || '')
         await refreshUser()
-        navigate('/solicitante/historial')
+        navigate('/solicitante')
       } else {
         // Si no retorna user, redirigir a login
         navigate('/login', { state: { message: 'Cuenta creada exitosamente. Por favor inicie sesión.' } })
