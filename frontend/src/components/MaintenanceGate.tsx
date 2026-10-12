@@ -86,7 +86,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
   return <main className="min-h-screen bg-slate-950 flex items-center justify-center px-5 py-12">
     <Helmet><title>Mantenimiento programado | Diario Mercantil de Venezuela</title><meta name="robots" content="noindex, nofollow" /></Helmet>
     <section className="w-full max-w-lg rounded-3xl bg-white p-7 sm:p-10 shadow-2xl">
-      <p className="text-sm font-semibold tracking-wide text-brand-800">DIARIO MERCANTIL DE VENEZUELA</p>
+      <img src="/Logotipo_Diario_Mercantil.svg" alt="Diario Mercantil de Venezuela" className="h-auto w-64 max-w-full" />
       <div className="mt-8 mb-5 inline-flex rounded-2xl bg-slate-100 p-4 text-brand-800"><Wrench size={32} aria-hidden="true" /></div>
       <h1 className="text-3xl font-semibold text-slate-900">Mantenimiento programado</h1>
       <p className="mt-4 text-slate-600 leading-relaxed">Estamos realizando mejoras en el sistema. El acceso al sitio está temporalmente restringido.</p>
@@ -95,7 +95,6 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
         <input id="maintenance-password" className="input w-full" type="password" required maxLength={1024} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button type="submit" disabled={busy} className="btn btn-primary w-full flex items-center justify-center gap-2"><LockKeyhole size={18} aria-hidden="true" />{busy ? 'Verificando...' : 'Autorizar acceso'}</button>
-        <p className="text-xs text-slate-500 leading-relaxed">El acceso autorizado dura cuatro horas. Durante ese tiempo puede iniciar sesión como administrador o cliente con su cuenta habitual.</p>
         {error && <button type="button" onClick={() => void check()} className="text-sm underline text-brand-800">Comprobar disponibilidad</button>}
       </form>
     </section>
