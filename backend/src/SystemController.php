@@ -61,7 +61,7 @@ class SystemController {
             // Financial Statistics
             try {
                 $stats["revenue_total_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('En trámite', 'Publicada')")->fetchColumn();
-                $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE status IN ('Borrador', 'Por verificar')")->fetchColumn();
+                $stats["revenue_pending_usd"] = (float)$pdo->query("SELECT COALESCE(SUM(COALESCE(subtotal_usd,0) + COALESCE(iva_usd,0)), 0) FROM legal_requests WHERE deleted_at IS NULL AND status IN ('Borrador', 'Por verificar')")->fetchColumn();
             } catch(Throwable $e){
                 error_log("Financial stats error: " . $e->getMessage());
             }

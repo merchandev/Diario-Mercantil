@@ -2,7 +2,7 @@ import { isUnchangedPayment, paymentIdempotency } from '../../lib/legalPayment'
 import { normalizeLegalMeta } from '../../lib/legalMeta'
 import { editorialToday } from '../../lib/editorialDate'
 import { includedVat } from '../../lib/pricing'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { addLegalPayment, attachLegalFile, createLegal, getBcvRate, getSettings, listLegalFiles, me, getLegal, type LegalFile, type LegalRequest, updateLegal, uploadFiles, submitLegal } from '../../lib/api'
 import YearPicker from '../../components/YearPicker'
@@ -24,8 +24,10 @@ type ConvocatoriaPaymentForm = {
 export default function Convocatoria() {
   const { showAlert } = useDialog()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const editId = searchParams.get('id')
+  const loadedId = useRef<number | null>(null)
+  const [draftStatus, setDraftStatus] = useState<{ state: 'idle' | 'saving' | 'saved' | 'error'; at?: string; message?: string }>({ state: 'idle' })
   const [req, setReq] = useState<LegalRequest | undefined>()
   const [meta, setMeta] = useState<any>({})
   const [files, setFiles] = useState<LegalFile[]>([])
@@ -41,7 +43,8 @@ export default function Convocatoria() {
   useEffect(() => { (async () => { try { const r = await me(); const u = (r as any).user || {}; setUser(u); } catch { } })(); }, [])
 
   useEffect(() => {
-    if (!editId) return;
+    if (!editId || loadedId.current === Number(editId)) return;
+    loadedId.current = Number(editId)
     getLegal(Number(editId)).then(data => {
       setReq(data.item);
       let parsedMeta = {};
@@ -66,20 +69,45 @@ export default function Convocatoria() {
     }).catch(console.error)
   }, [editId])
 
-  const ensureDraft = async () => {
-    if (req) return req
-    const r = await createLegal({ status: 'Borrador', pub_type: 'Convocatoria', name: '', document: '', date: editorialToday(), meta })
-    const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Convocatoria', date: editorialToday() }
-    setReq(created)
-    return created
+  const draftMeta = () => ({ ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla })
+
+  // Persists the step 1 data before anything is attached, so a draft reopened
+  // later never has files without the data that was typed for it.
+  const saveDraft = async (): Promise<LegalRequest> => {
+    setDraftStatus({ state: 'saving' })
+    try {
+      let saved = req
+      if (saved) {
+        await updateLegal(saved.id, { meta: draftMeta() })
+      } else {
+        const r = await createLegal({ status: 'Borrador', pub_type: 'Convocatoria', meta: draftMeta() })
+        saved = { id: Number((r as any).id), status: 'Borrador', pub_type: 'Convocatoria', date: editorialToday() } as LegalRequest
+        setReq(saved)
+        loadedId.current = saved.id
+        setSearchParams({ id: String(saved.id) }, { replace: true })
+      }
+      setDraftStatus({ state: 'saved', at: new Date().toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' }) })
+      return saved
+    } catch (e: any) {
+      setDraftStatus({ state: 'error', message: e?.message || 'No se pudo guardar el borrador.' })
+      throw e
+    }
   }
 
-  const onUpload = async (kind: string, filesList: FileList | null) => {
-    if (!filesList) return; const r = await ensureDraft(); const arr = Array.from(filesList) as File[]
-    const up = await uploadFiles(arr)
-    const fileIds = (up.created || []).map((it: any) => it.fileId)
-    for (const fid of fileIds) await attachLegalFile(r.id, fid, kind)
-    const lf = await listLegalFiles(r.id); setFiles(lf.items)
+  const onUpload = async (kind: string, input: HTMLInputElement) => {
+    const filesList = input.files
+    if (!filesList || filesList.length === 0) return
+    try {
+      const r = await saveDraft()
+      const up = await uploadFiles(Array.from(filesList) as File[])
+      const fileIds = (up.created || []).map((it: any) => it.fileId)
+      for (const fid of fileIds) await attachLegalFile(r.id, fid, kind)
+      const lf = await listLegalFiles(r.id); setFiles(lf.items)
+    } catch (e: any) {
+      await showAlert(e?.message || 'No se pudo cargar el archivo.', { title: 'No se pudo guardar' })
+    } finally {
+      input.value = ''
+    }
   }
 
   const totals = useMemo(() => {
@@ -104,7 +132,7 @@ export default function Convocatoria() {
 
     setSending(true)
     try {
-    await updateLegal(req.id, { meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla }, name: meta.razon_social || '', document: meta.rif || '' })
+    await updateLegal(req.id, { meta: draftMeta() })
     if (!paymentUnchanged) await addLegalPayment(req.id, { type: 'pago_movil', bank: pay.bank, ref: pay.ref, date: pay.date, amount_bs: Number(pay.amount_bs || totals.total), status: 'Por verificar', mobile_phone: pay.mobile_phone_prefix + pay.mobile_phone }, paymentIdempotency(req.id, pay))
     await submitLegal(req.id)
     await showAlert('Solicitud de convocatoria enviada para verificación.', { title: 'Solicitud enviada' })
@@ -154,6 +182,15 @@ export default function Convocatoria() {
           <input className="input md:col-span-2" placeholder="Nombres y apellidos del representante legal" value={meta.representante || ''} onChange={e => setMeta({ ...meta, representante: e.target.value })} />
           <input className="input" placeholder="Documento de identidad del representante" value={meta.ci_representante || ''} onChange={e => setMeta({ ...meta, ci_representante: e.target.value })} />
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn btn-outline" disabled={draftStatus.state === 'saving'} onClick={() => { saveDraft().catch(() => { }) }}>
+            {draftStatus.state === 'saving' ? 'Guardando...' : 'Guardar borrador'}
+          </button>
+          <span role="status" className={'text-sm ' + (draftStatus.state === 'error' ? 'text-rose-700' : 'text-green-700')}>
+            {draftStatus.state === 'saved' && `Borrador guardado a las ${draftStatus.at}.`}
+            {draftStatus.state === 'error' && `No se guardó el borrador: ${draftStatus.message}`}
+          </span>
+        </div>
       </div>
 
       <div className="card p-4 space-y-3">
@@ -161,7 +198,7 @@ export default function Convocatoria() {
         <div className="grid md:grid-cols-3 gap-3">
           <label className="text-sm block">
             <span className="font-medium text-slate-700">Convocatoria digitalizada (imagen)</span>
-            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_scan', e.target.files)} />
+            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_scan', e.currentTarget)} />
             {files.find(f => f.kind === 'convocatoria_scan') && (
               <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -171,7 +208,7 @@ export default function Convocatoria() {
           </label>
           <label className="text-sm block">
             <span className="font-medium text-slate-700">Texto de la convocatoria (Word)</span>
-            <input className="input w-full mt-1" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e => onUpload('convocatoria_word', e.target.files)} />
+            <input className="input w-full mt-1" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={e => onUpload('convocatoria_word', e.currentTarget)} />
             {files.find(f => f.kind === 'convocatoria_word') && (
               <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
@@ -181,7 +218,7 @@ export default function Convocatoria() {
           </label>
           <label className="text-sm block">
             <span className="font-medium text-slate-700">Logo de la sociedad (opcional)</span>
-            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_logo', e.target.files)} />
+            <input className="input w-full mt-1" type="file" accept="image/*" onChange={e => onUpload('convocatoria_logo', e.currentTarget)} />
             {files.find(f => f.kind === 'convocatoria_logo') && (
               <div className="mt-1 text-xs text-green-600 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>

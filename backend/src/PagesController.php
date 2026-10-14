@@ -114,13 +114,22 @@ class PagesController {
     Response::json(['ok'=>true]);
   }
 
+  private const PAUSED_SLUGS = ['directorio-legal'];
+
+  // The slug column uses a case- and pad-insensitive collation, so the pause is
+  // checked on the normalized request and again on the slug actually matched.
+  private function isPausedSlug($slug): bool {
+    return in_array(mb_strtolower(trim(rawurldecode((string)$slug)), 'UTF-8'), self::PAUSED_SLUGS, true);
+  }
+
   // Public endpoint by slug
   public function publicGet($slug){
-    if ($slug === 'directorio-legal') return Response::json(['error'=>'module_paused'],404);
+    if ($this->isPausedSlug($slug)) return Response::json(['error'=>'module_paused'],404);
     $pdo = Database::pdo();
     $s = $pdo->prepare("SELECT slug, title, header_html, body_json, footer_html, status, updated_at FROM pages WHERE slug=?");
     $s->execute([$slug]);
     $row = $s->fetch(PDO::FETCH_ASSOC);
+    if ($row && $this->isPausedSlug($row['slug'] ?? '')) return Response::json(['error'=>'module_paused'],404);
     if (!$row || ($row['status'] ?? 'published')!=='published') return Response::json(['error'=>'not_found'],404);
     if ($slug === 'terminos-y-condiciones') {
         require_once __DIR__.'/Services/TermsAcceptanceService.php';

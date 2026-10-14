@@ -478,7 +478,8 @@ export default function Documento() {
           parsedMeta = item.meta || {};
         }
         setMeta(normalizeLegalMeta(parsedMeta));
-        setPay(prev => ({ ...prev, name: item.name || prev.name, document: item.document || prev.document, phone: item.phone || prev.phone, email: item.email || prev.email, address: item.address || prev.address }));
+        // Name and document always come from the account (me); the company is in meta.
+        setPay(prev => ({ ...prev, phone: item.phone || prev.phone, email: item.email || prev.email, address: item.address || prev.address }));
 
         listLegalFiles(item.id).then(r => setFiles(r.items));
 
@@ -541,7 +542,8 @@ export default function Documento() {
   const ensureDraft = async () => {
     if (req) return req
     // Crear el borrador con el mínimo de campos para evitar fallos por metadatos
-    const r = await createLegal({ status: 'Borrador', pub_type: 'Documento', name: '', document: '', date: editorialToday() })
+    // La fecha de solicitud y la identidad del solicitante las asigna el servidor.
+    const r = await createLegal({ status: 'Borrador', pub_type: 'Documento' })
     const created: any = { id: (r as any).id, status: 'Borrador', pub_type: 'Documento', date: editorialToday() }
     setReq(created)
     return created
@@ -641,10 +643,7 @@ export default function Documento() {
       if (req && req.id) {
         // console.log('📝 Actualizando solicitud existente:', req.id)
         await updateLegal(req.id, {
-          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla },
-          name: meta.razon_social || '',
-          document: meta.rif || '',
-          date: meta.fecha || req.date
+          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla }
         })
         // console.log('✓ Solicitud actualizada, cambiando a paso 2')
       } else {
@@ -653,10 +652,7 @@ export default function Documento() {
         const r = await ensureDraft()
         // console.log('✓ Solicitud creada:', r)
         await updateLegal(r.id, {
-          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla },
-          name: meta.razon_social || '',
-          document: meta.rif || '',
-          date: meta.fecha || r.date
+          meta: { ...meta, fecha_registro: meta.fecha, numero_expediente: meta.expediente, numero_planilla: meta.planilla }
         })
         setReq(r) // Asegurar que req esté actualizado
         // console.log('✓ Solicitud actualizada')

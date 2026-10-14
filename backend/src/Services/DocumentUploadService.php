@@ -6,6 +6,7 @@ require_once __DIR__ . '/../Database.php';
 require_once __DIR__ . '/BcvService.php';
 require_once __DIR__ . '/PublicationService.php';
 require_once __DIR__ . '/PdfInspector.php';
+require_once __DIR__ . '/EditorialClock.php';
 
 final class DocumentUploadException extends RuntimeException
 {
@@ -252,7 +253,7 @@ final class DocumentUploadService
             'Borrador',
             (string) ($user['name'] ?? ''),
             (string) ($user['document'] ?? ''),
-            gmdate('Y-m-d'),
+            EditorialClock::today(),
             $folios,
             'Documento',
             (int) $user['id'],

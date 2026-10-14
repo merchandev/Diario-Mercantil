@@ -72,9 +72,40 @@ class LegalController {
     $query->execute([(int)$user['id']]);
     $counts = [];
     foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $row) $counts[$row['status']] = (int)$row['total'];
-    $query = $pdo->prepare("SELECT id,name,meta,status,comment FROM legal_requests WHERE user_id=? AND deleted_at IS NULL AND (status='Publicada' OR (status='Borrador' AND comment IS NOT NULL AND comment<>'')) ORDER BY id DESC LIMIT 12");
-    $query->execute([(int)$user['id']]);
-    return Response::json(['counts'=>$counts,'total'=>array_sum($counts),'notices'=>$query->fetchAll(PDO::FETCH_ASSOC)]);
+    return Response::json(['counts'=>$counts,'total'=>array_sum($counts),'notices'=>$this->applicantNotices($pdo, (int)$user['id'])]);
+  }
+
+  // Each notice is one event (publication or return), identified and ordered by
+  // its audit entry instead of the request id, so an old request published today
+  // is not displaced by newer requests and hiding one event never hides the next.
+  private function applicantNotices(PDO $pdo, int $userId, int $limit = 12): array {
+    $query = $pdo->prepare("SELECT id,name,meta,status,comment,publish_date FROM legal_requests WHERE user_id=? AND deleted_at IS NULL AND (status='Publicada' OR (status='Borrador' AND comment IS NOT NULL AND comment<>''))");
+    $query->execute([$userId]);
+    $notices = $query->fetchAll(PDO::FETCH_ASSOC);
+    if (!$notices) return [];
+
+    $events = [];
+    foreach (array_chunk(array_map(fn($n) => (string)$n['id'], $notices), 500) as $ids) {
+      $placeholders = implode(',', array_fill(0, count($ids), '?'));
+      $stmt = $pdo->prepare("SELECT resource_id,action,MAX(id) AS event_id FROM audit_logs WHERE resource_type='legal_request' AND action IN ('status_changed_to_Publicada','returnToDraft') AND resource_id IN ($placeholders) GROUP BY resource_id,action");
+      $stmt->execute($ids);
+      foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) $events[(string)$row['resource_id'] . ':' . $row['action']] = (int)$row['event_id'];
+    }
+
+    foreach ($notices as &$notice) {
+      $published = $notice['status'] === 'Publicada';
+      $eventId = $events[(string)$notice['id'] . ':' . ($published ? 'status_changed_to_Publicada' : 'returnToDraft')] ?? null;
+      $notice['event_id'] = $eventId;
+      $fallback = $published ? 'd' . (string)($notice['publish_date'] ?? '') : 'c' . substr(hash('sha256', (string)$notice['comment']), 0, 16);
+      $notice['event_key'] = $notice['id'] . ':' . $notice['status'] . ':' . ($eventId !== null ? 'a' . $eventId : $fallback);
+    }
+    unset($notice);
+
+    usort($notices, function (array $a, array $b): int {
+      if (($a['event_id'] === null) !== ($b['event_id'] === null)) return $a['event_id'] === null ? 1 : -1;
+      return [$b['event_id'], (string)($b['publish_date'] ?? ''), (int)$b['id']] <=> [$a['event_id'], (string)($a['publish_date'] ?? ''), (int)$a['id']];
+    });
+    return array_slice($notices, 0, $limit);
   }
 
   public function list(){
@@ -234,26 +265,109 @@ class LegalController {
     }
   }
 
+  // `date` is the request date: a real calendar day that cannot be after the
+  // editorial today. Edition planning dates are validated by EditionController.
+  private function requestDate($value): string {
+    $date = trim((string)$value);
+    $day = DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+    if (!$day || $day->format('Y-m-d') !== $date || $date > EditorialClock::today()) {
+      Response::json(['error'=>'La fecha de la solicitud debe ser válida (AAAA-MM-DD) y no puede ser futura.'], 422);
+    }
+    return $date;
+  }
+
+  // The applicant fields (name/document) always identify the account owner. The
+  // company being published lives in meta (razon_social, rif) and never replaces them.
+  private function withApplicantIdentity(array $in, array $u): array {
+    if (RolePolicy::canManageLegalRequests($u)) return $in;
+    $in['name'] = (string)($u['name'] ?? '');
+    $in['document'] = (string)($u['document'] ?? '');
+    return $in;
+  }
+
+  // Shared normalization/validation of registry metadata for create and update.
+  private function normalizeMeta(array $m): array {
+    $currentYear=(int)substr(EditorialClock::today(),0,4);
+    foreach ($m as $key=>$value) {
+      if (preg_match('/(?:year|anio|ano|año)/ui',(string)$key) && is_numeric($value) && (int)$value > $currentYear) Response::json(['error'=>'El año del documento no puede ser posterior al actual.'],422);
+    }
+    if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
+    if (isset($m['fecha'])) { $m['fecha_registro'] = $m['fecha']; unset($m['fecha']); }
+    if (isset($m['razon_denominacion_social'])) { $m['razon_social'] = $m['razon_denominacion_social']; unset($m['razon_denominacion_social']); }
+    if (isset($m['expediente'])) { $m['numero_expediente'] = $m['expediente']; unset($m['expediente']); }
+    if (isset($m['planilla'])) { $m['numero_planilla'] = $m['planilla']; unset($m['planilla']); }
+
+    if (!empty($m['numero_expediente']) && !preg_match('/^\d{3}-\d{1,8}$/', $m['numero_expediente'])) {
+        Response::json(['error'=>'El expediente debe tener formato 000-00000000'], 400);
+    }
+    if (!empty($m['numero_planilla']) && !preg_match('/^\d{3}\.\d{4}\.\d\.\d{1,6}$/', $m['numero_planilla'])) {
+        Response::json(['error'=>'La planilla debe tener formato 000.0000.0.000000'], 400);
+    }
+    if (isset($m['reference_type']) && !in_array($m['reference_type'], ['pub','tramite'], true)) {
+        Response::json(['error'=>'Seleccione planilla PUB o número de trámite.'],422);
+    }
+    if (!empty($m['numero_tramite'])) {
+        $m['numero_tramite'] = strtoupper(trim((string)$m['numero_tramite']));
+        if (!preg_match('~^[A-Z0-9][A-Z0-9._/ -]{0,63}$~D', $m['numero_tramite'])) {
+            Response::json(['error'=>'El número de trámite admite hasta 64 letras, números, espacios y separadores . _ / -.'],422);
+        }
+    }
+    if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
+        Response::json(['error'=>'El tomo debe ser solo números (máx 3)'], 400);
+    }
+    if (!empty($m['numero']) && !preg_match('/^\d{1,3}$/', (string)$m['numero'])) {
+        Response::json(['error'=>'El número mercantil debe contener entre 1 y 3 dígitos'], 400);
+    }
+    if (!empty($m['anio'])) {
+        $year = (string)$m['anio'];
+        if (!preg_match('/^\d{4}$/', $year) || (int)$year > $currentYear) {
+            Response::json(['error'=>'El año registral debe ser válido y no puede ser superior al año actual'], 400);
+        }
+    }
+    if (!empty($m['tipo_registrador']) && !in_array(strtoupper($m['tipo_registrador']), ['TITULAR', 'SUPLENTE', 'AUXILIAR'])) {
+        Response::json(['error'=>'Tipo de registrador inválido (TITULAR, SUPLENTE, AUXILIAR)'], 400);
+    }
+    if (!empty($m['letra']) && !preg_match('/^[A-E]$/i', $m['letra'])) {
+        Response::json(['error'=>'La letra del tomo debe estar entre A y E'], 400);
+    }
+    if (!empty($m['fecha_registro'])) {
+        $day = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$m['fecha_registro']);
+        if (!$day || $day->format('Y-m-d') !== $m['fecha_registro'] || $m['fecha_registro'] > EditorialClock::today()) {
+            Response::json(['error'=>'La fecha de registro debe ser válida y no futura'], 400);
+        }
+    }
+    foreach (['tipo_sociedad','tipo_acto','razon_social','estado','oficina','registrador','tipo_registrador','letra'] as $key) {
+        if (isset($m[$key]) && is_string($m[$key])) {
+            $m[$key] = mb_strtoupper(trim($m[$key]), 'UTF-8');
+        }
+    }
+    return $m;
+  }
+
   public function create(){
     try {
       $u = AuthController::requireAuth();
       $pdo = Database::pdo();
       $in = json_decode(file_get_contents('php://input'), true) ?: [];
       $this->validateEditorialDates($in);
+      $in = $this->withApplicantIdentity($in, $u);
+      $date = isset($in['date']) && $in['date'] !== '' ? $this->requestDate($in['date']) : EditorialClock::today();
+      $meta = isset($in['meta']) && is_array($in['meta']) ? json_encode($this->normalizeMeta($in['meta'])) : null;
       $status = 'Borrador';
       $uid = (int)$u['id'];
       $now = gmdate('c');
 
-      $stmt = $pdo->prepare('INSERT INTO legal_requests(status,name,document,date,folios,comment,user_id,pub_type,created_at) VALUES(?,?,?,?,?,?,?,?,?)');
+      $stmt = $pdo->prepare('INSERT INTO legal_requests(status,name,document,date,folios,comment,user_id,pub_type,meta,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)');
       $stmt->execute([
          $status,
          $in['name']??'',
          $in['document']??'',
-         $in['date']??gmdate('Y-m-d'),
+         $date,
          (int)($in['folios']??1),
          $in['comment']??null,
          $uid,
          $in['pub_type']??'Documento',
+         $meta,
          $now
       ]);
       Response::json(['ok'=>true,'id'=>$pdo->lastInsertId()]);
@@ -279,63 +393,12 @@ class LegalController {
     }
 
     if (isset($in['meta']) && is_array($in['meta'])) {
-        $m = $in['meta'];
-        $currentYear=(int)substr(EditorialClock::today(),0,4);
-        foreach ($m as $key=>$value) {
-          if (preg_match('/(?:year|anio|ano|año)/ui',(string)$key) && is_numeric($value) && (int)$value > $currentYear) return Response::json(['error'=>'El año del documento no puede ser posterior al actual.'],422);
-        }
-        if (isset($m['año'])) { $m['anio'] = $m['año']; unset($m['año']); }
-        if (isset($m['fecha'])) { $m['fecha_registro'] = $m['fecha']; unset($m['fecha']); }
-        if (isset($m['razon_denominacion_social'])) { $m['razon_social'] = $m['razon_denominacion_social']; unset($m['razon_denominacion_social']); }
-        if (isset($m['expediente'])) { $m['numero_expediente'] = $m['expediente']; unset($m['expediente']); }
-        if (isset($m['planilla'])) { $m['numero_planilla'] = $m['planilla']; unset($m['planilla']); }
-
-        if (!empty($m['numero_expediente']) && !preg_match('/^\d{3}-\d{1,8}$/', $m['numero_expediente'])) {
-            return Response::json(['error'=>'El expediente debe tener formato 000-00000000'], 400);
-        }
-        if (!empty($m['numero_planilla']) && !preg_match('/^\d{3}\.\d{4}\.\d\.\d{1,6}$/', $m['numero_planilla'])) {
-            return Response::json(['error'=>'La planilla debe tener formato 000.0000.0.000000'], 400);
-        }
-        if (isset($m['reference_type']) && !in_array($m['reference_type'], ['pub','tramite'], true)) {
-            return Response::json(['error'=>'Seleccione planilla PUB o número de trámite.'],422);
-        }
-        if (!empty($m['numero_tramite'])) {
-            $m['numero_tramite'] = strtoupper(trim((string)$m['numero_tramite']));
-            if (!preg_match('~^[A-Z0-9][A-Z0-9._/ -]{0,63}$~D', $m['numero_tramite'])) {
-                return Response::json(['error'=>'El número de trámite admite hasta 64 letras, números, espacios y separadores . _ / -.'],422);
-            }
-        }
-        if (!empty($m['tomo']) && !preg_match('/^\d{1,3}$/', $m['tomo'])) {
-            return Response::json(['error'=>'El tomo debe ser solo números (máx 3)'], 400);
-        }
-        if (!empty($m['numero']) && !preg_match('/^\d{1,3}$/', (string)$m['numero'])) {
-            return Response::json(['error'=>'El número mercantil debe contener entre 1 y 3 dígitos'], 400);
-        }
-        if (!empty($m['anio'])) {
-            $year = (string)$m['anio'];
-            if (!preg_match('/^\d{4}$/', $year) || (int)$year > (int)substr(EditorialClock::today(),0,4)) {
-                return Response::json(['error'=>'El año registral debe ser válido y no puede ser superior al año actual'], 400);
-            }
-        }
-        if (!empty($m['tipo_registrador']) && !in_array(strtoupper($m['tipo_registrador']), ['TITULAR', 'SUPLENTE', 'AUXILIAR'])) {
-            return Response::json(['error'=>'Tipo de registrador inválido (TITULAR, SUPLENTE, AUXILIAR)'], 400);
-        }
-        if (!empty($m['letra']) && !preg_match('/^[A-E]$/i', $m['letra'])) {
-            return Response::json(['error'=>'La letra del tomo debe estar entre A y E'], 400);
-        }
-        if (!empty($m['fecha_registro'])) {
-            $day = DateTimeImmutable::createFromFormat('!Y-m-d', (string)$m['fecha_registro']);
-            if (!$day || $day->format('Y-m-d') !== $m['fecha_registro'] || $m['fecha_registro'] > EditorialClock::today()) {
-                return Response::json(['error'=>'La fecha de registro debe ser válida y no futura'], 400);
-            }
-        }
-        foreach (['tipo_sociedad','tipo_acto','razon_social','estado','oficina','registrador','tipo_registrador','letra'] as $key) {
-            if (isset($m[$key]) && is_string($m[$key])) {
-                $m[$key] = mb_strtoupper(trim($m[$key]), 'UTF-8');
-            }
-        }
-        $in['meta'] = $m;
+        $in['meta'] = $this->normalizeMeta($in['meta']);
     }
+    if (array_key_exists('date', $in)) {
+        $in['date'] = $this->requestDate($in['date']);
+    }
+    $in = $this->withApplicantIdentity($in, $u);
 
     // A convocatoria has a final fixed price; capture it before payment/submit.
     $pricingStmt=$pdo->prepare('SELECT pub_type,total_bs FROM legal_requests WHERE id=?'); $pricingStmt->execute([$id]);

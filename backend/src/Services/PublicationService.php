@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/BcvService.php';
+require_once __DIR__ . '/EditorialClock.php';
 
 class PublicationService {
     private PDO $pdo;
@@ -89,7 +90,7 @@ class PublicationService {
         
         $price = $this->calculatePricing($folios);
         $stmt = $this->pdo->prepare("INSERT INTO legal_requests(status,name,document,date,folios,pub_type,user_id,precio_unitario_usd,subtotal_usd,porcentaje_iva,iva_usd,tasa_bcv,fecha_tasa,total_bs,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-        $stmt->execute(['Borrador', $userData['name'], $userData['document'], gmdate('Y-m-d'), $folios, 'Documento', $userData['id'], $price['price_per_folio_usd'], $price['subtotal_usd'], $price['iva_percent'], $price['iva_usd'], $price['bcv_rate'], $now, $price['total_bs'], $now]);
+        $stmt->execute(['Borrador', $userData['name'], $userData['document'], EditorialClock::today(), $folios, 'Documento', $userData['id'], $price['price_per_folio_usd'], $price['subtotal_usd'], $price['iva_percent'], $price['iva_usd'], $price['bcv_rate'], $now, $price['total_bs'], $now]);
         return (int)$this->pdo->lastInsertId();
     }
     

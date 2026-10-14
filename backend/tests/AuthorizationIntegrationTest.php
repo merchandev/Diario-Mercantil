@@ -45,6 +45,7 @@ class AuthorizationIntegrationTest extends TestCase {
         $pdo->exec("ALTER TABLE legal_requests ADD COLUMN verification_date TEXT");
         $pdo->exec("ALTER TABLE legal_requests ADD COLUMN subtotal_usd NUMERIC");
         $pdo->exec("ALTER TABLE legal_requests ADD COLUMN iva_usd NUMERIC");
+        $pdo->exec("ALTER TABLE legal_requests ADD COLUMN folios INTEGER");
         $pdo->exec("ALTER TABLE sessions ADD COLUMN ip_hash TEXT");
         $pdo->exec("ALTER TABLE sessions ADD COLUMN user_agent_hash TEXT");
         $pdo->exec("CREATE TABLE pages(id INTEGER PRIMARY KEY AUTOINCREMENT,slug TEXT UNIQUE,title TEXT,header_html TEXT,body_json TEXT,footer_html TEXT,status TEXT,created_at TEXT,updated_at TEXT)");
@@ -784,6 +785,116 @@ class AuthorizationIntegrationTest extends TestCase {
         $this->assertSame($before['editions'],$after['editions']);
         $this->assertSame($before['editions_published'],$after['editions_published']);
         $this->assertSame($before['publications'],$after['publications']);
+    }
+
+    public function testPendingRevenueExcludesTrashedDrafts(): void {
+        $pdo=Database::pdo();
+        $before=(float)$this->request('GET','/api/stats','admin_session_test')['body']['revenue_pending_usd'];
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,pub_type,subtotal_usd,iva_usd) VALUES(975,2,'Borrador',100,'COTIZADA','2026-01-02','Documento',8.62,1.38)");
+        $quoted=(float)$this->request('GET','/api/stats','admin_session_test')['body']['revenue_pending_usd'];
+        $this->assertEqualsWithDelta($before+10,$quoted,0.001);
+        $pdo->exec("UPDATE legal_requests SET deleted_at='2026-01-03' WHERE id=975");
+        $trashed=(float)$this->request('GET','/api/stats','admin_session_test')['body']['revenue_pending_usd'];
+        $this->assertEqualsWithDelta($before,$trashed,0.001);
+    }
+
+    public function testApplicantIdentityIsNeverReplacedByTheRepresentedCompany(): void {
+        $pdo=Database::pdo();
+        $created=$this->request('POST','/api/legal','user_session_test',['pub_type'=>'Documento','name'=>'EMPRESA REPRESENTADA, C.A.','document'=>'J123456789']);
+        $this->assertSame(200,$created['code'],$created['raw']);
+        $id=(int)$created['body']['id'];
+        $saved=$this->request('PUT','/api/legal/'.$id,'user_session_test',[
+            'meta'=>['razon_social'=>'empresa representada, c.a.','rif'=>'J123456789'],
+            'name'=>'EMPRESA REPRESENTADA, C.A.','document'=>'J123456789'
+        ]);
+        $this->assertSame(200,$saved['code'],$saved['raw']);
+        $item=$this->request('GET','/api/legal/'.$id,'user_session_test')['body']['item'];
+        $this->assertSame('User',$item['name']);
+        $this->assertSame('V456',$item['document']);
+        $this->assertSame('EMPRESA REPRESENTADA, C.A.',json_decode($item['meta'],true)['razon_social']);
+        $this->assertSame('J123456789',json_decode($item['meta'],true)['rif']);
+        // A stored company identity from the old flow is repaired on the next applicant save.
+        $pdo->prepare('UPDATE legal_requests SET name=?,document=? WHERE id=?')->execute(['EMPRESA REPRESENTADA, C.A.','J123456789',$id]);
+        $this->assertSame(200,$this->request('PUT','/api/legal/'.$id,'user_session_test',['meta'=>['razon_social'=>'EMPRESA REPRESENTADA, C.A.']])['code']);
+        $this->assertSame(['User','V456'],array_values($pdo->query('SELECT name,document FROM legal_requests WHERE id='.$id)->fetch(PDO::FETCH_NUM)));
+    }
+
+    public function testConvocatoriaDraftPersistsMetaOnCreationWithSharedValidation(): void {
+        $pdo=Database::pdo();
+        $count=(int)$pdo->query('SELECT COUNT(*) FROM legal_requests')->fetchColumn();
+        $invalid=$this->request('POST','/api/legal','user_session_test',['pub_type'=>'Convocatoria','meta'=>['razon_social'=>'X','expediente'=>'ABC']]);
+        $this->assertSame(400,$invalid['code'],$invalid['raw']);
+        $this->assertSame($count,(int)$pdo->query('SELECT COUNT(*) FROM legal_requests')->fetchColumn());
+        $created=$this->request('POST','/api/legal','user_session_test',['pub_type'=>'Convocatoria','meta'=>[
+            'razon_social'=>'convocatoria de prueba','tipo_convocatoria'=>'Asamblea Ordinaria de accionistas o socios',
+            'fecha'=>'2026-01-02','expediente'=>'391-123','rif'=>'J000000001'
+        ]]);
+        $this->assertSame(200,$created['code'],$created['raw']);
+        $reopened=$this->request('GET','/api/legal/'.(int)$created['body']['id'],'user_session_test');
+        $this->assertSame(200,$reopened['code']);
+        $meta=json_decode($reopened['body']['item']['meta'],true);
+        $this->assertSame('CONVOCATORIA DE PRUEBA',$meta['razon_social']);
+        $this->assertSame('Asamblea Ordinaria de accionistas o socios',$meta['tipo_convocatoria']);
+        $this->assertSame('2026-01-02',$meta['fecha_registro']);
+        $this->assertSame('391-123',$meta['numero_expediente']);
+        $this->assertSame('Convocatoria',$reopened['body']['item']['pub_type']);
+    }
+
+    public function testRequestDateMustBeValidAndNotFuture(): void {
+        $caracas=new DateTimeZone('America/Caracas');
+        $today=(new DateTimeImmutable('now',$caracas))->format('Y-m-d');
+        $tomorrow=(new DateTimeImmutable('now',$caracas))->modify('+1 day')->format('Y-m-d');
+        $this->assertSame(422,$this->request('POST','/api/legal','user_session_test',['date'=>$tomorrow])['code']);
+        $this->assertSame(422,$this->request('POST','/api/legal','user_session_test',['date'=>'2026-02-30'])['code']);
+        $created=$this->request('POST','/api/legal','user_session_test',['pub_type'=>'Documento']);
+        $this->assertSame(200,$created['code'],$created['raw']);
+        $id=(int)$created['body']['id'];
+        $this->assertSame($today,Database::pdo()->query('SELECT date FROM legal_requests WHERE id='.$id)->fetchColumn());
+        $this->assertSame(422,$this->request('PUT','/api/legal/'.$id,'user_session_test',['date'=>$tomorrow])['code']);
+        $this->assertSame(200,$this->request('PUT','/api/legal/'.$id,'user_session_test',['date'=>$today])['code']);
+    }
+
+    public function testNoticesAreIndependentEventsOrderedByEventNotRequestId(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,meta,date,pub_type) VALUES(980,2,'Por verificar',100,'User','{\"razon_social\":\"ANTIGUA C.A.\"}','2026-01-02','Documento')");
+        $returned=$this->request('POST','/api/legal/980/return-to-draft','admin_session_test',['reason'=>'Falta un folio.']);
+        $this->assertSame(200,$returned['code'],$returned['raw']);
+        $notice=fn(array $summary) => array_values(array_filter($summary['body']['notices'],fn($n) => (int)$n['id']===980))[0] ?? null;
+        $returnNotice=$notice($this->request('GET','/api/legal/summary','user_session_test'));
+        $this->assertNotNull($returnNotice);
+        $this->assertSame('Borrador',$returnNotice['status']);
+
+        // Thirteen publications of newer requests whose events happened earlier.
+        for ($id=1500; $id<=1512; $id++) {
+            $pdo->exec("INSERT INTO legal_requests(id,user_id,status,total_bs,name,date,publish_date,pub_type) VALUES($id,2,'Publicada',100,'User','2026-01-02','2026-10-01','Documento')");
+            $pdo->exec("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(1,'status_changed_to_Publicada','legal_request',$id)");
+        }
+        $pdo->exec("UPDATE legal_requests SET status='Publicada',publish_date='2026-10-12',comment=NULL WHERE id=980");
+        $pdo->exec("INSERT INTO audit_logs(actor_user_id,action,resource_type,resource_id) VALUES(1,'status_changed_to_Publicada','legal_request',980)");
+
+        $summary=$this->request('GET','/api/legal/summary','user_session_test');
+        $this->assertSame(200,$summary['code'],$summary['raw']);
+        $this->assertCount(12,$summary['body']['notices']);
+        $this->assertSame(980,(int)$summary['body']['notices'][0]['id']);
+        $publishedNotice=$notice($summary);
+        $this->assertSame('Publicada',$publishedNotice['status']);
+        $this->assertNotSame($returnNotice['event_key'],$publishedNotice['event_key']);
+        $this->assertSame(count($summary['body']['notices']),count(array_unique(array_column($summary['body']['notices'],'event_key'))));
+    }
+
+    public function testPausedDirectoryPageIsBlockedForEverySlugVariant(): void {
+        $pdo=Database::pdo();
+        $pdo->exec("INSERT INTO pages(slug,title,body_json,status) VALUES('directorio-legal','Directorio','[]','published')");
+        try {
+            foreach (['/api/page/directorio-legal','/api/page/DIRECTORIO-LEGAL','/api/page/Directorio-Legal','/api/page/directorio-legal%20'] as $path) {
+                $res=$this->request('GET',$path);
+                $this->assertSame(404,$res['code'],$path);
+                $this->assertSame('module_paused',$res['body']['error'],$path);
+            }
+            $this->assertNotContains('directorio-legal',array_column($this->request('GET','/api/public/pages')['body']['items'] ?? [],'slug'));
+        } finally {
+            $pdo->exec("DELETE FROM pages WHERE slug='directorio-legal'");
+        }
     }
 
     public function testRegistrationRequiresCurrentTermsAndNineCharacters(): void {
